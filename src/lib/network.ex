@@ -103,7 +103,7 @@ defmodule Server do
 
   @doc """
   Function to send a package 'data' to a destination 'dest'.
-  It is assumed that 'dest' is a tuple containing {ip-address, port}
+  It is assumed that 'dest' is a tuple containing { ip-address, port }
   """
   defp send_data( socket, dest, data ) when socket |> is_tuple do
     :gen_udp.send( socket, dest, data )
@@ -133,8 +133,8 @@ defmodule Client do
   def initiate_client() do
     case :gen_udp.open( @client_port, [active: :true, binary: :true, reuseaddr: :true] ) do
       { :ok, socket } ->
-        spawn( fn -> send_data( socket, 5 ) end )
-        loop()
+        send_data( socket, 5 )
+        loop( socket )
 
 
       { :error, reason } ->
@@ -147,14 +147,20 @@ defmodule Client do
   @doc """
   Loop to just check for connection to the server
   """
-  defp loop() do
-    receive {:udp, _socket, ip, port, result} do
-      IO.puts( "Data received is #{result}" )
-    end
+  defp loop( socket ) do
+    case :gen_udp.recv( socket, 0 ) do
+      {:ok, recv_data} ->
 
-    loop()
+        { _, _, packet: packet } = recv_data
+
+        IO.puts("Received the packet #{packet}")
+
+      {:error, reason} ->
+        IO.puts( "Error when reading due to #{reason}" )
+      end
+
+    loop( socket )
   end
-
 
   @doc """
   Function to send an int to the server

@@ -29,15 +29,16 @@ defmodule Server do
   end
 
 
-  def launch_server( port ) when port |> is_integer do
-    # Error-handling when opening the port
-    case :gen_udp.open( port, [active: :false, binary: :true, reuseaddr: :true] ) do
+  def launch_server( port ) when port |> is_integer and port < 30000 do
+    # Gets a kernel-error when using binary: :true as an option
+    case :gen_udp.open( @server_port, [ active: :false, reuseaddr: :true ] ) do
       { :ok, socket } ->
         listen( socket )
 
       { :error, reason } ->
-        IO.puts( "Could not open the port due to #{reason}" )
-        Logger.error( "Could not open the port due to #{reason}" )
+        IO.puts( "Could not open the port #{port} due to #{reason}" )
+        Logger.error( "Could not open the port #{port} due to #{reason}" )
+        launch_server( port + 1 )
     end
   end
 

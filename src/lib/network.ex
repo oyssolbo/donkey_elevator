@@ -11,34 +11,35 @@ defmodule Server do
   require Logger
 
   # Read parameters from a list of IP and PORT-addresses ( TODO )
-  @server_ip {127,0,0,1}
-  @server_port 20012
+  @default_server_ip {127, 0, 0, 1}
+  @default_server_port 20012
+  @default_local_host {255, 255, 255, 255}
   @default_timeout 500
 
 
   @doc """
   Launches the server with an integer value for the port
 
-  launch_server/0 defaults launch_server/1 to @server_port
+  launch_server/0 defaults launch_server/1 to @default_server_port
 
   launch_server/1 takes in a port with value 'port' to launch the server
   at
   """
   def launch_server() do
-    launch_server( @server_port )
+    launch_server( @default_server_port )
   end
 
 
-  def launch_server( port ) when port |> is_integer and port < 30000 do
+  def launch_server( port ) when port |> is_integer do
     # Gets a kernel-error when using binary: :true as an option
-    case :gen_udp.open( @server_port, [ active: :false, reuseaddr: :true ] ) do
+    case :gen_udp.open( @default_server_port, [ active: :false, reuseaddr: :true ] ) do
       { :ok, socket } ->
         listen( socket )
 
       { :error, reason } ->
         IO.puts( "Could not open the port #{port} due to #{reason}" )
         Logger.error( "Could not open the port #{port} due to #{reason}" )
-        launch_server( port + 1 )
+
     end
   end
 
@@ -61,11 +62,10 @@ defmodule Server do
         spawn( fn -> serve_message( recv_data, socket ) end )
 
       { :error, reason } ->
-        Logger.error( "Error occured when listening due to #{reason}" )
-        IO.puts( "Shutting down the socket #{socket}" )
-        shut_down_socket( socket )
+        Logger.error( "Error occured when listening on socket #{socket} due to #{reason}" )
 
     end
+
     listen( socket )
   end
 
@@ -122,11 +122,11 @@ defmodule Client do
   require Logger
 
   # Read parameters from a list of IP and PORT-addresses ( TODO )
-  @server_ip {127,0,0,1}
-  @server_port 20012
+  @default_server_ip {127,0,0,1}
+  @default_server_port 20012
   @default_timeout 500
 
-  @client_port @server_port + 1
+  @client_port @default_server_port + 1
 
   @doc """
   Function to initiate the port and connect to the server
@@ -134,8 +134,8 @@ defmodule Client do
   def initiate_client() do
     case :gen_udp.open( @client_port, [active: :true, binary: :true, reuseaddr: :true] ) do
       { :ok, socket } ->
-        send_data( socket, 5 )
-        loop( socket )
+        spawn( fn -> send_data( socket, 5 ) end )
+        spawn( fn -> loop( socket ) end )
 
 
       { :error, reason } ->
@@ -167,7 +167,7 @@ defmodule Client do
   Function to send an int to the server
   """
   defp send_data( socket, data ) when data |> is_integer and data >= 0 do
-    dest = { @server_ip, @server_port }
+    dest = { @default_server_ip, @default_server_port }
     data_string = Integer.to_string( data )
 
     case :gen_tcp.send( socket, dest, data_string ) do

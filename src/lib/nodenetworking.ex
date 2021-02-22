@@ -1,6 +1,8 @@
 defmodule NodeInit do
   @moduledoc """
-  Module for initializing a node on the
+  Module for initializing a node on the system
+
+  Lot of creditation to Jostein Løwer here...
   """
 
   @doc """

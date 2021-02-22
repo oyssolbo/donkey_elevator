@@ -126,7 +126,7 @@ defmodule Client do
   # Read parameters from a list of IP and PORT-addresses ( TODO )
   @default_server_ip {127,0,0,1}
   @default_server_port 20013
-  @default_timeout 500
+  @default_timeout 1000
 
   @client_port @default_server_port + 1
 

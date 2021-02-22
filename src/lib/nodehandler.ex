@@ -1,5 +1,7 @@
 defmodule NodeNetworking do
-
+  @moduledoc """
+  The original test of node-netwroking.
+  """
 
 
   # Credit to Jostein Løwer: https://github.com/jostlowe/kokeplata/blob/master/lib/networkstuff.ex (22.02.21)

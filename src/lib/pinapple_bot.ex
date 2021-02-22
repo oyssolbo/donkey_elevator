@@ -2,7 +2,7 @@
 defmodule PineappleBot do
   def start do
     Node.start(:"foo@192.168.0.198") #this machine's IP (hostname -I for ip)
-    Node.set_cookie(:cookie_name)
+    Node.set_cookie(:cookie_name) # Throws an error for me...
     spawn(fn -> pineapple_bot() end)
   end
 

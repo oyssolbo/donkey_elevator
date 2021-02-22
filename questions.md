@@ -1,4 +1,8 @@
-### TTK4145
+### Questions regarding networking
+    Should the master be just a server, and the elevator the clients?
 
-This repository contains the elevator-project for TTK4145 at NTNU.
 
+### Questions regarding topology
+
+
+### Other

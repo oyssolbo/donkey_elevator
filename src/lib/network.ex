@@ -11,7 +11,6 @@ defmodule Server do
   require Logger
 
   # Read parameters from a list of IP and PORT-addresses ( TODO )
-  @default_server_ip {127, 0, 0, 1}
   @default_server_port 20012
   @default_local_host {255, 255, 255, 255}
   @default_timeout 500
@@ -32,8 +31,9 @@ defmodule Server do
 
   def launch_server( port ) when port |> is_integer do
     # Gets a kernel-error when using binary: :true as an option
-    case :gen_udp.open( @default_server_port, [ active: :false, reuseaddr: :true ] ) do
+    case :gen_udp.open( @default_server_port, [ :binary, active: :false, reuseaddr: :true ] ) do
       { :ok, socket } ->
+        IO.puts("Listening on port")
         listen( socket )
 
       { :error, reason } ->
@@ -59,6 +59,7 @@ defmodule Server do
   defp listen( socket ) do
     case :gen_udp.recv( socket, 0 ) do
       { :ok, recv_data } ->
+        IO.puts("Data received")
         spawn( fn -> serve_message( recv_data, socket ) end )
 
       { :error, reason } ->
@@ -76,6 +77,7 @@ defmodule Server do
   """
   defp serve_message( { :udp, _socket, ip, port, data }, socket ) do
     # Send an acknowledgement that the data is received
+    IO.puts("Serving message")
     dest = { ip, port }
     result = factorial( String.to_integer( data ) )
     send_data( socket, dest, Integer.to_string( result ) )
@@ -123,7 +125,7 @@ defmodule Client do
 
   # Read parameters from a list of IP and PORT-addresses ( TODO )
   @default_server_ip {127,0,0,1}
-  @default_server_port 20012
+  @default_server_port 20013
   @default_timeout 500
 
   @client_port @default_server_port + 1
@@ -132,8 +134,9 @@ defmodule Client do
   Function to initiate the port and connect to the server
   """
   def initiate_client() do
-    case :gen_udp.open( @client_port, [active: :true, binary: :true, reuseaddr: :true] ) do
+    case :gen_udp.open( @client_port, [:binary, active: :true, reuseaddr: :true] ) do
       { :ok, socket } ->
+        IO.puts("Spawning")
         spawn( fn -> send_data( socket, 5 ) end )
         spawn( fn -> loop( socket ) end )
 
@@ -151,33 +154,57 @@ defmodule Client do
   defp loop( socket ) do
     case :gen_udp.recv( socket, 0 ) do
       {:ok, recv_data} ->
+        IO.puts("Received data")
 
         { _, _, packet: packet } = recv_data
 
         IO.puts("Received the packet #{packet}")
 
       {:error, reason} ->
-        IO.puts( "Error when reading due to #{reason}" )
+        loop(socket)
       end
-
-    loop( socket )
   end
 
   @doc """
   Function to send an int to the server
   """
   defp send_data( socket, data ) when data |> is_integer and data >= 0 do
-    dest = { @default_server_ip, @default_server_port }
+    ip = get_my_ip() |> ip_to_string() # Since on the same machine
+    dest = { ip, @default_server_port }
     data_string = Integer.to_string( data )
+    IO.puts("Trying to send data")
 
     case :gen_tcp.send( socket, dest, data_string ) do
       :ok ->
         send_data( socket, data - 1 )
+        IO.puts("Sending data")
         :ok
       { :error, reason } ->
-        IO.puts( "Error occured due to #{reason}" )
-        :error
+        IO.puts( "Error occured due to #{reason} under transmit" )
     end
   end
 
+  defp get_my_ip(counter \\ 0) when counter < 11 do
+    Process.sleep(100)
+
+    if counter == 10 do
+      IO.puts("Couldn't find my IP")
+    end
+
+    {:ok, socket} = :gen_udp.open(6199, active: false, broadcast: true)
+    :ok = :gen_udp.send(socket, {255, 255, 255, 255}, 6199, "Test packet")
+
+    ip =
+      case :gen_udp.recv(socket, 100, 1000) do
+        {:ok, {ip, _port, _data}} -> ip
+        {:error, _} -> get_my_ip(counter + 1)
+      end
+
+    :gen_udp.close(socket)
+    ip
+  end
+
+  defp ip_to_string(ip) do
+    :inet.ntoa(ip) |> to_string()
+  end
 end

@@ -1,27 +1,25 @@
-defmodule Elevator do
+defmodule Elevator_data do
+
+end
+
+defmodule ElevatorFailure do
   @moduledoc """
-  Module describing one single elevator in the elevator-project
-  """
+  Draft of a module implementing the FSM for failure
 
-  """
-  Required functions:
+  It is chosen to separate this to its own module such that it
+  is easier to add other failure-modes and separate the failure from
+  the rest of the elevator
 
-  Handlers:
-    -input: order
-    -input: obstruction
-    -input: emergency
+  It receives the current elevator-state through message-passing
 
-  Calculate next state given input:
-    -
-
-  Store input and next state before actually switching
-
-  Change the system's state and deliver output
-
-  Must also initialize the elevator when the state is lost
+  Errors that must be handled as of 24.02.21
+  -timeout_door
+  -timeout_elevator_timeout
   """
 
   use GenServer
+  require Logger
+
 
   @node_name              :elevator_fsm   # Name of the node
   @timer_door             3000            # Timer for door                            [ms]
@@ -29,123 +27,119 @@ defmodule Elevator do
   @timer_elevator_stuck   5000            # Timer if elevator stuck in the same spot  [ms]
   @keys [:state, :order, :floor, :dir, :timer]
 
+
   # :state  //  Current elevator_state
   # :order  //  Current elevator_order
   # :floor  //  Current elevator_floor
   # :dir    //  Current elevator_direction
   # _timer  //  Watchdog for either door or timeout
-  defstruct [:state, :order, :floor, :dir, :timer]
+  # priority_order // Random order given to an elevator to detect if the engine
+  #                     can be recovered
+  defstruct :state, :order, :floor, :dir, :timer, :priority_order
 
   # Starting link to the GenServer
   def start_link(init_arg \\ []) do
     GenServer.start_link(__MODULE__, init_arg, name: @name)
   end
 
-  # Initializing the elevator after startup
-  def init_elevator(socket) do
-
-    data = %Elevator{
-      state: :init,
-      order: :nil,
-      floor: :nil,
-      dir: :down,
-      timer: make_ref()
-    }
-
-    # Potentially load last state from elevator. Must check
-    # validity of that state. Check that we have a valid state
-    # and valid data to work with - especially if we have to read
-    # the last saved data from memory
-    # previous_orders = access_orders(self()) # Accessing the orders for this elevator
-    valid_data_check()
-
-
-    # When correctness checked, change the state of HW
-    Driver.set_door_open_light(:off)
-    Driver.set_motor_direction(:down)
-
-    # We must have a function that detects when we come to a floor, and
-    # sets the elevator into the new state
-
-    # Return if correct
-    {:ok, data}
-  end
+  data = %Elevator_data{
+    state: :init,
+    order: :nil,
+    floor: :nil,
+    dir: :down,
+    timer: make_ref(),
+    priority_order: :nil
+  }
 
 
 
-  # Checking the validity of something
-  defp valid_data_check(data) do
-    :ok
-  end
+  ############################### MUST BE AUTOMATED ################################
+  @max_floor 4
+  @min_floor 1
 
 
-  # By using GenServer, we are allowed to overwrite the callback-functions
-
-  # Handlers
+  ################################## Handle calls ##################################
 
   @doc """
-  Get position of elevator during init
+  @brief Function to handle if the door has been open for too long
+          The function tries to shut the door, until the elevator door
+          can be closed again
   """
-  def handle_call(:get_position, _from, %Elevator{state: :init} = data) do
-    {:reply, {:error, :not_ready}, data}
+  def handle_call(:timeout_door, _from,
+        %Elevator_data{state: :emergency} = data) do
+
+    # Must set the cost of the elevator to infty as long as it is in this state
+
+    # Logging the call and switching to :door-state
+    IO.puts("Warning. Door has timeout. Tries to close")
+    Logger.error("Elevator_data timeout :timeout_door")
+    {:reply, {:ok, :door}, data}
   end
+
 
   @doc """
-  Return the elevator's position when at a floor
+  @brief Function to handle if the motor has been destroyed/shut down and the
+          network still has communication. Tries to move the elevator with an
+          executive order
   """
-  def handle_call(:get_position, _from, data) do
-    {:reply, {:ok, data.floor}, data}
-  end
+  def handle_call(:timeout_position, _from,
+        %Elevator_data{state: :emergency, floor: current_floor} = data) do
 
+    # Must set the cost of the elevator to infty as long as it is in this state
 
+    # Logging the error
+    IO.puts("Warning. The elevator has been in the same position for too long. Tries to move")
+    Logger.error("Elevator_data timeout :timeout_position")
 
-  """
-  Just for experimenting/thinking
-
-  Problem is to understand how one can solve the problem with the state-machine
-  """
-  def receive_messages() do
-    # Access internal data
-    state = :nil # or something - however we can check this
-    current_floor = :nil # or something
-
-    # Running the process on its own thread via spawn(), such that we can receive data
-    # from the outside world, like the master/delegator
-    receive do
-      # Receives f.ex. new orders from delegator
-      {:new_order, order: order} ->
-        IO.puts("Serving order #{order}")
-        calculate_next_service(order)
-
-      {:error, _} ->
-          # What to do if an error occurs
-
+    # Calculating the priority-order
+    if current_floor == @max_floor or current_floor == @min_floor do
+      priority_order = @max_floor - @min_floor
+    else
+      priority_order = @min_floor
     end
+    Logger.info("Trying to restore using priority order #{priority_order}")
+
+    # Setting the next-state
+    data.priority_order = priority_order
+
+    {:reply, {:ok, priority_order}, data} # order to priority_floor != current_floor
+  end
 
 
+  @doc """
+  @brief Function to solve if stop-button pressed
+  """
+  def handle_call(:stop_activated, _from,
+        %Elevator_data{state: :emergency} = data) do
 
+    # Must set the cost of the elevator to infty as long as it is in this state
 
-    # We would like to to this infinite
-    fsm()
+    # Must wait until the stop-button is dropped again
+    {:noreply, {:ok, :wait}, data}
 
   end
 
 
-  def fsm(messages, internal_states) do
-    # This function is purely based on the input
+  @doc """
+  @brief Function to handle all other emergency-cases
+  """
+  def handle_call(_, _from,
+        %Elevator_data{state: :emergency} = data) do
 
+    # Must set the cost of the elevator to infty as long as it is in this state
 
-    """
-    But do we really need this when we already use GenServer?
-    By using GenServer we already use CB-functions such that a FSM is
-    constructed via the messages that is received from the external connections.
-
-    In other words, by using a GenServer command, we can design the system such
-    that it creates an abstracted FSM
-    """
+    # Should pherhaps just throw an error such that the elevator can be inited again
+    data.state = :init
+    {:reply, {:error, :init}, data}
 
   end
 
+end
 
+
+defmodule ElevatorDoor do
+  @moduledoc """
+
+  """
 
 end

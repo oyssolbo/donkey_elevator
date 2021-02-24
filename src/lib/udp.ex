@@ -21,12 +21,12 @@ defmodule UDP do
 
 
   @doc """
-  Function for open a socket on port 'port' with args 'args'
+  Function for open a socket on port 'port' with options 'opts'
   """
-  def open_connection(port, args \\ [:binary, active: :false, reuseaddr: :true])
-        when port |> is_integer and args |> is_list do
+  def open_connection(port, opts \\ [:binary, active: :false, reuseaddr: :true])
+        when port |> is_integer and opts |> is_list do
 
-    case :gen_udp.open(port, args) do
+    case :gen_udp.open(port, opts) do
       {:ok, socket} ->
         IO.puts("Opened port on port #{port}")
         {:ok, socket}

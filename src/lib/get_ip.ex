@@ -8,13 +8,22 @@ defmodule GetIP do
   Link: https://github.com/jostlowe/kokeplata/blob/master/lib/networkstuff.ex
   """
 
+  require Logger
+
   @broadcast_address {255, 255, 255, 255}
   @init_port 6789
   @num_tries 5
 
 
   @doc """
-  Function that hopefully returns the IP-address of the system
+  @brief        Function that hopefully returns the IP-address of the system
+
+  @p port       Port we should try to access. Default param set to @init_port
+
+  @retval       RETURNS:                        IF:
+                  ip                            If the IP-address was found
+                  {:error, :could_not_get_ip}   If the IP-address could not be
+                                                resolved
   """
   def get_my_ip(port \\ @init_port) do
     case UDP.open_connection(port, [active: false, broadcast: true]) do
@@ -23,7 +32,7 @@ defmodule GetIP do
 
         case UDP.receive_data(socket) do
           {:recv, {ip, _port, _data}} ->
-            ip
+            {:recv, ip}
           {:error, _} ->
             {:error, :could_not_get_ip}
         end
@@ -34,6 +43,7 @@ defmodule GetIP do
           if port - @init_port < @num_tries do
             get_my_ip(port + 1)
           else
+            Logger.error("Could not find ip-address")
             {:error, :could_not_get_ip}
           end
     end
@@ -41,7 +51,9 @@ defmodule GetIP do
 
 
   @doc """
-  Formats an ip-address to a bytestring
+  @brief        Formats an IP-address to a bytestring
+
+  @p ip         IP-address to convert to a bytestring
   """
   def ip_to_string(ip) do
     :inet.ntoa(ip) |> to_string()

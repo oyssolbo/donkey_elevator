@@ -29,11 +29,11 @@ defmodule UDP do
     case :gen_udp.open(port, args) do
       {:ok, socket} ->
         IO.puts("Opened port on port #{port}")
-        socket
+        {:ok, socket}
       {:error, reason} ->
         IO.puts("An error occurred when opening the port #{port}")
         Logger.error("An error occurred when opening the port #{port}")
-        :nil
+        {:nil, 0}
     end
   end
 
@@ -67,7 +67,7 @@ defmodule UDP do
 
       {:error, reason} ->
         Logger.error("Error occurred when recv packet")
-        :nil
+        {:nil, 0}
     end
   end
 

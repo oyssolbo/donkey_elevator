@@ -1,6 +1,28 @@
-defmodule Elevator_data do
+defmodule ElevatorData do
+  @moduledoc """
+  Module for implementing the struct containing the elevator's data
+  """
 
+  use GenServer
+
+  @node_name            :elevator_data
+  @enforce_keys         [:state, :order, :floor, :dir]
+
+  defstruct [:state, :order, :floor, :dir, :timer]
+
+
+  def create_data_struct() do
+    elevator_data = %ElevatorData{
+      state: :init_state,
+      order: :nil,
+      floor: :nil,
+      dir: :nil
+    }
+
+    {:ok, elevator_data}
+  end
 end
+
 
 defmodule ElevatorFailure do
   @moduledoc """
@@ -18,14 +40,13 @@ defmodule ElevatorFailure do
   """
 
   use GenServer
+
   require Logger
+  require ElevatorData
 
-
-  @node_name              :elevator_fsm   # Name of the node
-  @timer_door             3000            # Timer for door                            [ms]
-  @timer_message          500             # Timer for message lost (pherhaps drop)    [ms]
-  @timer_elevator_stuck   5000            # Timer if elevator stuck in the same spot  [ms]
-  @keys [:state, :order, :floor, :dir, :timer]
+  @node_name              :elevator_failure   # Name of the node
+  @timer_message          500                 # Timer for message lost (pherhaps drop)    [ms]
+  @timer_elevator_stuck   5000                # Timer if elevator stuck in the same spot  [ms]
 
 
   # :state  //  Current elevator_state
@@ -35,21 +56,12 @@ defmodule ElevatorFailure do
   # _timer  //  Watchdog for either door or timeout
   # priority_order // Random order given to an elevator to detect if the engine
   #                     can be recovered
-  defstruct :state, :order, :floor, :dir, :timer, :priority_order
+  # defstruct :state, :order, :floor, :dir, :timer, :priority_order
 
   # Starting link to the GenServer
   def start_link(init_arg \\ []) do
     GenServer.start_link(__MODULE__, init_arg, name: @name)
   end
-
-  data = %Elevator_data{
-    state: :init,
-    order: :nil,
-    floor: :nil,
-    dir: :down,
-    timer: make_ref(),
-    priority_order: :nil
-  }
 
 
 
@@ -66,13 +78,13 @@ defmodule ElevatorFailure do
           can be closed again
   """
   def handle_call(:timeout_door, _from,
-        %Elevator_data{state: :emergency} = data) do
+        %ElevatorData{state: :emergency} = data) do
 
     # Must set the cost of the elevator to infty as long as it is in this state
 
     # Logging the call and switching to :door-state
     IO.puts("Warning. Door has timeout. Tries to close")
-    Logger.error("Elevator_data timeout :timeout_door")
+    Logger.error("ElevatorData timeout :timeout_door")
     {:reply, {:ok, :door}, data}
   end
 
@@ -83,26 +95,50 @@ defmodule ElevatorFailure do
           executive order
   """
   def handle_call(:timeout_position, _from,
-        %Elevator_data{state: :emergency, floor: current_floor} = data) do
+        %ElevatorData{state: :emergency, dir: direction, floor: current_floor} = data) do
 
     # Must set the cost of the elevator to infty as long as it is in this state
 
     # Logging the error
     IO.puts("Warning. The elevator has been in the same position for too long. Tries to move")
-    Logger.error("Elevator_data timeout :timeout_position")
+    Logger.error("ElevatorData timeout :timeout_position")
 
-    # Calculating the priority-order
-    if current_floor == @max_floor or current_floor == @min_floor do
-      priority_order = @max_floor - @min_floor
-    else
-      priority_order = @min_floor
-    end
-    Logger.info("Trying to restore using priority order #{priority_order}")
+    # Calculating which order to add to the queue
+    direction = :nil
+    target_floor = -1
+    case direction do
+      :up ->
+        if current_floor == @max_floor do
+          direction = :down
+          target_floor = @max_floor - 1
+        else
+          target_floor = current_floor + 1
+          direction = :up
+        end
 
-    # Setting the next-state
-    data.priority_order = priority_order
+      :down ->
+        if current_floor == @min_floor do
+          direction = :up
+          target_floor = @min_floor + 1
+        else
+          target_floor = current_floor - 1
+          direction = :down
+        end
 
-    {:reply, {:ok, priority_order}, data} # order to priority_floor != current_floor
+      :nil ->
+        IO.puts("Warning! Should be impossible to accheive this error when stationary")
+        Logger.error("Timeout for movement accheived when stationary")
+        :error
+      end
+
+    # Trying to restore the state by giving an order up or down
+    Logger.info("Trying to restore movement in direction #{direction} with order to floor #{target_floor}")
+
+    # Setting the next order and direction
+    #data.order = target_floor # Need to find a way to do this
+    #data.dir = direction
+
+    {:reply, {:ok, :resolving_motor_error}, data}
   end
 
 
@@ -110,12 +146,12 @@ defmodule ElevatorFailure do
   @brief Function to solve if stop-button pressed
   """
   def handle_call(:stop_activated, _from,
-        %Elevator_data{state: :emergency} = data) do
+        %ElevatorData{state: :emergency} = data) do
 
     # Must set the cost of the elevator to infty as long as it is in this state
 
     # Must wait until the stop-button is dropped again
-    {:noreply, {:ok, :wait}, data}
+    {:noreply, {:ok, :resolving_stop_error}, data}
 
   end
 
@@ -124,13 +160,13 @@ defmodule ElevatorFailure do
   @brief Function to handle all other emergency-cases
   """
   def handle_call(_, _from,
-        %Elevator_data{state: :emergency} = data) do
+        %ElevatorData{state: :emergency} = data) do
 
     # Must set the cost of the elevator to infty as long as it is in this state
 
     # Should pherhaps just throw an error such that the elevator can be inited again
-    data.state = :init
-    {:reply, {:error, :init}, data}
+    #data.state = :init # Same here...
+    #{:reply, {:error, :init}, data}
 
   end
 
@@ -141,5 +177,12 @@ defmodule ElevatorDoor do
   @moduledoc """
 
   """
+
+  use GenServer
+
+  require ElevatorData
+
+  @timer_door             3000                # Timer for door                            [ms]
+
 
 end

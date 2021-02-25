@@ -1,4 +1,4 @@
-defmodule GetIP do
+defmodule IP do
   @moduledoc """
   Module giving basic functions for using networking
 

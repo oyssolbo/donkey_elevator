@@ -1,4 +1,4 @@
-defmodule FunctionNode do
+defmodule SystemNode do
   @moduledoc """
   Module for initializing, discovering and connecting all nodes on the network
 

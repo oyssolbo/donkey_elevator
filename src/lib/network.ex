@@ -6,6 +6,9 @@ defmodule Network do
 
   Credit to: Jostein Løwer, NTNU (2019)
   Link: https://github.com/jostlowe/kokeplata/blob/master/lib/networkstuff.ex
+
+  Dependencies:
+  -UDP
   """
 
   require Logger

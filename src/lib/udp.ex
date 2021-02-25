@@ -1,19 +1,26 @@
 defmodule UDP do
   @moduledoc """
-  Basic module for implementing some quick UDP-functions
+  Module for implementing some quick-and-dirty UDP-functions
   """
-
 
   require Logger
 
-
+  @doc """
+  @local_port             Default port to open
+  @broadcast_address      Address required to broadcast
+  @default_timeout        How long to wait before resending [ms]
+  """
   @local_port 20012
   @broadcast_address {255, 255, 255, 255}
   @default_timeout 500
 
 
   @doc """
-  Function for opening a standard port
+  @brief        Function that opens socket at the port @local_port
+
+  @retval       RETURNS:                        IF:
+                  {:ok, socket}                 If socket opened
+                  {:nil, 0}                     If an error occured
   """
   def open_connection() do
     open_connection(@local_port)
@@ -21,7 +28,15 @@ defmodule UDP do
 
 
   @doc """
-  Function for open a socket on port 'port' with options 'opts'
+  @brief        Function that opens socket at the port @local_port
+
+  @param port   Port to be opened. Must be integer
+  @param opts   Options for the port. Must be a list. If none given, defaults to
+                  [:binary, active: :false, reuseaddr: :true]
+
+  @retval       RETURNS:                        IF:
+                  {:ok, socket}                 If socket opened
+                  {:nil, 0}                     If an error occured
   """
   def open_connection(port, opts \\ [:binary, active: :false, reuseaddr: :true])
         when port |> is_integer and opts |> is_list do
@@ -39,16 +54,26 @@ defmodule UDP do
 
 
   @doc """
-  Function for sending the packet 'packet' from 'from_socket' to 'to_socket'
+  @brief        Function that sends data
+
+  @param from_socket  Socket to send from
+  @param to_socket    Socket to send to
+  @param packet       Data to be sent between the sockets
+
+
+  @retval       RETURNS:                        IF:
+                  {:ok, socket}                 If socket opened
+                  {:nil, 0}                     If an error occured
   """
-  def send_data(from_socket, to_socket, packet) when from_socket |> is_tuple do
+  def send_data(from_socket, to_socket, packet)
+        when from_socket |> is_tuple and to_socket |> is_tuple do
     Logger.info("Sent packet #{packet} from #{from_socket} to #{to_socket}")
     :gen_udp.send(from_socket, to_socket, packet)
   end
 
 
   @doc """
-  Function that handles if we are not given correct socket-syntax
+  @brief        Function to handle if not correct socket-syntax
   """
   def send_data(_, _, _) do
     IO.puts("The values 'from_socket' and 'to_socket' must be tuples")
@@ -57,7 +82,13 @@ defmodule UDP do
 
 
   @doc """
-  Function for reading local data
+  @brief        Function for reading data received on a socket
+
+  @param socket Socket to analyze new data
+
+  @retval       RETURNS:                        IF:
+                  {:recv, recv_packet}          If packet received
+                  {:nil, 0}                     If an error occured
   """
   def receive_data(socket) do
     case :gen_udp.recv(socket, 0, @default_timeout) do
@@ -73,7 +104,9 @@ defmodule UDP do
 
 
   @doc """
-  Function for closing the socket 'socket'
+  @brief        Function closing socket
+
+  @param socket Socket to close
   """
   def close_socket(socket) do
     :gen_udp.close(socket)

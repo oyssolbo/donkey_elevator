@@ -6,17 +6,17 @@ defmodule ElevatorData do
   use GenServer
 
   @node_name            :elevator_data
-  @enforce_keys         [:state, :order, :floor, :dir]
+  #@enforce_keys         [:state, :order, :floor, :dir, :cost]
 
-  defstruct [:state, :order, :floor, :dir, :timer]
+  #defstruct [:state, :order, :floor, :dir, :cost]
 
-
-  def create_data_struct() do
+  def init(:elevator_data) do
     elevator_data = %ElevatorData{
-      state: :init_state,
+      state: :nil,
       order: :nil,
       floor: :nil,
       dir: :nil
+      #cost: :nil
     }
 
     {:ok, elevator_data}
@@ -37,6 +37,7 @@ defmodule ElevatorFailure do
   Errors that must be handled as of 24.02.21
   -timeout_door
   -timeout_elevator_timeout
+  -stop
   """
 
   use GenServer
@@ -81,6 +82,7 @@ defmodule ElevatorFailure do
         %ElevatorData{state: :emergency} = data) do
 
     # Must set the cost of the elevator to infty as long as it is in this state
+
 
     # Logging the call and switching to :door-state
     IO.puts("Warning. Door has timeout. Tries to close")

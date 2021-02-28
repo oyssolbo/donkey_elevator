@@ -45,4 +45,21 @@ defmodule Matriks do
         do: do_to_list(value)
   end
   defp do_to_list(other), do: other
+
+  # Utility functions for elevator-related modules
+  def falseOrderMatrix do
+    from_list([[false, false, false, false], [false, false, false, false], [false, false, false,false]])
+  end
+  def rndOrderMatrix do
+    from_list([[Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])], 
+               [Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])], 
+               [Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])]])
+  end
+  def orderMatrixOR(mn, mo) do
+      [[mn[0][0] or mo[0][0], mn[0][1] or mo[0][1], mn[0][2] or mo[0][2], mn[0][3] or mo[0][3]],
+       [mn[1][0] or mo[1][0], mn[1][1] or mo[1][1], mn[1][2] or mo[1][2], mn[1][3] or mo[1][3]],
+       [mn[2][0] or mo[2][0], mn[2][1] or mo[2][1], mn[2][2] or mo[2][2], mn[2][3] or mo[2][3]]]
+  end
 end
+
+

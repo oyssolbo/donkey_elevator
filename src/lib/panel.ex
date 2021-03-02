@@ -1,18 +1,20 @@
+# Should one import, or should one try to use require inside the Module? What is the difference here?
+
 #import Driver
 import Matriks
 
 defmodule Panel do
     @state_map  %{:on => true, :off => false}
-    
+
     def init(mid, eid) do
         checkerID = spawn(fn -> orderChecker(Matriks.falseOrderMatrix) end)
-        senderID = spawn(fn -> orderSender(mid, eid, 0), checkerID end)
+        senderID = spawn(fn -> orderSender(mid, eid, checkerID, 0, Matriks.falseOrderMatrix) end)
         {senderID, checkerID}
     end
 
 
     defp orderChecker(oldOrderMatrix) do
-        
+
         # Update order matrix by reading all HW order buttons
         [newUp, newDown, newCab] = [upChecker, downChecker, cabChecker]
         newOrderMatrix = Matriks.from_list([newUp, newDown, newCab])
@@ -37,6 +39,7 @@ defmodule Panel do
         if outGoingMatrix != Matriks.falseOrderMatrix do
 
             # ... send the respective  orders to master and elevator
+            # Should have an enum or variable indicating idx for master and idx for elevator
             send(mid, {self(), :newOrders, sendID, [Matriks.to_list(outGoingMatrix[0]), Matriks.to_list(outGoingMatrix[1])]})
             send(eid, {self(), :newOrders, sendID, Matriks.to_list(outGoingMatrix[2])})
 
@@ -44,6 +47,9 @@ defmodule Panel do
             receive do
                 {:ack, from, sentID} ->
                     # When ack is recieved, send ack back. Send request to checker for latest order matrix
+                    """
+                    Shouldn't really be necessary! See what I wrote on miro
+                    """
                     send(from, {:ack, sentID})
                     send(checkerAddr, {:gibOrdersPls, self()})
                     receive do
@@ -53,10 +59,11 @@ defmodule Panel do
                     end
                 # If no ack is received after 1.5 sec: Recurse and repeat
                 after
+                    # Should have the timer as a standard-value
                     1500 -> orderSender(mid, eid, checkerAddr, sendID, outGoingMatrix)
             end
 
-        else 
+        else
             # If order matrix is empty, send request to checker for latest orders. Recurse with those (but same sender ID)
             send(checkerAddr, {:gibOrdersPls, self()})
                     receive do
@@ -64,7 +71,7 @@ defmodule Panel do
                             orderSender(mid, eid, checkerAddr, sendID, updatedMatrix)
                     end
         end
-     
+
     end
 
 
@@ -95,7 +102,5 @@ end
     UP    [ 0  0  0  0 ]
     DOWN  [ 0  0  0  0 ]
     CAB   [ 0  0  0  0 ]
-
     Enum.random {0, 1}
-
 """

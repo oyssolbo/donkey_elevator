@@ -6,7 +6,7 @@ defmodule Panel do
     
     def init(mid, eid) do
         checkerID = spawn(fn -> orderChecker(Matriks.falseOrderMatrix) end)
-        senderID = spawn(fn -> orderSender(mid, eid, 0), checkerID end)
+        senderID = spawn(fn -> orderSender(mid, eid, checkerID, 0, Matriks.falseOrderMatrix) end)
         {senderID, checkerID}
     end
 

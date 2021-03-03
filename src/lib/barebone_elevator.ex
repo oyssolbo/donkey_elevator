@@ -41,7 +41,10 @@ defmodule BareElevator do
     Driver.set_motor_direction(:stop)
   end
 
-
+  def update_floor() do
+    Driver.get_floor_sensor_state() |> at_floor()
+  end
+  
   # Function that checks if we are at a floor. Messages the FSM which floor we are at
   def at_floor(floor) when floor |> is_integer do
     GenServer.cast(@node_name, {:at_floor, floor})

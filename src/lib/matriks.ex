@@ -1,15 +1,15 @@
 defmodule Matriks do
-    
-    @moduledoc """
+
+  @moduledoc """
   Helpers for working with multidimensional lists, also called matrices.
   Stolen from https://blog.danielberkompas.com/2016/04/23/multidimensional-arrays-in-elixir/
   """
 
   @doc """
   Converts a multidimensional list into a zero-indexed map.
-  
+
   ## Example
-  
+
       iex> list = [["x", "o", "x"]]
       ...> Matriks.from_list(list)
       %{0 => %{0 => "x", 1 => "o", 2 => "x"}}
@@ -28,9 +28,9 @@ defmodule Matriks do
 
   @doc """
   Converts a zero-indexed map into a multidimensional list.
-  
+
   ## Example
-  
+
       iex> matrix = %{0 => %{0 => "x", 1 => "o", 2 => "x"}}
       ...> Matriks.to_list(matrix)
       [["x", "o", "x"]]
@@ -47,19 +47,17 @@ defmodule Matriks do
   defp do_to_list(other), do: other
 
   # Utility functions for elevator-related modules
-  def falseOrderMatrix do
+  def false_order_matrix do
     from_list([[false, false, false, false], [false, false, false, false], [false, false, false,false]])
   end
-  def rndOrderMatrix do
-    from_list([[Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])], 
-               [Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])], 
+  def rnd_order_matrix do
+    from_list([[Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])],
+               [Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])],
                [Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])]])
   end
-  def orderMatrixOR(mn, mo) do
+  def order_matrix_OR(mn, mo) do
       [[mn[0][0] or mo[0][0], mn[0][1] or mo[0][1], mn[0][2] or mo[0][2], mn[0][3] or mo[0][3]],
        [mn[1][0] or mo[1][0], mn[1][1] or mo[1][1], mn[1][2] or mo[1][2], mn[1][3] or mo[1][3]],
        [mn[2][0] or mo[2][0], mn[2][1] or mo[2][1], mn[2][2] or mo[2][2], mn[2][3] or mo[2][3]]]
   end
 end
-
-

@@ -1,0 +1,4 @@
+%{
+  "gen_sm": {:git, "https://github.com/ericentin/gen_state_machine", "77776ec405364573ad63b1e07d1541ec057e40f9", []},
+  "gen_state_machine": {:git, "https://github.com/ericentin/gen_state_machine", "77776ec405364573ad63b1e07d1541ec057e40f9", []},
+}

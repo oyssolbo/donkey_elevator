@@ -12,7 +12,7 @@ defmodule ElevatorData do
 
   def init(:elevator_data) do
     elevator_data = %ElevatorData{
-      state: :nil,
+      state: :init,
       order: :nil,
       floor: :nil,
       dir: :nil

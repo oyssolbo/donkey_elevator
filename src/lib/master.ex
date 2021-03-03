@@ -1,6 +1,6 @@
-defmodule Master do
-  @moduledoc """
-  Module implement the code for the master-module
-  """
+# defmodule Master do
+#   @moduledoc """
+#   Module implement the code for the master-module
+#   """
 
-end
+# end

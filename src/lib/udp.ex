@@ -95,9 +95,8 @@ defmodule UDP do
       {:ok, recv_packet} ->
         Logger.info("Received #{recv_packet} on #{socket}")
         {:recv, recv_packet}
-
       {:error, reason} ->
-        Logger.error("Error occurred when recv packet")
+        Logger.error("Error occurred when recv packet due to #{reason}")
         {:nil, 0}
     end
   end

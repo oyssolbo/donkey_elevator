@@ -87,7 +87,7 @@ defmodule Panel do
         [floor1, floor2, floor3, floor4] = [Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])]
     end
 
-    defp orderMatrixUpdater(mn, mo) do
+    defp order_matrix_updater(mn, mo) do
         updated = [[mn[0][0] or mo[0][0], mn[0][1] or mo[0][1], mn[0][2] or mo[0][2], mn[0][3] or mo[0][3]],
                    [mn[1][0] or mo[1][0], mn[1][1] or mo[1][1], mn[1][2] or mo[1][2], mn[1][3] or mo[1][3]],
                    [mn[2][0] or mo[2][0], mn[2][1] or mo[2][1], mn[2][2] or mo[2][2], mn[2][3] or mo[2][3]]]

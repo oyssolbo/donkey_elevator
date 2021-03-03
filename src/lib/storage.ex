@@ -5,7 +5,7 @@ defmodule Storage do
     @moduledoc """
     Rudamentary file storage module. Allows sent data to be written to file, or read from it.
     Use atoms :write or :read to tell it what you want. Be sure to include MasterID and versionID
-    as arguments. 
+    as arguments.
 
     For write, returns IDs of attempted write, as well as whether it succeeded (as message).
 
@@ -15,7 +15,7 @@ defmodule Storage do
     """
     @doc """
     Writes to or reads from file.
-  
+
     ## Example
         Write:
       iex> strg = Storage.init
@@ -25,24 +25,24 @@ defmodule Storage do
       send(strg, {self(), :read})
     """
     def init() do
-        spawn(fn -> storMod() end)
+        spawn(fn -> storage_module() end)
     end
 
-    defp storMod do
+    defp storage_module do
         receive do
-            {from,:write, data, masterID, versID} -> 
-                dataTag = Enum.join(["\nMasterID: ", masterID, ", Version ID: ", versID])
-                writeData = Enum.join([data, dataTag])
-                result = File.write("saveData.txt", writeData)
-                send(from, {:Storage, dataTag, result})
-                storMod()
+            {from,:write, data, masterID, versID} ->
+                data_tag = Enum.join(["\nMasterID: ", masterID, ", Version ID: ", versID])
+                write_data = Enum.join([data, data_tag])
+                result = File.write("save_data.txt", write_data)
+                send(from, {:Storage, data_tag, result})
+                storage_module()
 
-            {from, :read} -> 
-                send(from, {:Storage, File.read("saveData.txt")})  
-                storMod()
+            {from, :read} ->
+                send(from, {:Storage, File.read("save_data.txt")})
+                storage_module()
 
         end
-        
+
     end
 
 @doc """

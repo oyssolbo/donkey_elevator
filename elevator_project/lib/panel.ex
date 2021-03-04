@@ -16,7 +16,7 @@ defmodule Panel do
     defp order_checker(old_order_matrix) do
 
         # Update order matrix by reading all HW order buttons
-        [new_up, new_down, new_cab] = [up_checker, down_checker, cab_checker]
+        [new_up, new_down, new_cab] = [up_checker(), down_checker(), cab_checker()]
         new_order_matrix = Matriks.from_list([new_up, new_down, new_cab])
         updated_matrix = Matriks.orderMatrixOR(old_order_matrix, new_order_matrix)
 

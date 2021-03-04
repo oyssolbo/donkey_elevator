@@ -50,6 +50,9 @@ defmodule BareElevator do
 
     # Set direction down
     Driver.set_motor_direction(:down)
+
+
+
   end
 
 
@@ -115,10 +118,15 @@ defmodule BareElevator do
         %BareElevator{dir: :down} = elevator_data) do
     {:next_state, :idle_state, reached_floor_limit()}
   end
+
+
   def handle_event(:cast, {:at_floor, floor = @max_floor}, :moving_state,
   %BareElevator{dir: :up} = elevator_data) do
     {:next_state, :idle_state, reached_floor_limit()}
   end
+
+
+
 
 
 ################################################ Actions ######################################################

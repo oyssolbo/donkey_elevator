@@ -71,6 +71,13 @@ defmodule UDP do
     :gen_udp.send(from_socket, to_socket, packet)
   end
 
+  def send_data(from_socket, ip, port, packet) do
+    #when from_socket |> is_tuple and to_socket |> is_tuple do
+    #Logger.info("Sent packet #{packet} from #{from_socket} to #{ip} on port #{port}")
+    :gen_udp.send(from_socket, {255,255,255,255}, 6789, "test packet")
+end
+
+
 
   @doc """
   @brief        Function to handle if not correct socket-syntax

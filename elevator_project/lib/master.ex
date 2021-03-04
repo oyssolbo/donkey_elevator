@@ -74,12 +74,12 @@ defmodule Master do
     start_link({:init_state, master_data})
 
     # Must include a way to init master node and throw error if true
-    name = to_string(@node_name) <> to_string(Master[:activation_time])
+    name = to_string(@node_name) #<> to_string(Master[:activation_time])
     case SystemNode.start_node(name, @default_cookie) do
       pid ->
         # Successfull in starting a distributed node
         # Connecting to other nodes
-        SystemNodes.connect_nodes(pid)
+        SystemNode.connect_nodes(pid)
 
         # Spawning a function to detect
         spawn(fn-> check_external_nodes() end)

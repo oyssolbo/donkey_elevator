@@ -16,26 +16,43 @@ defmodule SystemNode do
   @brief            Initializing a node
 
   @param name       Start of the node's name. Concatinated with the node's IP-address
-  @param module     The module of the corresponding @p function
-  @param function   Given function the node should spawn
-  @param args       The given parameters to the function
-  @param opts       Given options for
+  @param cookie     The cookie of the network the node should listen to
 
-  @retval           Returns the PID (sadly not -controller) of the spawned function
+  @retval       RETURNS:              IF:
+                  :pid                  If started in distributed mode
+                  self()                If not possible to start in distributed mode
   """
-  def start_node(name, module, function, args \\ [], opts \\ []) do
+  def start_node(name, cookie) when name |> is_string and cookie |> is_atom do
     # Accessing ip, starting node and setting cookie
     {:recv, ip} = GetIP.get_ip()
     name = name <> ip
-    pid = Node.start(name, :longnames, @default_tick_time)
-    Node.set_cookie(pid, :ttk4145_30)
+    case Node.start(name, :longnames, @default_tick_time) do
+      {:ok, pid} ->
+        Node.set_cookie(pid, cookie)
+        pid
+      {:error, _} ->
+        Logger.error("An error occured when starting the node #{name} as a distributed node")
+        {:error, self()}
+    end
+  end
 
+  @doc """
+  @brief            Connecting a node to a function
+
+  @param pid        Process ID of the node to be spawned
+  @param module     The module of the corresponding @p function
+  @param function   Given function the node should spawn
+  @param args       The given parameters to the function
+  @param opts       Given options for spawning
+
+  @retval           Returns the PID (sadly not -controller) of the spawned function
+  """
+  def node_spawn_function(pid, module, function, args \\ [], opts \\ []) do
     # Spawning desired function
     pid = Node.spawn(pid, module, function, args, opts)
     Logger.info("Node spawned")
     pid
   end
-
 
   @doc """
   @brief        Closing a given node. The other nodes on the distributed system will

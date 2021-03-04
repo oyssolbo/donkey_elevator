@@ -22,7 +22,7 @@ defmodule SystemNode do
                   :pid                  If started in distributed mode
                   self()                If not possible to start in distributed mode
   """
-  def start_node(name, cookie) when name |> is_string and cookie |> is_atom do
+  def start_node(name, cookie) when name and cookie |> is_atom do
     # Accessing ip, starting node and setting cookie
     {:recv, ip} = GetIP.get_ip()
     name = name <> ip

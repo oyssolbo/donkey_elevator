@@ -10,9 +10,9 @@ defmodule BareElevator do
     - Network
   """
 
-  use Logger
   use GenStateMachine
 
+  require Logger
   require Driver
 
   @min_floor 0

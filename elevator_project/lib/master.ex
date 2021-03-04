@@ -13,18 +13,18 @@ defmodule Master do
     - Storage
   """
 
-  use Logger
   use GenStateMachine
 
-  require Elevator
+  require Logger
   require Driver
   require Network
   require Matriks
   require Panel
   require Storage
   require SystemNode
+  require BareElevator
 
-  """
+  @doc """
   The module must check if there are any other masters active during startup
   and then possibly change state accordingly
 
@@ -44,10 +44,10 @@ defmodule Master do
   @default_check_time_ms 2000
 
   @node_name :master
-  @enforce_keys [:active_orders, :connected_elevators, :node_timers, :activation_time,
+  @enforce_keys [:active_orders, :connected_externals, :node_timers, :activation_time,
                   :pid, :masterID, :versID]
 
-  defstruct [:active_orders, :connected_elevators, :node_timers, :activation_time,
+  defstruct [:active_orders, :connected_externals, :node_timers, :activation_time,
                   :pid, :masterID, :versID]
 
 
@@ -65,6 +65,7 @@ defmodule Master do
       connected_externals: :nil,
       node_timers: :nil,
       activation_time: make_ref(),
+      pid: :nil, # Change this (?)
       masterID: :nil, # change this
       versID: :nil # and this
     }

@@ -69,7 +69,7 @@ defmodule Network do
 
   @retval       RETURNS:                      IF:
                   nodes                         If nodes discovered
-                  {:error, :node_not_running}   If nodes not running
+                  {:error, :node_not_running}   If no nodes discovered
   """
   def detect_nodes() do
     case [Node.self() | Node.list()] do

@@ -10,7 +10,9 @@ defmodule BareElevator do
     - Network
   """
 
+  use Logger
   use GenStateMachine
+
   require Driver
 
   @min_floor 0
@@ -37,6 +39,8 @@ defmodule BareElevator do
       dir: :down,
       timer: make_ref()
     }
+
+    # Must have a way to init the elevator-node
 
     # Starting a link to the server (connects the module to the server)
     start_link({:init_state, elevator_data})
@@ -74,7 +78,8 @@ defmodule BareElevator do
   """
   def handle_event(:cast, {:received_order, order}) do
     # Do something
-    # Unsure how this will work
+    # Unsure how this will work and how to even store the current orders given
+    # to the elevator
   end
 
 

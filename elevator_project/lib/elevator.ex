@@ -10,15 +10,14 @@
 
 #   #defstruct [:state, :order, :floor, :dir, :cost]
 
-
-  # def init(:elevator_data) do
-  #   elevator_data = %ElevatorData{
-  #     state: :init,
-  #     order: :nil,
-  #     floor: :nil,
-  #     dir: :nil
-  #     #cost: :nil
-  #   }
+#   def init(:elevator_data) do
+#     elevator_data = %ElevatorData{
+#       state: :init,
+#       order: :nil,
+#       floor: :nil,
+#       dir: :nil
+#       #cost: :nil
+#     }
 
 #     {:ok, elevator_data}
 #   end

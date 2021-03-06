@@ -59,7 +59,7 @@ defmodule Master do
   of the module
   """
   def init() do
-    # Set correct elevator-state
+    # Set correct master-state
     master_data = %Master{
       active_orders: :nil,
       connected_externals: :nil,
@@ -85,7 +85,7 @@ defmodule Master do
         spawn(fn-> check_external_nodes() end)
 
         # Changing state
-        GenStateMachine.cast({:read_memory, master_data})
+        GenStateMachine.cast(@node_name, {:read_memory, master_data})
 
       {:error, _} ->
         # Not successful in starting a distributed node
@@ -99,8 +99,11 @@ defmodule Master do
   Function for terminating the server
   """
   def terminate(_reason, _state) do
-    :error
+    Logger.info("Master given orders to terminate. Terminating")
+    Process.exit(self(), :normal)
   end
+
+  ############################################### Events ################################################
 
 
   @doc """
@@ -111,6 +114,28 @@ defmodule Master do
     GenStateMachine.start_link(__MODULE__, init_arg, server_opts)
   end
 
+
+  @doc """
+  Function to read the existing data in the memory, such that the server is up
+  to date and can take descisions
+  """
+  def handle_event(:cast, {:read_memory, _}, :init_state, master_data) do
+    # Must read from the Storage in some way, but unsure how
+
+    # And which state should we transfer into?
+    {:next_state, :backup_state, master_data}
+  end
+
+  @doc """
+  Function to handle the event of a restart
+  """
+  def handle_event(:cast, :restart, _, _) do
+    Process.exit(self(), :normal)
+  end
+
+
+
+  ############################################## Actions #################################################
 
   @doc """
   Function to check after other nodes on the network excluding one self
@@ -124,28 +149,9 @@ defmodule Master do
         check_external_nodes()
       {:error, _} ->
         Logger.info("No nodes detected. Master is restarting")
-        GenStateMachine.cast(:restart)
+        GenStateMachine.cast(@node_name, :restart)
     end
   end
-
-
-  @doc """
-  Function to read the existing data in the memory, such that the server is up
-  to date and can take descisions
-  """
-  def handle_event(:cast, {:read_memory, master_data}) do
-    # Must read from the Storage in some way, but unsure how
-
-    # And which state should we transfer into?
-    {:next_state, :backup_state, master_data}
-  end
-
-  @doc """
-
-  """
-
-
-
 
 
 

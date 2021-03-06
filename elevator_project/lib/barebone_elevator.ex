@@ -67,7 +67,9 @@ defmodule BareElevator do
   Function to stop the elevator in case of the GenStateMachine-server crashes
   """
   def terminate(_reason, _state) do
+    Logger.info("Elevator given order to terminate. Terminating")
     Driver.set_motor_direction(:stop)
+    Process.exit(self(), :normal)
   end
 
 

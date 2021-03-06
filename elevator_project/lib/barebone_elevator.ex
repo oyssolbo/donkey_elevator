@@ -19,6 +19,7 @@ defmodule BareElevator do
   @max_floor 3
   @node_name :barebone_elevator
   @enforce_keys [:target_floor, :dir, :timer]
+  @door_timer 3000 # ms
 
   defstruct [:target_floor, :dir, :timer]
 
@@ -76,24 +77,30 @@ defmodule BareElevator do
   @doc """
   Function to handle if received a new order
   """
-  def handle_event(:cast, {:received_order, order}) do
+  def handle_event(:cast, {:received_order, order}, _, _elevator_data) do
     # Do something
     # Unsure how this will work and how to even store the current orders given
     # to the elevator
+
+    # First check if the order is invalid
+
+    # Must add the order to the elevator
+    # Calculate optimal order
+    # Acknowledge the order
   end
 
 
   @doc """
   Function to handle when the elevator is at the desired floor in moving state
 
-  Transitions into
+  Transitions into door_state
   """
   def handle_event(:cast, {:at_floor, floor}, :moving_state,
         %BareElevator{target_floor: target_floor = floor} = elevator_data) do
 
     # If we have reached the desired floor then stop and open door
-    actions = [reached_target_floor(), ]
-    {:next_state, :door_state, reached_target_floor()}
+    actions = [reached_target_floor()]
+    {:next_state, :door_state, actions}
   end
 
 
@@ -102,23 +109,52 @@ defmodule BareElevator do
 
   Transitions into the state 'idle_state'
   """
-  def handle_event(:cast, {:at_floor, floor}, :init_state) do
-    {:next_state, :idle_state, reached_target_floor()}
+  def handle_event(:cast, {:at_floor, floor}, :init_state, _elevator_data) do
+    actions = [reached_target_floor()]
+    {:next_state, :idle_state, actions}
   end
 
 
   @doc """
   Functions to handle if we have reached the top- or bottom-floor without an
-  order there
+  order there. These functions should not be triggered if we have an order at
+  the floor, as that event should be handled above.
   """
   def handle_event(:cast, {:at_floor, floor = @min_floor}, :moving_state,
         %BareElevator{dir: :down} = elevator_data) do
-    {:next_state, :idle_state, reached_floor_limit()}
+    {:next_state, :restart_state, reached_floor_limit()}
   end
   def handle_event(:cast, {:at_floor, floor = @max_floor}, :moving_state,
-  %BareElevator{dir: :up} = elevator_data) do
-    {:next_state, :idle_state, reached_floor_limit()}
+        %BareElevator{dir: :up} = elevator_data) do
+    {:next_state, :restart_state, reached_floor_limit()}
   end
+
+
+  @doc """
+  Function to handle if the elevator enters a restart
+  """
+  def handle_event(:cast, _, :restart_state, _elevator_data) do
+    {:next_state, :init_state, restart_process()}
+  end
+
+
+  @doc """
+  Function that handles if the door has been open for too long
+
+  Closes the door and enters idle_state
+  """
+  def handle_event(:cast, :door_timer, :door_state, _elevator_data) do
+    {:next_state, :idle_state, close_door()}
+  end
+
+
+  @doc """
+  Function that handles when the next priority order has been updated
+  """
+  def handle_event(:cast, :designated_order, :idle_state, _elevator_data) do
+
+  end
+
 
 
 ################################################ Actions ######################################################
@@ -146,7 +182,7 @@ defmodule BareElevator do
 
 
   @doc """
-  Function to handle if max- or min-floor reached
+  Function to handle if max- or min-floor reached when no order was received there
   """
   defp reached_floor_limit() do
     Driver.set_motor_direction(:stop)
@@ -161,7 +197,36 @@ defmodule BareElevator do
     # Must update the order here somehow
     Driver.set_motor_direction(:stop)
     IO.puts("Reached the desired floor")
+    open_door()
+    spawn(fn -> door_timer() end)
   end
+
+  @doc """
+  Starts the door-timer, which signals that the elevator should
+  close the door
+  """
+  defp door_timer() do
+    Process.sleep(@door_timer)
+    GenStateMachine.cast(@node_name, :door_timer)
+  end
+
+
+  @doc """
+  Requires a timer for when the elevator detects that it is not moving
+
+  Unsure how to do this exactly. One way could to have an interrupt, but
+  we cannot guarantee that the state will be updated
+
+  Could have a recursion that it calls the handler which requires after 3 seconds or
+  something, which should allow us with the updated state of the elevator
+
+  More difficult to implement than originally thought. If the proposed method
+  above is used, we will end up with the same state being checked
+
+  Could pherhaps have a global timer?
+  """
+  #defp check_floor_timer(elevator_data, )
+
 
 
   @doc """
@@ -173,6 +238,16 @@ defmodule BareElevator do
 
   defp close_door() do
     Driver.set_door_open_light(:off)
+  end
+
+
+  @doc """
+  Function to kill the module in case of an error
+  """
+  defp restart_process() do
+    # Should pherhaps consider sending a message to master or something ?
+    Driver.set_direction(:stop)
+    Process.exit(self(), :shutdown)
   end
 
 end

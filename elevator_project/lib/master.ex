@@ -64,10 +64,10 @@ defmodule Master do
       active_orders: :nil,
       connected_externals: :nil,
       node_timers: :nil,
-      activation_time: make_ref(),
-      pid: :nil, # Change this (?)
-      masterID: :nil, # change this
-      versID: :nil # and this
+      activation_time: Time.utc_now(),
+      pid: :nil,
+      masterID: :nil, # Could pherhaps just use name?
+      versID: 0
     }
 
     # Start link to GenStateMachine
@@ -77,7 +77,10 @@ defmodule Master do
     name = to_string(@node_name) <> to_string(Master[:activation_time])
     case SystemNode.start_node(name, @default_cookie) do
       pid ->
-        # Successfull in starting a distributed node
+        # Successful in starting a distributed node
+        # Inserting the correct pid
+        Map.replace!(master_data, :pid, pid)
+
         # Connecting to other nodes
         SystemNodes.connect_nodes(pid)
 
@@ -127,10 +130,30 @@ defmodule Master do
   end
 
   @doc """
-  Function to handle the event of a restart
+  Function to handle if restart being casted
   """
   def handle_event(:cast, :restart, _, _) do
-    Process.exit(self(), :normal)
+    restart_process()
+  end
+
+  @doc """
+  Function to handle if another master is active at the same time
+  """
+  def handle_event(:cast, {:another_active_server, t_other}, :active_state, master_data) do
+    time = Map.get(master_data, :activation_time, Time.utc_now())
+    case Time.compare(time, t_other) do
+      :gt->
+        # "Youngest" server. Step down
+        acceptance_test()
+        {:next_state, :backup_state, master_data}
+      :eq->
+        # Equivalent. Restart server - but must guarantee that everything ok first
+        acceptance_test()
+        GenStateMachine.cast(:restart)
+      :lt->
+        # "Oldest" server. Continue
+        {:next_state, :active_state, master_data}
+    end
   end
 
 
@@ -153,7 +176,18 @@ defmodule Master do
     end
   end
 
+  @doc """
+  Function to terminate the process
+  """
+  defp restart_process() do
+    Process.exit(self(), :normal)
+  end
 
-
+  @doc """
+  Function to perform the acceptance-tests - must be developed
+  """
+  defp acceptance_test() do
+    :ok
+  end
 
 end

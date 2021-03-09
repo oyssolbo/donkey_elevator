@@ -40,6 +40,9 @@ defmodule BareElevator do
       timer: make_ref()
     }
 
+    #Connect to simulator or elevator
+    Driver.start_link([])
+
     # Must have a way to init the elevator-node
 
     # Starting a link to the server (connects the module to the server)
@@ -86,6 +89,17 @@ defmodule BareElevator do
   end
 
 
+
+  @doc """
+  Function to handle when the elevator has received a floor in init-state
+
+  Transitions into the state 'idle_state'
+  """
+  def handle_event(:cast, {:at_floor, floor}, :init_state, elevator_data) do #Need to find a way to accepts any elevator data
+    {:next_state, :idle_state, reached_target_floor()}
+  end
+  #%BareElevator{dir: :down, target_floor: nil, timer: #Reference<0.1321098122.3586916359.85862>}
+
   @doc """
   Function to handle when the elevator is at the desired floor in moving state
 
@@ -100,14 +114,6 @@ defmodule BareElevator do
   end
 
 
-  @doc """
-  Function to handle when the elevator has received a floor in init-state
-
-  Transitions into the state 'idle_state'
-  """
-  def handle_event(:cast, {:at_floor, floor}, :init_state) do
-    {:next_state, :idle_state, reached_target_floor()}
-  end
 
 
   @doc """
@@ -136,7 +142,7 @@ defmodule BareElevator do
 
   Invokes the function check_at_floor() with the data
   """
-  defp read_current_floor() do
+  def read_current_floor() do
     Driver.get_floor_sensor_state() |> check_at_floor()
     read_current_floor()
   end
@@ -152,6 +158,13 @@ defmodule BareElevator do
     GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
 
+
+   @doc """
+  Dummy fuction to handle between floors
+  """
+  defp check_at_floor(floor) when floor |> is_atom do
+    #Between floors, do nothing
+  end
 
   @doc """
   Function to handle if max- or min-floor reached

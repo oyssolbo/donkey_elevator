@@ -2,12 +2,14 @@ defmodule BareElevator do
   @moduledoc """
   Barebones elevator-module that must be developed further.
 
-  The module uses
-
-
   Requirements:
     - Driver
     - Network
+
+  To be implemented:
+    - Lights
+    - Orderpanel
+    - Storage
   """
 
   use GenStateMachine
@@ -15,20 +17,24 @@ defmodule BareElevator do
   require Logger
   require Driver
 
-  @min_floor 0
-  @max_floor 3
-  @node_name :barebone_elevator
-  @enforce_keys [:target_floor, :dir, :timer]
-  @door_timer 3000 # ms
+  @min_floor    0
+  @max_floor    3
+  @door_time    3000  # ms
+  @moving_time  5000  # ms
+  @init_time    @moving_time
 
-  defstruct [:target_floor, :dir, :timer]
+  @node_name    :barebone_elevator
+  @enforce_keys [:orders, :target_floor, :dir, :timer]
+
+
+  defstruct     [:orders, :target_floor, :dir, :timer]
 
 
   @doc """
   Function to initialize the elevator, and tries to get the elevator into a defined state.
 
   The function does:
-    - establishes conenction to GenStateMachine-server
+    - establishes connection to GenStateMachine-server
     - stores the current data on the server
     - spawns a process to continously check the state of the elevator
     - sets engine direction down
@@ -36,6 +42,7 @@ defmodule BareElevator do
   def init() do
     # Set correct elevator-state
     elevator_data = %BareElevator{
+      orders: {},
       target_floor: :nil,
       dir: :down,
       timer: make_ref()
@@ -98,10 +105,10 @@ defmodule BareElevator do
   Transitions into door_state
   """
   def handle_event(:cast, {:at_floor, floor}, :moving_state,
-        %BareElevator{target_floor: target_floor = floor} = elevator_data) do
+        %BareElevator{target_floor: target_floor = floor, timer: timer} = elevator_data) do
 
-    # If we have reached the desired floor then stop and open door
-    actions = [reached_target_floor()]
+    # We have reached the desired floor
+    actions = [reached_target_floor(elevator_data)]
     {:next_state, :door_state, actions}
   end
 
@@ -111,9 +118,11 @@ defmodule BareElevator do
 
   Transitions into the state 'idle_state'
   """
-  def handle_event(:cast, {:at_floor, floor}, :init_state, _elevator_data) do
-    actions = [reached_target_floor()]
-    {:next_state, :idle_state, actions}
+  def handle_event(:cast, {:at_floor, floor}, :init_state,
+        %BareElevator{timer: timer} = elevator_data) do
+
+    Process.cancel_timer(timer)
+    {:next_state, :idle_state}
   end
 
 
@@ -151,9 +160,30 @@ defmodule BareElevator do
 
 
   @doc """
+  Function to handle if the elevator hasn't reached a floor
+
+  Transitions into restart
+  """
+  def handle_event(:cast, :moving_timer, :moving_state, _elevator_data) do
+    {:next_state, :restart_state}
+  end
+
+
+  @doc """
+  Function to handle if we are stuck at init for too long
+
+  Restarts the process
+  """
+  def handle_event(:cast, :init_timer, :init_state, _elevator_data) do
+    {:next_state, :restart_state}
+  end
+
+
+
+  @doc """
   Function that handles when the next priority order has been updated
   """
-  def handle_event(:cast, :designated_order, :idle_state, _elevator_data) do
+  def handle_event(:cast, :designated_order, :idle_state, elevator_data) do
 
   end
 
@@ -195,40 +225,54 @@ defmodule BareElevator do
   @doc """
   Function to handle if we have reached the desired floor
   """
-  defp reached_target_floor() do
+  defp reached_target_floor(elevator_data) do
     # Must update the order here somehow
     Driver.set_motor_direction(:stop)
     IO.puts("Reached the desired floor")
     open_door()
-    spawn(fn -> door_timer() end)
+    start_door_timer(elevator_data)
   end
+
+
+  @doc """
+  Function to calculate the direction to the next order
+  """
+  defp calculate_target_floor(%BareElevator{dir: dir} = elevator_data) do
+
+  end
+
 
   @doc """
   Starts the door-timer, which signals that the elevator should
   close the door
   """
-  defp door_timer() do
-    Process.sleep(@door_timer)
-    GenStateMachine.cast(@node_name, :door_timer)
+  defp start_door_timer(%BareElevator{timer: timer} = elevator_data) do
+    Process.cancel_timer(timer)
+    timer = Process.send_after(self(), :door_timer, @door_time)
+    new_data = Map.put(elevator_data, :timer, timer)
   end
 
 
   @doc """
-  Requires a timer for when the elevator detects that it is not moving
+  Function that starts a timer to check if we are moving
 
-  Unsure how to do this exactly. One way could to have an interrupt, but
-  we cannot guarantee that the state will be updated
-
-  Could have a recursion that it calls the handler which requires after 3 seconds or
-  something, which should allow us with the updated state of the elevator
-
-  More difficult to implement than originally thought. If the proposed method
-  above is used, we will end up with the same state being checked
-
-  Could pherhaps have a global timer?
+  last_floor Int used to indicate the last registered floor
   """
-  #defp check_floor_timer(elevator_data, )
+  defp start_moving_timer(%BareElevator{timer: timer} = elevator_data) do
+    Process.cancel_timer(timer)
+    timer = Process.send_after(self(), :moving_timer, @moving_time)
+    new_data = Map.put(elevator_data, :timer, timer)
+  end
 
+
+  @doc """
+  Function that starts a timer to check if init takes too long
+  """
+  defp start_init_timer(%BareElevator{timer: timer} = elevator_data) do
+    Process.cancel_timer(timer)
+    timer = Process.send_after(self(), :init_timer, @init_time)
+    new_data = Map.put(elevator_data, :timer, timer)
+  end
 
 
   @doc """
@@ -237,7 +281,6 @@ defmodule BareElevator do
   defp open_door() do
     Driver.set_door_open_light(:on)
   end
-
   defp close_door() do
     Driver.set_door_open_light(:off)
   end

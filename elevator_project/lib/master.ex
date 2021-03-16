@@ -37,18 +37,32 @@ defmodule Master do
       orders and timers?
   """
 
-  @min_floor 0
-  @max_floor 3
-  @num_elevators 1  # For the time being
-  @default_cookie :ttk4145_30
-  @default_check_time_ms 2000
+  @min_floor              0
+  @max_floor              3
+  @num_elevators          1  # For the time being
+  @default_cookie         :ttk4145_30
+  @default_check_time_ms  2000
 
   @node_name :master
-  @enforce_keys [:active_orders, :connected_externals, :node_timers, :activation_time,
-                  :pid, :masterID, :versID]
+  @enforce_keys [
+    :active_orders,
+    :connected_externals,
+    :node_timers,
+    :activation_time,
+    :pid,
+    :masterID,
+    :versID
+  ]
 
-  defstruct [:active_orders, :connected_externals, :node_timers, :activation_time,
-                  :pid, :masterID, :versID]
+  defstruct [
+    :active_orders,
+    :connected_externals,
+    :node_timers,
+    :activation_time,
+    :pid,
+    :masterID,
+    :versID
+  ]
 
 
   @doc """
@@ -82,7 +96,7 @@ defmodule Master do
         Map.replace!(master_data, :pid, pid)
 
         # Connecting to other nodes
-        SystemNodes.connect_nodes(pid)
+        SystemNode.connect_nodes(pid)
 
         # Spawning a function to detect
         spawn(fn-> check_external_nodes() end)
@@ -93,7 +107,7 @@ defmodule Master do
       {:error, _} ->
         # Not successful in starting a distributed node
         Logger.error("An error occured when trying to make master a distributed system. Restarting master")
-        GenStateMachine.cast(:restart)
+        GenStateMachine.cast(@node_name, :restart)
     end
   end
 
@@ -149,7 +163,7 @@ defmodule Master do
       :eq->
         # Equivalent. Restart server - but must guarantee that everything ok first
         acceptance_test()
-        GenStateMachine.cast(:restart)
+        GenStateMachine.cast(@node_name, :restart)
       :lt->
         # "Oldest" server. Continue
         {:next_state, :active_state, master_data}

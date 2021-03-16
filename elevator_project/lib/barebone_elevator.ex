@@ -24,10 +24,10 @@ defmodule BareElevator do
   @init_time    @moving_time
 
   @node_name    :barebone_elevator
-  @enforce_keys [:orders, :target_floor, :dir, :timer]
+  @enforce_keys [:orders, :target_floor, :last_floor, :dir, :timer]
 
 
-  defstruct     [:orders, :target_floor, :dir, :timer]
+  defstruct     [:orders, :target_floor, :last_floor, :dir, :timer]
 
 
   @doc """
@@ -44,6 +44,7 @@ defmodule BareElevator do
     elevator_data = %BareElevator{
       orders: {},
       target_floor: :nil,
+      last_floor: :nil,
       dir: :down,
       timer: make_ref()
     }
@@ -108,7 +109,7 @@ defmodule BareElevator do
         %BareElevator{target_floor: target_floor = floor, timer: timer} = elevator_data) do
 
     # We have reached the desired floor
-    actions = [reached_target_floor(elevator_data)]
+    actions = [reached_target_floor(elevator_data)] # Have to set the new floor somehow
     {:next_state, :door_state, actions}
   end
 
@@ -237,7 +238,22 @@ defmodule BareElevator do
   @doc """
   Function to calculate the direction to the next order
   """
-  defp calculate_target_floor(%BareElevator{dir: dir} = elevator_data) do
+  defp calculate_target_floor(%BareElevator{dir: dir, orders: orders} = elevator_data) do
+    # Must be calculated based on the last floor, direction and the given orders
+    if dir == :down do
+      calculate_orders_down()
+      calculate_orders_up()
+    else
+      calculate_orders_up()
+      calculcate_orders_down()
+    end
+  end
+
+  defp calculcate_orders_down() do
+
+  end
+
+  defp calculate_orders_up() do
 
   end
 

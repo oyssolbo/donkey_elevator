@@ -34,4 +34,38 @@ defmodule Order do
   defp zip(_, _, _, orders) do
     :lists.reverse(orders)
   end
+
+
+  @doc """
+  Function to check if an order is valid
+
+  For the order to be valid, we require that:
+    - order_floor is between min and max
+    - order_type is either :cab, :up, :down
+  """
+  def check_valid_orders([order | rest_orders]) do
+    case check_valid_order(order) do
+      :ok->
+        check_valid_orders(rest_orders)
+      {:error, id}->
+        IO.puts("Invalid order found!")
+        :error
+    end
+  end
+
+  def check_valid_orders([]) do
+    :ok
+  end
+
+  defp check_valid_order(%Order{order_id: id, order_type: type, order_floor: floor}) do
+    min_floor = Application.fetch_env!(:elevator_project, :min_floor)
+    num_floors = Application.fetch_env!(:elevator_project, :num_floors)
+
+    if floor < min_floor or floor > min_floor + num_floors - 1 do
+      {:error, id}
+    end
+    :ok
+  end
+
+
 end

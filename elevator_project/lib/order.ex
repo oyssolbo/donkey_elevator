@@ -48,7 +48,8 @@ defmodule Order do
       :ok->
         check_valid_orders(rest_orders)
       {:error, id}->
-        IO.puts("Invalid order found!")
+        IO.puts("Invalid order found! Order's ID given as")
+        IO.inspect(id)
         :error
     end
   end
@@ -62,10 +63,17 @@ defmodule Order do
     num_floors = Application.fetch_env!(:elevator_project, :num_floors)
 
     if floor < min_floor or floor > min_floor + num_floors - 1 do
+      IO.puts("Order floor out of range. Received the floor")
+      IO.inspect(floor)
       {:error, id}
     end
+
+    if type not in [:cab, :up, :down] do
+      IO.puts("Order invalid type. Received the type")
+      IO.inspect(type)
+      {:error, id}
+    end
+
     :ok
   end
-
-
 end

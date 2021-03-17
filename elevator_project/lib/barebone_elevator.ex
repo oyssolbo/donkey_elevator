@@ -5,12 +5,12 @@ defmodule BareElevator do
   Requirements:
     - Driver
     - Network
+    - Order
 
   To be implemented:
     - Lights
     - Orderpanel
     - Storage
-    - Order
 
 
   TODO:
@@ -21,6 +21,7 @@ defmodule BareElevator do
 
   require Logger
   require Driver
+  require Order
 
   @min_floor    Application.fetch_env!(:elevator_project, :min_floor)
   @max_floor    Application.fetch_env!(:elevator_project, :num_floors) + @min_floor - 1
@@ -32,16 +33,16 @@ defmodule BareElevator do
   @init_time    @moving_time
 
   @node_name    :barebone_elevator
-  @enforce_keys [:orders, :target_floor, :last_floor, :dir, :timer]
+  @enforce_keys [:orders, :target_order, :last_floor, :dir, :timer]
 
 
-  defstruct     [:orders, :target_floor, :last_floor, :dir, :timer]
+  defstruct     [:orders, :target_order, :last_floor, :dir, :timer]
 
 
   @doc """
   Function to initialize the elevator, and tries to get the elevator into a defined state.
 
-  The function does:
+  The function
     - establishes connection to GenStateMachine-server
     - stores the current data on the server
     - spawns a process to continously check the state of the elevator
@@ -51,7 +52,7 @@ defmodule BareElevator do
     # Set correct elevator-state
     elevator_data = %BareElevator{
       orders: [],
-      target_floor: :nil,
+      target_order: :nil,
       last_floor: :nil,
       dir: :down,
       timer: make_ref()
@@ -100,15 +101,22 @@ defmodule BareElevator do
   external orders over UDP then... It does simplify the elevator, but adds larger requirements
   to the order-panel
   """
-  def handle_event(:cast, {:received_order, order}, _, %BareElevator{orders: orders} = elevator_data) do
-    # First check if the order is invalid
+  def handle_event(:cast, {:received_order, new_order}, _,
+        %BareElevator{orders: prev_orders} = elevator_data) do
+    # First check if the order is valid - throws an error if not
+    Order.check_valid_orders([new_order])
 
+    # Checking if order already exists - if not, add to list
+    if new_order not in prev_orders do
+      new_orders = [prev_orders | new_order]
+      new_elevator_data = Map.put(elevator_data, :orders, new_orders)
+    end
 
-    # Add the order to the elevator
+    # Acknowledge the order - Must then know who sent it. Currently we don't know
 
-    # Acknowledge the order
+    # Calculate next target_order
 
-    # Calculate next direction
+    {:keep_state, new_elevator_data}
   end
 
 
@@ -117,12 +125,33 @@ defmodule BareElevator do
 
   Transitions into door_state
   """
-  def handle_event(:cast, {:at_floor, floor}, :moving_state,
-        %BareElevator{target_floor: target_floor = floor, timer: timer} = elevator_data) do
+  def handle_event(
+        :cast,
+        {:at_floor, floor},
+        :moving_state,
+        %BareElevator{orders: orders, target_order: target_order, dir: dir, timer: timer} = elevator_data)
+  do
+    if Map.get(target_order, :order_floor) != floor do
+      {:keep_state_and_data}
+    end
+
+    if not Map.get(target_order, :order_type) in [dir, :cab] do
+      {:keep_state_and_data}
+    end
 
     # We have reached the desired floor
-    actions = [reached_target_floor(elevator_data)] # Have to set the new floor somehow
-    {:next_state, :door_state, actions}
+    IO.puts("Reached target floor at floor")
+    IO.inspect(floor)
+
+    # Remove old order and calculate new target_order
+    temp_remove_order = List.delete(orders, target_order)
+    temp_target_order = update_target_order(temp_remove_order)
+
+    # Open door and start timer
+    open_door()
+    new_elevator_data = start_door_timer(temp_target_order)
+
+    {:next_state, :door_state, new_elevator_data}
   end
 
 
@@ -132,7 +161,7 @@ defmodule BareElevator do
   Transitions into the state 'idle_state'
   """
   def handle_event(:cast, {:at_floor, floor}, :init_state,
-        %BareElevator{timer: timer, } = elevator_data) do
+        %BareElevator{timer: timer} = elevator_data) do
 
     Process.cancel_timer(timer)
     {:next_state, :idle_state, elevator_data}
@@ -254,9 +283,10 @@ defmodule BareElevator do
   @doc """
   Function to handle if we have reached the desired floor
   """
-  defp reached_target_floor(elevator_data) do
-    # Must update the order here somehow
+  defp reached_target_floor(%BareElevator{orders: active_orders} = elevator_data) do
     Driver.set_motor_direction(:stop)
+    # Must find the active order and remove it from the list
+
     IO.puts("Reached the desired floor")
     open_door()
     start_door_timer(elevator_data)
@@ -266,7 +296,7 @@ defmodule BareElevator do
   @doc """
   Function to calculate the direction to the next order
   """
-  defp calculate_target_floor(%BareElevator{dir: dir, orders: orders} = elevator_data) do
+  defp calculate_target_floor(%BareElevator{dir: dir, orders: active_orders} = elevator_data) do
     # Must be calculated based on the last floor, direction and the given orders
     if dir == :down do
       calculate_orders_down()
@@ -346,5 +376,10 @@ defmodule BareElevator do
     Driver.set_motor_direction(:stop)
     Process.exit(self(), :shutdown)
   end
+
+
+  @doc """
+  Function to remove current active order from the list
+  """
 
 end

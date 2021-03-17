@@ -21,6 +21,7 @@ defmodule BareElevator do
   @max_floor    3
   @door_time    3000  # ms
   @moving_time  5000  # ms
+  @update_time  250   # ms
   @init_time    @moving_time
 
   @node_name    :barebone_elevator
@@ -42,7 +43,7 @@ defmodule BareElevator do
   def init() do
     # Set correct elevator-state
     elevator_data = %BareElevator{
-      orders: {},
+      orders: [],
       target_floor: :nil,
       last_floor: :nil,
       dir: :down,
@@ -85,18 +86,21 @@ defmodule BareElevator do
 ################################################## Events #####################################################
 
   @doc """
-  Function to handle if received a new order
-  """
-  def handle_event(:cast, {:received_order, order}, _, _elevator_data) do
-    # Do something
-    # Unsure how this will work and how to even store the current orders given
-    # to the elevator
+  Function to handle if a new order is received
 
+  This event should be handled if the elevator is in idle, moving or door-state and NOT when
+  the elevator is initializing or restarting. Could pherhaps be best to send both internal and
+  external orders over UDP then... It does simplify the elevator, but adds larger requirements
+  to the order-panel
+  """
+  def handle_event(:cast, {:received_order, order}, _, %BareElevator{orders: orders} = elevator_data) do
     # First check if the order is invalid
 
-    # Must add the order to the elevator
-    # Calculate optimal order
+    # Add the order to the elevator
+
     # Acknowledge the order
+
+    # Calculate next direction
   end
 
 
@@ -120,10 +124,10 @@ defmodule BareElevator do
   Transitions into the state 'idle_state'
   """
   def handle_event(:cast, {:at_floor, floor}, :init_state,
-        %BareElevator{timer: timer} = elevator_data) do
+        %BareElevator{timer: timer, } = elevator_data) do
 
     Process.cancel_timer(timer)
-    {:next_state, :idle_state}
+    {:next_state, :idle_state, elevator_data}
   end
 
 
@@ -134,19 +138,19 @@ defmodule BareElevator do
   """
   def handle_event(:cast, {:at_floor, floor = @min_floor}, :moving_state,
         %BareElevator{dir: :down} = elevator_data) do
-    {:next_state, :restart_state, reached_floor_limit()}
+    {:next_state, :restart_state, elevator_data, [reached_floor_limit()]}
   end
   def handle_event(:cast, {:at_floor, floor = @max_floor}, :moving_state,
         %BareElevator{dir: :up} = elevator_data) do
-    {:next_state, :restart_state, reached_floor_limit()}
+    {:next_state, :restart_state, elevator_data, [reached_floor_limit()]}
   end
 
 
   @doc """
   Function to handle if the elevator enters a restart
   """
-  def handle_event(:cast, _, :restart_state, _elevator_data) do
-    {:next_state, :init_state, restart_process()}
+  def handle_event(:cast, _, :restart_state, elevator_data) do
+    {:next_state, :init_state, elevator_data, [restart_process()]}
   end
 
 
@@ -155,8 +159,8 @@ defmodule BareElevator do
 
   Closes the door and enters idle_state
   """
-  def handle_event(:cast, :door_timer, :door_state, _elevator_data) do
-    {:next_state, :idle_state, close_door()}
+  def handle_event(:cast, :door_timer, :door_state, elevator_data) do
+    {:next_state, :idle_state, elevator_data, [close_door()]}
   end
 
 
@@ -165,8 +169,24 @@ defmodule BareElevator do
 
   Transitions into restart
   """
-  def handle_event(:cast, :moving_timer, :moving_state, _elevator_data) do
-    {:next_state, :restart_state}
+  def handle_event(:cast, :moving_timer, :moving_state, elevator_data) do
+    {:next_state, :restart_state, elevator_data}
+  end
+
+
+  @doc """
+  Function to handle when the elevator's status must be sent to the master
+
+  No transition
+  """
+  def handle_event(:cast, :udp_timer, _,
+        %BareElevator{orders: orders, dir: dir, last_floor: last_floor} = elevator_data) do
+
+    # IMPORTANT! We must find a way to handle init/restart
+    # Might be a bug to use self() when sending
+    Process.send(Process.whereis(:active_master), {self(), dir, last_floor, orders}, [])
+    start_udp_timer()
+    {:keep_state_and_data}
   end
 
 
@@ -175,8 +195,8 @@ defmodule BareElevator do
 
   Restarts the process
   """
-  def handle_event(:cast, :init_timer, :init_state, _elevator_data) do
-    {:next_state, :restart_state}
+  def handle_event(:cast, :init_timer, :init_state, elevator_data) do
+    {:next_state, :restart_state, elevator_data}
   end
 
 
@@ -243,13 +263,14 @@ defmodule BareElevator do
     if dir == :down do
       calculate_orders_down()
       calculate_orders_up()
-    else
+    end
+    if dir == :up do
       calculate_orders_up()
-      calculcate_orders_down()
+      calculate_orders_down()
     end
   end
 
-  defp calculcate_orders_down() do
+  defp calculate_orders_down() do
 
   end
 
@@ -290,6 +311,13 @@ defmodule BareElevator do
     new_data = Map.put(elevator_data, :timer, timer)
   end
 
+  @doc """
+  Function to start a timer to send updates over UDP to the master
+  """
+  defp start_udp_timer() do
+    Process.send_after(self(), :udp_timer, @update_time)
+  end
+
 
   @doc """
   Function to open/close door
@@ -307,7 +335,7 @@ defmodule BareElevator do
   """
   defp restart_process() do
     # Should pherhaps consider sending a message to master or something ?
-    Driver.set_direction(:stop)
+    Driver.set_motor_direction(:stop)
     Process.exit(self(), :shutdown)
   end
 

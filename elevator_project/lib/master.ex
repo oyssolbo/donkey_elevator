@@ -37,10 +37,11 @@ defmodule Master do
       orders and timers?
   """
 
-  @min_floor              0
-  @max_floor              3
-  @num_elevators          1  # For the time being
-  @default_cookie         :ttk4145_30
+  @min_floor              Application.fetch_env!(:elevator_project, :min_floor)
+  @max_floor              Application.fetch_env!(:elevator_project, :num_floors) + @min_floor - 1
+  @num_elevators          Application.fetch_env!(:elevator_project, :num_elevators)
+  @cookie                 Application.fetch_env!(:elevator_project, :default_cookie)
+
   @default_check_time_ms  2000
 
   @node_name :master

@@ -24,6 +24,7 @@ defmodule BareElevator do
 
   @min_floor    Application.fetch_env!(:elevator_project, :min_floor)
   @max_floor    Application.fetch_env!(:elevator_project, :num_floors) + @min_floor - 1
+  @cookie       Application.fetch_env!(:elevator_project, :default_cookie)
 
   @door_time    3000  # ms
   @moving_time  5000  # ms

@@ -10,6 +10,11 @@ defmodule BareElevator do
     - Lights
     - Orderpanel
     - Storage
+    - Order
+
+
+  TODO:
+    Must use the orders to calculate the direction the elevator must travel in
   """
 
   use GenStateMachine
@@ -17,8 +22,9 @@ defmodule BareElevator do
   require Logger
   require Driver
 
-  @min_floor    0
-  @max_floor    3
+  @min_floor    Application.fetch_env!(:elevator_project, :min_floor)
+  @max_floor    Application.fetch_env!(:elevator_project, :num_floors) + @min_floor - 1
+
   @door_time    3000  # ms
   @moving_time  5000  # ms
   @update_time  250   # ms
@@ -95,6 +101,7 @@ defmodule BareElevator do
   """
   def handle_event(:cast, {:received_order, order}, _, %BareElevator{orders: orders} = elevator_data) do
     # First check if the order is invalid
+
 
     # Add the order to the elevator
 

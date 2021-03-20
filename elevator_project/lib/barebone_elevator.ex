@@ -181,7 +181,8 @@ defmodule BareElevator do
         :moving_state,
         %BareElevator{dir: :down} = elevator_data)
   do
-    {:next_state, :restart_state, elevator_data, [reached_floor_limit()]}
+    reached_floor_limit()
+    {:next_state, :restart_state, elevator_data}
   end
 
   def handle_event(
@@ -190,7 +191,8 @@ defmodule BareElevator do
         :moving_state,
         %BareElevator{dir: :up} = elevator_data)
   do
-    {:next_state, :restart_state, elevator_data, [reached_floor_limit()]}
+    reached_floor_limit()
+    {:next_state, :restart_state, elevator_data}
   end
 
 
@@ -203,7 +205,8 @@ defmodule BareElevator do
          :restart_state,
          elevator_data)
   do
-    {:next_state, :init_state, elevator_data, [restart_process()]}
+    restart_process()
+    {:next_state, :init_state, elevator_data}
   end
 
 
@@ -218,7 +221,8 @@ defmodule BareElevator do
         :door_state,
         elevator_data)
   do
-    {:next_state, :idle_state, elevator_data, [close_door()]}
+    close_door()
+    {:next_state, :idle_state, elevator_data}
   end
 
 
@@ -423,8 +427,8 @@ defmodule BareElevator do
     end
 
     # Check if orders on this floor, and in correct direction
-    order_in_dir = Enum.find(orders, :nil, fn(element)-> match?({:order_type, dir, :order_floor, floor}, element)
-    order_in_cab = Enum.find(orders, :nil, fn(element)-> match?({:order_type, :cab, :order_floor, floor}, element)
+    order_in_dir = Enum.find(orders, :nil, fn(element)-> match?({:order_type, dir, :order_floor, floor}, element) end)
+    order_in_cab = Enum.find(orders, :nil, fn(element)-> match?({:order_type, :cab, :order_floor, floor}, element) end)
 
     if order_in_cab != :nil do
       {order_in_cab, dir}

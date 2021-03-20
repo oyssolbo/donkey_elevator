@@ -331,7 +331,9 @@ defmodule BareElevator do
   floor Current elevator floor
   timer Current active timer for elevator (moving)
   """
-  defp reached_target_floor(%BareElevator{orders: orders, dir: dir} = elevator_data, floor)
+  defp reached_target_floor(
+        %BareElevator{orders: orders, dir: dir} = elevator_data,
+        floor)
   do
     Driver.set_motor_direction(:stop)
     IO.puts("Reached target floor at floor")
@@ -372,35 +374,85 @@ defmodule BareElevator do
     end
   end
 
-  defp remove_orders([], dir, floor)
+  defp remove_orders(
+        [],
+        dir,
+        floor)
   do
     []
   end
 
   @doc """
-  Function to calculate the direction to the next order
+  Function to calculate the next target floor and direction
   """
-  defp calculate_target_floor(%BareElevator{dir: dir, orders: active_orders} = elevator_data)
+  defp calculate_target_floor(
+        %BareElevator{dir: dir, orders: orders} = elevator_data,
+        floor)
   do
-    # Must be calculated based on the last floor, direction and the given orders
-    if dir == :down do
-      calculate_orders_down()
-      calculate_orders_up()
-    end
-    if dir == :up do
-      calculate_orders_up()
-      calculate_orders_down()
-    end
+    {next_target_order, next_direction} = find_optimal_order(orders, dir, floor)
+
+    temp_elevator_data = Map.put(elevator_data, :target_order, next_target_order)
+    new_elevator_data = Map.put(temp_elevator_data, :dir, next_direction)
+
+    new_elevator_data
   end
 
-  defp calculate_orders_down()
+  @doc """
+  Function to find the next optimal order. The function uses the current floor and direction
+  to return the next optimal order for the elevator to serve.
+  The function changes direction it checks in if nothing is found.
+
+  One may be worried that the function is stuck here in an endless recursion-loop since it changes
+  direction if it haven't found anything. As long as there exist an order inside the elevator-space,
+  the function will find it. It may be a possible bug if an order is outside of the elevator-space, but
+  that is directly linked to why is it here in the first place
+
+
+  orders Orders to be scanned
+  dir Current direction to check for orders
+  Floor Current floor to check for order
+  """
+  defp find_optimal_order(
+        orders,
+        dir,
+        floor) when floor >= @min_floor and floor <= @max_floor
   do
+    # To prevent indefinite recursion on empty orders
+    if orders == [] do
+      {:nil, dir}
+    end
 
-  end
+    # Check if orders on this floor, and in correct direction
+    order_in_dir = Enum.find(orders, :nil, fn(element)-> match?({:order_type, dir, :order_floor, floor}, element)
+    order_in_cab = Enum.find(orders, :nil, fn(element)-> match?({:order_type, :cab, :order_floor, floor}, element)
 
-  defp calculate_orders_up()
-  do
+    if order_in_cab != :nil do
+      {order_in_cab, dir}
+    end
+    if order_in_dir != nil do
+      {order_in_cab, dir}
+    end
 
+    # No match found. Recurse on the next floor in same direction
+    if dir == :down and floor != @min_floor do
+      {order, dir} = find_optimal_order(orders, dir, floor - 1)
+      {order, dir}
+    end
+    if dir == :up and floor != @max_floor do
+      {order, dir} = find_optimal_order(orders, dir, floor + 1)
+      {order, dir}
+    end
+
+    # Max or min floor, change search direction
+    if dir == :down and floor == @min_floor do
+      {order, dir} = find_optimal_order(orders, :up, floor + 1)
+      {order, dir}
+    end
+
+    if dir == :up and floor == @max_floor do
+      {order, dir} = find_optimal_order(orders, :down, floor - 1)
+      {order, dir}
+    end
   end
 
 

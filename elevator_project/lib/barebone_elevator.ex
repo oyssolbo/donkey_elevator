@@ -104,14 +104,13 @@ defmodule BareElevator do
   to the order-panel
   """
   def handle_event(
-        :cast,
-        {:received_order, new_order},
+        {:call, from},
+        {:received_order, %Order{order_id: id} = new_order},
         _,
-        %BareElevator{orders: prev_orders} = elevator_data)
+        %BareElevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
     do
-    # First check if the order is valid - throws an error if not
+    # First check if the order is valid - throws an error if not (will trigger a crash)
     Order.check_valid_orders([new_order])
-
 
     # Checking if order already exists - if not, add to list
     if new_order not in prev_orders do
@@ -119,11 +118,10 @@ defmodule BareElevator do
       elevator_data = Map.put(elevator_data, :orders, new_orders)
     end
 
-    # Acknowledge the order - Must then know who sent it. Currently we don't know
-
     # Calculate next target_order
+    elevator_data = calculate_target_floor(elevator_data, last_floor)
 
-    {:keep_state, elevator_data}
+    {:keep_state, elevator_data, {:reply, from, {:ack, id}}}
   end
 
 
@@ -350,6 +348,7 @@ defmodule BareElevator do
     # Remove old order and calculate new target_order
     updated_orders = remove_orders(orders, dir, floor)
     elevator_data = Map.put(elevator_data, :orders, updated_orders)
+    elevator_data = calculate_target_floor(elevator_data, floor)
 
     elevator_data
   end

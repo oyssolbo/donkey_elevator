@@ -39,8 +39,11 @@ defmodule UDP do
   {:ok, socket}                   If socket opened
   {:error, 0}                     If an error occured
   """
-  def open_connection(port, opts \\ [:binary, active: :false, reuseaddr: :true])
-        when port |> is_integer and opts |> is_list do
+  def open_connection(
+        port,
+        opts \\ [:binary, active: :false, reuseaddr: :true])
+  when port |> is_integer and opts |> is_list
+  do
 
     case :gen_udp.open(port, opts) do
       {:ok, socket} ->
@@ -66,12 +69,21 @@ defmodule UDP do
   {:ok, socket}                   If socket opened
   {:nil, 0}                       If an error occured
   """
-  def send_data(from_socket, to_address, port, packet) do
+  def send_data(
+        from_socket,
+        to_address,
+        port,
+        packet)
+  do
     Logger.info("Sent packet #{packet} to port #{port} on address #{to_address}")
     :gen_udp.send(from_socket, to_address, port, packet)
   end
 
-  def send_data(from_socket, port, packet) do
+  def send_data(
+        from_socket,
+        port,
+        packet)
+  do
     Logger.info("Sent packet #{packet} to port #{port} on local ip")
     :gen_udp.send(from_socket, @local_ip, port, packet)
   end
@@ -86,7 +98,8 @@ defmodule UDP do
   {:recv, recv_packet}            If packet received
   {:nil, 0}                       If an error occured
   """
-  def receive_data(socket) do
+  def receive_data(socket)
+  do
     case :gen_udp.recv(socket, 0, @default_timeout) do
       {:ok, recv_packet} ->
         Logger.info("Received #{recv_packet} on #{socket}")
@@ -104,7 +117,8 @@ defmodule UDP do
 
   socket Socket to close
   """
-  def close_socket(socket) do
+  def close_socket(socket)
+  do
     :gen_udp.close(socket)
   end
 

@@ -33,9 +33,8 @@ defmodule BareElevator do
   @init_time    @moving_time
 
   @node_name    :barebone_elevator
+
   @enforce_keys [:orders, :target_order, :last_floor, :dir, :timer]
-
-
   defstruct     [:orders, :target_order, :last_floor, :dir, :timer]
 
 
@@ -49,6 +48,8 @@ defmodule BareElevator do
     - sets engine direction down
   """
   def init() do
+    Logger.info("Elevator initialized")
+
     # Set correct elevator-state
     elevator_data = %BareElevator{
       orders: [],
@@ -66,7 +67,8 @@ defmodule BareElevator do
     # Spawning a process to continously check the floor
     spawn(fn-> read_current_floor() end)
 
-    # Set direction down
+    # Close door and set direction down
+    close_door()
     Driver.set_motor_direction(:down)
   end
 
@@ -101,22 +103,27 @@ defmodule BareElevator do
   external orders over UDP then... It does simplify the elevator, but adds larger requirements
   to the order-panel
   """
-  def handle_event(:cast, {:received_order, new_order}, _,
-        %BareElevator{orders: prev_orders} = elevator_data) do
+  def handle_event(
+        :cast,
+        {:received_order, new_order},
+        _,
+        %BareElevator{orders: prev_orders} = elevator_data)
+    do
     # First check if the order is valid - throws an error if not
     Order.check_valid_orders([new_order])
+
 
     # Checking if order already exists - if not, add to list
     if new_order not in prev_orders do
       new_orders = [prev_orders | new_order]
-      new_elevator_data = Map.put(elevator_data, :orders, new_orders)
+      elevator_data = Map.put(elevator_data, :orders, new_orders)
     end
 
     # Acknowledge the order - Must then know who sent it. Currently we don't know
 
     # Calculate next target_order
 
-    {:keep_state, new_elevator_data}
+    {:keep_state, elevator_data}
   end
 
 
@@ -131,6 +138,8 @@ defmodule BareElevator do
         :moving_state,
         %BareElevator{orders: orders, target_order: target_order, dir: dir, timer: timer} = elevator_data)
   do
+    # Checking if at target floor and if there is a valid order to stop on
+    # Must be a better way to implement this! Ugly to keep one order as a priority/target
     if Map.get(target_order, :order_floor) != floor do
       {:keep_state_and_data}
     end
@@ -139,18 +148,7 @@ defmodule BareElevator do
       {:keep_state_and_data}
     end
 
-    # We have reached the desired floor
-    IO.puts("Reached target floor at floor")
-    IO.inspect(floor)
-
-    # Remove old order and calculate new target_order
-    temp_remove_order = List.delete(orders, target_order)
-    temp_target_order = update_target_order(temp_remove_order)
-
-    # Open door and start timer
-    open_door()
-    new_elevator_data = start_door_timer(temp_target_order)
-
+    new_elevator_data = reached_target_floor(elevator_data, floor)
     {:next_state, :door_state, new_elevator_data}
   end
 
@@ -160,8 +158,12 @@ defmodule BareElevator do
 
   Transitions into the state 'idle_state'
   """
-  def handle_event(:cast, {:at_floor, floor}, :init_state,
-        %BareElevator{timer: timer} = elevator_data) do
+  def handle_event(
+        :cast,
+        {:at_floor, floor},
+        :init_state,
+        %BareElevator{timer: timer} = elevator_data)
+  do
 
     Process.cancel_timer(timer)
     {:next_state, :idle_state, elevator_data}
@@ -173,12 +175,21 @@ defmodule BareElevator do
   order there. These functions should not be triggered if we have an order at
   the floor, as that event should be handled above.
   """
-  def handle_event(:cast, {:at_floor, floor = @min_floor}, :moving_state,
-        %BareElevator{dir: :down} = elevator_data) do
+  def handle_event(
+        :cast,
+        {:at_floor, floor = @min_floor},
+        :moving_state,
+        %BareElevator{dir: :down} = elevator_data)
+  do
     {:next_state, :restart_state, elevator_data, [reached_floor_limit()]}
   end
-  def handle_event(:cast, {:at_floor, floor = @max_floor}, :moving_state,
-        %BareElevator{dir: :up} = elevator_data) do
+
+  def handle_event(
+        :cast,
+        {:at_floor, floor = @max_floor},
+        :moving_state,
+        %BareElevator{dir: :up} = elevator_data)
+  do
     {:next_state, :restart_state, elevator_data, [reached_floor_limit()]}
   end
 
@@ -186,7 +197,12 @@ defmodule BareElevator do
   @doc """
   Function to handle if the elevator enters a restart
   """
-  def handle_event(:cast, _, :restart_state, elevator_data) do
+  def handle_event(
+        :cast,
+         _,
+         :restart_state,
+         elevator_data)
+  do
     {:next_state, :init_state, elevator_data, [restart_process()]}
   end
 
@@ -196,7 +212,12 @@ defmodule BareElevator do
 
   Closes the door and enters idle_state
   """
-  def handle_event(:cast, :door_timer, :door_state, elevator_data) do
+  def handle_event(
+        :cast,
+        :door_timer,
+        :door_state,
+        elevator_data)
+  do
     {:next_state, :idle_state, elevator_data, [close_door()]}
   end
 
@@ -206,7 +227,12 @@ defmodule BareElevator do
 
   Transitions into restart
   """
-  def handle_event(:cast, :moving_timer, :moving_state, elevator_data) do
+  def handle_event(
+        :cast,
+        :moving_timer,
+        :moving_state,
+        elevator_data)
+  do
     {:next_state, :restart_state, elevator_data}
   end
 
@@ -216,8 +242,12 @@ defmodule BareElevator do
 
   No transition
   """
-  def handle_event(:cast, :udp_timer, _,
-        %BareElevator{orders: orders, dir: dir, last_floor: last_floor} = elevator_data) do
+  def handle_event(
+        :cast,
+        :udp_timer,
+        _,
+        %BareElevator{orders: orders, dir: dir, last_floor: last_floor} = elevator_data)
+  do
 
     # IMPORTANT! We must find a way to handle init/restart
     # Might be a bug to use self() when sending
@@ -232,7 +262,12 @@ defmodule BareElevator do
 
   Restarts the process
   """
-  def handle_event(:cast, :init_timer, :init_state, elevator_data) do
+  def handle_event(
+        :cast,
+        :init_timer,
+        :init_state,
+        elevator_data)
+  do
     {:next_state, :restart_state, elevator_data}
   end
 
@@ -241,7 +276,12 @@ defmodule BareElevator do
   @doc """
   Function that handles when the next priority order has been updated
   """
-  def handle_event(:cast, :designated_order, :idle_state, elevator_data) do
+  def handle_event(
+        :cast,
+        :designated_order,
+        :idle_state,
+        elevator_data)
+  do
 
   end
 
@@ -254,7 +294,8 @@ defmodule BareElevator do
 
   Invokes the function check_at_floor() with the data
   """
-  defp read_current_floor() do
+  defp read_current_floor()
+  do
     Driver.get_floor_sensor_state() |> check_at_floor()
     read_current_floor()
   end
@@ -265,7 +306,8 @@ defmodule BareElevator do
 
   If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server
   """
-  defp check_at_floor(floor) when floor |> is_integer do
+  defp check_at_floor(floor) when floor |> is_integer
+  do
     Driver.set_floor_indicator(floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
@@ -274,7 +316,8 @@ defmodule BareElevator do
   @doc """
   Function to handle if max- or min-floor reached when no order was received there
   """
-  defp reached_floor_limit() do
+  defp reached_floor_limit()
+  do
     Driver.set_motor_direction(:stop)
     IO.puts("Elevator reached limit. Stopping the elevator, and going to idle")
   end
@@ -282,21 +325,63 @@ defmodule BareElevator do
 
   @doc """
   Function to handle if we have reached the desired floor
-  """
-  defp reached_target_floor(%BareElevator{orders: active_orders} = elevator_data) do
-    Driver.set_motor_direction(:stop)
-    # Must find the active order and remove it from the list
 
-    IO.puts("Reached the desired floor")
+  orders Current active orders
+  dir Current elevator-direction
+  floor Current elevator floor
+  timer Current active timer for elevator (moving)
+  """
+  defp reached_target_floor(%BareElevator{orders: orders, dir: dir} = elevator_data, floor)
+  do
+    Driver.set_motor_direction(:stop)
+    IO.puts("Reached target floor at floor")
+    IO.inspect(floor)
+
+    # Open door and start timer
     open_door()
-    start_door_timer(elevator_data)
+    elevator_data = start_door_timer(elevator_data)
+
+    # Remove old order and calculate new target_order
+    updated_orders = remove_orders(orders, dir, floor)
+    elevator_data = Map.put(elevator_data, :orders, updated_orders)
+
+    elevator_data
   end
 
 
   @doc """
+  Function to remove all orders from the list with the current floor and direction
+
+  first_order First order in the order-list
+  rest_orders Rest of the orders in the order-list
+  dir Direction of elevator
+  floor Current floor the elevator is in
+
+  Returns
+  updated_orders List of orders where the old ones are deleted
+  """
+  defp remove_orders(
+        [%Order{order_type: order_type, order_floor: order_floor} = first_order | rest_orders],
+        dir,
+        floor)
+  do
+    if order_type not in [dir, :cab] or order_floor != floor do
+      [first_order | remove_orders(rest_orders, dir, floor)]
+    else
+      remove_orders(rest_orders, dir, floor)
+    end
+  end
+
+  defp remove_orders([], dir, floor)
+  do
+    []
+  end
+
+  @doc """
   Function to calculate the direction to the next order
   """
-  defp calculate_target_floor(%BareElevator{dir: dir, orders: active_orders} = elevator_data) do
+  defp calculate_target_floor(%BareElevator{dir: dir, orders: active_orders} = elevator_data)
+  do
     # Must be calculated based on the last floor, direction and the given orders
     if dir == :down do
       calculate_orders_down()
@@ -308,11 +393,13 @@ defmodule BareElevator do
     end
   end
 
-  defp calculate_orders_down() do
+  defp calculate_orders_down()
+  do
 
   end
 
-  defp calculate_orders_up() do
+  defp calculate_orders_up()
+  do
 
   end
 
@@ -321,10 +408,13 @@ defmodule BareElevator do
   Starts the door-timer, which signals that the elevator should
   close the door
   """
-  defp start_door_timer(%BareElevator{timer: timer} = elevator_data) do
+  defp start_door_timer(%BareElevator{timer: timer} = elevator_data)
+  do
     Process.cancel_timer(timer)
     timer = Process.send_after(self(), :door_timer, @door_time)
-    new_data = Map.put(elevator_data, :timer, timer)
+    new_elevator_data = Map.put(elevator_data, :timer, timer)
+
+    new_elevator_data
   end
 
 
@@ -333,26 +423,33 @@ defmodule BareElevator do
 
   last_floor Int used to indicate the last registered floor
   """
-  defp start_moving_timer(%BareElevator{timer: timer} = elevator_data) do
+  defp start_moving_timer(%BareElevator{timer: timer} = elevator_data)
+  do
     Process.cancel_timer(timer)
     timer = Process.send_after(self(), :moving_timer, @moving_time)
-    new_data = Map.put(elevator_data, :timer, timer)
+    new_elevator_data = Map.put(elevator_data, :timer, timer)
+
+    new_elevator_data
   end
 
 
   @doc """
   Function that starts a timer to check if init takes too long
   """
-  defp start_init_timer(%BareElevator{timer: timer} = elevator_data) do
+  defp start_init_timer(%BareElevator{timer: timer} = elevator_data)
+  do
     Process.cancel_timer(timer)
     timer = Process.send_after(self(), :init_timer, @init_time)
-    new_data = Map.put(elevator_data, :timer, timer)
+    new_elevator_data = Map.put(elevator_data, :timer, timer)
+
+    new_elevator_data
   end
 
   @doc """
   Function to start a timer to send updates over UDP to the master
   """
-  defp start_udp_timer() do
+  defp start_udp_timer()
+  do
     Process.send_after(self(), :udp_timer, @update_time)
   end
 
@@ -360,10 +457,12 @@ defmodule BareElevator do
   @doc """
   Function to open/close door
   """
-  defp open_door() do
+  defp open_door()
+  do
     Driver.set_door_open_light(:on)
   end
-  defp close_door() do
+  defp close_door()
+  do
     Driver.set_door_open_light(:off)
   end
 
@@ -371,15 +470,10 @@ defmodule BareElevator do
   @doc """
   Function to kill the module in case of an error
   """
-  defp restart_process() do
+  defp restart_process()
+  do
     # Should pherhaps consider sending a message to master or something ?
     Driver.set_motor_direction(:stop)
     Process.exit(self(), :shutdown)
   end
-
-
-  @doc """
-  Function to remove current active order from the list
-  """
-
 end

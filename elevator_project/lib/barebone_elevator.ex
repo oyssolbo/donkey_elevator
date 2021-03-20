@@ -47,7 +47,8 @@ defmodule BareElevator do
     - spawns a process to continously check the state of the elevator
     - sets engine direction down
   """
-  def init() do
+  def init()
+  do
     Logger.info("Elevator initialized")
 
     # Set correct elevator-state
@@ -76,7 +77,8 @@ defmodule BareElevator do
   @doc """
   Function to link to the GenStateMachine-server
   """
-  def start_link(init_arg \\ [:init_state]) do
+  def start_link(init_arg \\ [:init_state])
+  do
     server_opts = [name: @node_name]
     GenStateMachine.start_link(__MODULE__, init_arg, server_opts)
   end
@@ -85,7 +87,8 @@ defmodule BareElevator do
   @doc """
   Function to stop the elevator in case of the GenStateMachine-server crashes
   """
-  def terminate(_reason, _state) do
+  def terminate(_reason, _state)
+  do
     Logger.info("Elevator given order to terminate. Terminating")
     Driver.set_motor_direction(:stop)
     Process.exit(self(), :normal)
@@ -108,7 +111,7 @@ defmodule BareElevator do
         {:received_order, %Order{order_id: id} = new_order},
         _,
         %BareElevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
-    do
+  do
     # First check if the order is valid - throws an error if not (will trigger a crash)
     Order.check_valid_orders([new_order])
 

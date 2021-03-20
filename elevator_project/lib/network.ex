@@ -19,16 +19,17 @@ defmodule Network do
 
 
   @doc """
-  @brief        Function that hopefully returns the IP-address of the system
+  Function that hopefully returns the IP-address of the system
 
-  @param port   Port we should try to access. Default param set to @init_port
+  port Port we should try to access. Default param set to @init_port
 
-  @retval       RETURNS:                        IF:
-                  ip                              If the IP-address was found
-                  {:error, :could_not_get_ip}     If the IP-address could not be
-                                                    resolved
+  RETURNS:                        IF:
+    ip                              If the IP-address was found
+    {:error, :could_not_get_ip}     If the IP-address could not be
+                                      resolved
   """
-  def get_ip(port \\ @init_port) do
+  def get_ip(port \\ @init_port)
+  do
     case UDP.open_connection(port, [active: false, broadcast: true]) do
       {:ok, socket} ->
         UDP.send_data(socket, @broadcast_address, port, "Test")
@@ -54,24 +55,26 @@ defmodule Network do
 
 
   @doc """
-  @brief        Formats an IP-address to a bytestring
+  Formats an IP-address to a bytestring
 
-  @param ip     IP-address to convert to a bytestring
+  ip IP-address to convert to a bytestring
   """
-  def ip_to_string(ip) do
+  def ip_to_string(ip)
+  do
     :inet.ntoa(ip) |> to_string()
   end
 
 
 
   @doc """
-  @brief        Detects all nodes on the network
+  Detects all nodes on the network
 
-  @retval       RETURNS:                      IF:
-                  nodes                         If nodes discovered
-                  {:error, :node_not_running}   If no nodes discovered
+  RETURNS:                      IF:
+    nodes                         If nodes discovered
+    {:error, :node_not_running}   If no nodes discovered
   """
-  def detect_nodes() do
+  def detect_nodes()
+  do
     case [Node.self() | Node.list()] do
       [:'nonode@nohost'] ->
         {:error, :node_not_running}

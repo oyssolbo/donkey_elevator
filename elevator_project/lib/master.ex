@@ -35,6 +35,10 @@ defmodule Master do
   Is it possible to use a struct to hold all of the desired data?
       E.G. Struct containing the current connected elevators and their respective
       orders and timers?
+
+
+  How could one differentiate the elevators from each other? All of them must have
+  different names: :elevator + ip pherhaps?
   """
 
   @min_floor              Application.fetch_env!(:elevator_project, :min_floor)
@@ -44,7 +48,7 @@ defmodule Master do
 
   @default_check_time_ms  2000
 
-  @node_name :master
+  @node_name :master #<> Network.get_ip()
   @enforce_keys [
     :active_orders,
     :connected_externals,
@@ -73,7 +77,8 @@ defmodule Master do
   connected external modules, timer for external nodes and the activation-time¨
   of the module
   """
-  def init() do
+  def init()
+  do
     # Set correct master-state
     master_data = %Master{
       active_orders: :nil,
@@ -121,13 +126,30 @@ defmodule Master do
     Process.exit(self(), :normal)
   end
 
+
+  @doc """
+  Function for registering a new order with the master
+  """
+
+
+  @doc """
+  Function for sending elevator-data
+  """
+
+
+  @doc """
+  Function for receiving heartbeats from the active master
+  """
+
+
   ############################################### Events ################################################
 
 
   @doc """
   Function to link to the GenStateMachine-server
   """
-  def start_link(init_arg \\ [:init_state]) do
+  def start_link(init_arg \\ [:init_state])
+  do
     server_opts = [name: @node_name]
     GenStateMachine.start_link(__MODULE__, init_arg, server_opts)
   end
@@ -137,24 +159,38 @@ defmodule Master do
   Function to read the existing data in the memory, such that the server is up
   to date and can take descisions
   """
-  def handle_event(:cast, {:read_memory, _}, :init_state, master_data) do
-    # Must read from the Storage in some way, but unsure how
+  def handle_event(
+        :cast,
+        {:read_memory, _},
+        :init_state,
+        master_data)
+  do
+    # Must try to establish connection with the other master, and pherhaps also the storage - if we go for that
 
-    # And which state should we transfer into?
     {:next_state, :backup_state, master_data}
   end
 
   @doc """
   Function to handle if restart being casted
   """
-  def handle_event(:cast, :restart, _, _) do
+  def handle_event(
+        :cast,
+        :restart,
+        _,
+        _)
+  do
     restart_process()
   end
 
   @doc """
   Function to handle if another master is active at the same time
   """
-  def handle_event(:cast, {:another_active_server, t_other}, :active_state, master_data) do
+  def handle_event(
+        :cast,
+        {:another_active_server, t_other},
+        :active_state,
+        master_data)
+  do
     time = Map.get(master_data, :activation_time, Time.utc_now())
     case Time.compare(time, t_other) do
       :gt->
@@ -163,8 +199,11 @@ defmodule Master do
         {:next_state, :backup_state, master_data}
       :eq->
         # Equivalent. Restart server - but must guarantee that everything ok first
+        # But what happens to the backup data here then? We might run into the problem that
+        # both masters tries to restart - since they both have the same time. Something more
+        # clever must be done here in that case
         acceptance_test()
-        GenStateMachine.cast(@node_name, :restart)
+        # GenStateMachine.cast(@node_name, :restart)
       :lt->
         # "Oldest" server. Continue
         {:next_state, :active_state, master_data}
@@ -178,7 +217,8 @@ defmodule Master do
   @doc """
   Function to check after other nodes on the network excluding one self
   """
-  defp check_external_nodes() do
+  defp check_external_nodes()
+  do
     # Wait for '@default_check_time_ms' before checking
     :timer.sleep(@default_check_time_ms)
 
@@ -194,14 +234,16 @@ defmodule Master do
   @doc """
   Function to terminate the process
   """
-  defp restart_process() do
+  defp restart_process()
+  do
     Process.exit(self(), :normal)
   end
 
   @doc """
   Function to perform the acceptance-tests - must be developed
   """
-  defp acceptance_test() do
+  defp acceptance_test()
+  do
     :ok
   end
 

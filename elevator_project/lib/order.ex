@@ -20,11 +20,20 @@ defmodule Order do
 
     orders = Order.zip(l1, l2, l3)
   """
-  def zip(order_ids, order_types, order_floors) do
+  def zip(
+        order_ids,
+        order_types,
+        order_floors)
+  do
     zip(order_ids, order_types, order_floors, [])
   end
 
-  defp zip([order_id | rest_id], [order_type | rest_types], [order_floor | rest_floors], orders) do
+  defp zip(
+        [order_id | rest_id],
+        [order_type | rest_types],
+        [order_floor | rest_floors],
+        orders)
+  do
     zip(rest_id, rest_types, rest_floors,
     [
       %Order{order_id: order_id, order_type: order_type, order_floor: order_floor} | orders
@@ -43,7 +52,8 @@ defmodule Order do
     - order_floor is between min and max
     - order_type is either :cab, :up, :down
   """
-  def check_valid_orders([order | rest_orders]) do
+  def check_valid_orders([order | rest_orders])
+  do
     case check_valid_order(order) do
       :ok->
         check_valid_orders(rest_orders)
@@ -54,11 +64,13 @@ defmodule Order do
     end
   end
 
-  def check_valid_orders([]) do
+  def check_valid_orders([])
+  do
     :ok
   end
 
-  defp check_valid_order(%Order{order_id: id, order_type: type, order_floor: floor}) do
+  defp check_valid_order(%Order{order_id: id, order_type: type, order_floor: floor})
+  do
     min_floor = Application.fetch_env!(:elevator_project, :min_floor)
     num_floors = Application.fetch_env!(:elevator_project, :num_floors)
 

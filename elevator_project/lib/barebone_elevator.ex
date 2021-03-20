@@ -121,7 +121,8 @@ defmodule BareElevator do
     # Calculate next target_order
     elevator_data = calculate_target_floor(elevator_data, last_floor)
 
-    {:keep_state, elevator_data, {:reply, from, {:ack, id}}}
+    # We must be sure that the ack can take long enough time, since some of the processes can take some time
+    {:keep_state, elevator_data, [{:reply, from, {:ack, id}}]}
   end
 
 

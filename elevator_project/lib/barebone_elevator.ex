@@ -14,7 +14,8 @@ defmodule BareElevator do
 
 
   TODO:
-    Must use the orders to calculate the direction the elevator must travel in
+    Must find a way to handle motor-problems gracefully
+    Must check that the idle-state works reasonably well
   """
 
   use GenStateMachine
@@ -146,11 +147,16 @@ defmodule BareElevator do
         :idle_state,
         elevator_data)
   do
-    # Must check if there are any orders
+    floor = Driver.get_floor_sensor_state()
+    new_elevator_data = calculate_target_floor(elevator_data, floor)
 
-    # If there are any orders, calculate the optimal direction and transition into 
+    target_order = Map.get(new_elevator_data, :target_order)
 
-    # Transition into the moving with the optimal direction
+    if target_order != :nil do
+      {:next_state, :moving_state, new_elevator_data}
+    end
+
+    {:keep_state_and_data}
   end
 
 

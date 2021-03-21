@@ -9,8 +9,7 @@ defmodule SystemNode do
 
   require Logger
 
-  @default_tick_time 500 #Interval between pings
-
+  @default_tick_time 500 #Interval between pings (Testing needed to find optimum)
 
   @doc """
   @brief            Initializing a node
@@ -25,11 +24,11 @@ defmodule SystemNode do
   def start_node(name, cookie) when cookie |> is_atom do
     # Accessing ip, starting node and setting cookie
     ip = Network.get_ip()
-    name = name <> "@" <> ip
+    name = String.to_atom(name <> "@" <> ip)
     case Node.start(name, :longnames, @default_tick_time) do
-      {:ok, pid} ->
-        Node.set_cookie(pid, cookie)
-        pid
+      {:ok, _pid} ->
+        Node.set_cookie(Node.self(), cookie)
+        Node.self()
       {:error, _} ->
         Logger.error("An error occured when starting the node #{name} as a distributed node")
         {:error, self()}
@@ -49,11 +48,23 @@ defmodule SystemNode do
   @retval           Returns the PID (sadly not -controller) of the spawned function
   """
   def node_spawn_function(pid, module, function, args \\ [], opts \\ []) do
-    # Spawning desired function
+    # Spawning desired function as a process
     pid = Node.spawn(pid, module, function, args, opts)
-    Logger.info("Node spawned")
+    Logger.info("Link established")
     pid
   end
+
+
+
+
+  def node_spawn_function_linked(pid, module, function, args \\ []) do
+    # Spawning desired function as a process
+    #pid = Node.spawn_link(node, module, fun, args)
+    Logger.info("Link established")
+    pid
+  end
+
+
 
   @doc """
   @brief        Closing a given node. The other nodes on the distributed system will

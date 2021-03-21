@@ -18,6 +18,8 @@ defmodule BareElevator do
     Must check that the idle-state works reasonably well
   """
 
+##### Module definitions #####
+
   use GenStateMachine
 
   require Logger
@@ -37,6 +39,12 @@ defmodule BareElevator do
 
   @enforce_keys [:orders, :target_order, :last_floor, :dir, :timer]
   defstruct     [:orders, :target_order, :last_floor, :dir, :timer]
+
+
+
+###################################### External functions ######################################
+
+##### Connection to GenStateMachine-server #####
 
 
   @doc """
@@ -94,11 +102,27 @@ defmodule BareElevator do
   end
 
 
-
-################################################## Events and transitions #####################################################
-
+##### Interface to external modules #####
 
 
+  @doc """
+  Function for external modules (either Panel or Master) to call when a new order is detected
+  """
+  def add_order()
+  do
+    :ok
+  end
+
+  @doc """
+  Work in progress - must be decided alongside the interface of Panel and Master
+  """
+  def wip()
+  do
+    :ok
+  end
+
+
+###################################### Events and transitions ######################################
 
 ##### init_state #####
 
@@ -133,8 +157,6 @@ defmodule BareElevator do
   end
 
 
-
-
 ##### idle_state #####
 
   @doc """
@@ -159,8 +181,6 @@ defmodule BareElevator do
 
     {:keep_state_and_data}
   end
-
-
 
 
 ##### moving_state #####
@@ -245,8 +265,6 @@ defmodule BareElevator do
   end
 
 
-
-
 ##### door_state #####
 
   @doc """
@@ -265,8 +283,6 @@ defmodule BareElevator do
   end
 
 
-
-
 ##### restart_state #####
 
   @doc """
@@ -281,8 +297,6 @@ defmodule BareElevator do
     restart_process()
     {:next_state, :init_state, elevator_data}
   end
-
-
 
 
 ##### all_states #####
@@ -342,9 +356,7 @@ defmodule BareElevator do
   end
 
 
-
-################################################ Actions ######################################################
-
+###################################### Actions ######################################
 
 ##### Checking floor #####
 

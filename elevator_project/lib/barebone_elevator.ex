@@ -47,7 +47,7 @@ defmodule BareElevator do
     - spawns a process to continously check the state of the elevator
     - sets engine direction down
   """
-  def init()
+  def init([])
   do
     Logger.info("Elevator initialized")
 
@@ -60,24 +60,22 @@ defmodule BareElevator do
       timer: make_ref()
     }
 
-    # Must have a way to init the elevator-node
-
-    # Starting a link to the server (connects the module to the server)
-    start_link({:init_state, elevator_data})
-
-    # Spawning a process to continously check the floor
-    spawn(fn-> read_current_floor() end)
-
     # Close door and set direction down
     close_door()
     Driver.set_motor_direction(:down)
+
+    # Starting process for error-handling
+    start_init_timer(elevator_data)
+    spawn(fn-> read_current_floor() end)
+
+    {:ok, :init_state, elevator_data}
   end
 
 
   @doc """
   Function to link to the GenStateMachine-server
   """
-  def start_link(init_arg \\ [:init_state])
+  def start_link(init_arg \\ [])
   do
     server_opts = [name: @node_name]
     GenStateMachine.start_link(__MODULE__, init_arg, server_opts)
@@ -115,16 +113,20 @@ defmodule BareElevator do
     # First check if the order is valid - throws an error if not (will trigger a crash)
     Order.check_valid_orders([new_order])
 
-    # Checking if order already exists - if not, add to list
+    # Checking if order already exists - if not, add to list, calculate next target and ack
     if new_order not in prev_orders do
       new_orders = [prev_orders | new_order]
-      elevator_data = Map.put(elevator_data, :orders, new_orders)
+      temp_elevator_data = Map.put(elevator_data, :orders, new_orders)
+
+      # We have a potential bug here. Since we are using a functional language, the elevator_data that is
+      # inside of the if is not equivalent to the elevator_data outside of the scope...
+
+      new_elevator_data = calculate_target_floor(temp_elevator_data, last_floor)
+
+      {:keep_state, new_elevator_data, [{:reply, from, {:ack, id}}]}
     end
 
-    # Calculate next target_order
-    elevator_data = calculate_target_floor(elevator_data, last_floor)
-
-    # We must be sure that the ack can take long enough time, since some of the processes can take some time
+    # Ack if already in list
     {:keep_state, elevator_data, [{:reply, from, {:ack, id}}]}
   end
 
@@ -138,16 +140,30 @@ defmodule BareElevator do
         :cast,
         {:at_floor, floor},
         :moving_state,
-        %BareElevator{orders: orders, target_order: target_order, dir: dir, timer: timer} = elevator_data)
+        elevator_data)
   do
+    # I cannot understand how we should reset the timer when one get to a new floor.
+    # We must check if the new floor is not equal the old floor, but at the same time one
+    # could have the old floor also have an order in it, and therefore one cannot just disregard
+    # the floor if last_floor != floor
+
+    _last_floor = Map.get(elevator_data, :last_floor, floor)
+    target_order = Map.get(elevator_data, :target_order)
+    dir = Map.get(elevator_data, :dir)
+
+    if target_order == :nil do
+      # Invalid order here! Restart
+      {:next_state, :restart_state, elevator_data}
+    end
+
     # Checking if at target floor and if there is a valid order to stop on
     # Must be a better way to implement this! Ugly to keep one order as a priority/target
     if Map.get(target_order, :order_floor) != floor do
-      {:keep_state_and_data}
+      {:keep_state, elevator_data}
     end
 
-    if not Map.get(target_order, :order_type) in [dir, :cab] do
-      {:keep_state_and_data}
+    if Map.get(target_order, :order_type) not in [dir, :cab] do
+      {:keep_state, elevator_data}
     end
 
     new_elevator_data = reached_target_floor(elevator_data, floor)
@@ -162,7 +178,7 @@ defmodule BareElevator do
   """
   def handle_event(
         :cast,
-        {:at_floor, floor},
+        {:at_floor, _floor},
         :init_state,
         %BareElevator{timer: timer} = elevator_data)
   do
@@ -176,25 +192,28 @@ defmodule BareElevator do
   Functions to handle if we have reached the top- or bottom-floor without an
   order there. These functions should not be triggered if we have an order at
   the floor, as that event should be handled above.
+
+  Currently the elevator is set to idle, but one could argue that the elevator
+  instead should be set to restart.
   """
   def handle_event(
         :cast,
-        {:at_floor, floor = @min_floor},
+        {:at_floor, _floor = @min_floor},
         :moving_state,
         %BareElevator{dir: :down} = elevator_data)
   do
     reached_floor_limit()
-    {:next_state, :restart_state, elevator_data}
+    {:next_state, :idle_state, elevator_data}
   end
 
   def handle_event(
         :cast,
-        {:at_floor, floor = @max_floor},
+        {:at_floor, _floor = @max_floor},
         :moving_state,
         %BareElevator{dir: :up} = elevator_data)
   do
     reached_floor_limit()
-    {:next_state, :restart_state, elevator_data}
+    {:next_state, :idle_state, elevator_data}
   end
 
 
@@ -252,7 +271,7 @@ defmodule BareElevator do
         :cast,
         :udp_timer,
         _,
-        %BareElevator{orders: orders, dir: dir, last_floor: last_floor} = elevator_data)
+        %BareElevator{orders: orders, dir: dir, last_floor: last_floor} = _elevator_data)
   do
 
     # IMPORTANT! We must find a way to handle init/restart
@@ -275,20 +294,6 @@ defmodule BareElevator do
         elevator_data)
   do
     {:next_state, :restart_state, elevator_data}
-  end
-
-
-
-  @doc """
-  Function that handles when the next priority order has been updated
-  """
-  def handle_event(
-        :cast,
-        :designated_order,
-        :idle_state,
-        elevator_data)
-  do
-
   end
 
 
@@ -347,14 +352,14 @@ defmodule BareElevator do
 
     # Open door and start timer
     open_door()
-    elevator_data = start_door_timer(elevator_data)
+    timer_elevator_data = start_door_timer(elevator_data)
 
     # Remove old order and calculate new target_order
     updated_orders = remove_orders(orders, dir, floor)
-    elevator_data = Map.put(elevator_data, :orders, updated_orders)
-    elevator_data = calculate_target_floor(elevator_data, floor)
+    orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
+    new_elevator_data = calculate_target_floor(orders_elevator_data, floor)
 
-    elevator_data
+    new_elevator_data
   end
 
 
@@ -383,11 +388,12 @@ defmodule BareElevator do
 
   defp remove_orders(
         [],
-        dir,
-        floor)
+        _dir,
+        _floor)
   do
     []
   end
+
 
   @doc """
   Function to calculate the next target floor and direction
@@ -396,13 +402,43 @@ defmodule BareElevator do
         %BareElevator{dir: dir, orders: orders} = elevator_data,
         floor)
   do
-    {next_target_order, next_direction} = find_optimal_order(orders, dir, floor)
+    next_target_order = find_optimal_order(orders, dir, floor)
 
     temp_elevator_data = Map.put(elevator_data, :target_order, next_target_order)
-    new_elevator_data = Map.put(temp_elevator_data, :dir, next_direction)
+    new_elevator_data = calculate_target_direction(temp_elevator_data, floor)
 
     new_elevator_data
   end
+
+
+  @doc """
+  Function to calculate the next direction the elevator should travel in
+
+  elevator_data Struct to get the next target-floor
+  floor         Current floor the elevator is in
+  """
+  defp calculate_target_direction(
+        elevator_data,
+        floor)
+  do
+    target_order = Map.get(elevator_data, :target_order)
+
+    if target_order == :nil do
+      Map.get(elevator_data, :dir)
+    end
+
+    target_order_floor = Map.get(target_order, :order_floor)
+    if target_order_floor == floor do
+      Map.get(elevator_data, :dir)
+    end
+
+    if target_order_floor > floor do
+      :up
+    else
+      :down
+    end
+  end
+
 
   @doc """
   Function to find the next optimal order. The function uses the current floor and direction
@@ -415,9 +451,9 @@ defmodule BareElevator do
   that is directly linked to why is it here in the first place
 
 
-  orders Orders to be scanned
-  dir Current direction to check for orders
-  Floor Current floor to check for order
+  orders  Orders to be scanned
+  dir     Current direction to check for orders
+  Floor   Current floor to check for order
   """
   defp find_optimal_order(
         orders,
@@ -426,39 +462,39 @@ defmodule BareElevator do
   do
     # To prevent indefinite recursion on empty orders
     if orders == [] do
-      {:nil, dir}
+      :nil
     end
 
     # Check if orders on this floor, and in correct direction
-    order_in_dir = Enum.find(orders, :nil, fn(element)-> match?({:order_type, dir, :order_floor, floor}, element) end)
-    order_in_cab = Enum.find(orders, :nil, fn(element)-> match?({:order_type, :cab, :order_floor, floor}, element) end)
+    order_in_dir = Enum.find(orders, :nil, fn(element)-> match?(%Order{order_type: dir, order_floor: floor}, element) end)
+    order_in_cab = Enum.find(orders, :nil, fn(element)-> match?(%Order{order_type: :cab, order_floor: floor}, element) end)
 
     if order_in_cab != :nil do
-      {order_in_cab, dir}
+      order_in_cab
     end
     if order_in_dir != nil do
-      {order_in_cab, dir}
+      order_in_cab
     end
 
     # No match found. Recurse on the next floor in same direction
     if dir == :down and floor != @min_floor do
-      {order, dir} = find_optimal_order(orders, dir, floor - 1)
-      {order, dir}
+      order = find_optimal_order(orders, dir, floor - 1)
+      order
     end
     if dir == :up and floor != @max_floor do
-      {order, dir} = find_optimal_order(orders, dir, floor + 1)
-      {order, dir}
+      order = find_optimal_order(orders, dir, floor + 1)
+      order
     end
 
     # Max or min floor, change search direction
     if dir == :down and floor == @min_floor do
-      {order, dir} = find_optimal_order(orders, :up, floor + 1)
-      {order, dir}
+      order = find_optimal_order(orders, :up, floor + 1)
+      order
     end
 
     if dir == :up and floor == @max_floor do
-      {order, dir} = find_optimal_order(orders, :down, floor - 1)
-      {order, dir}
+      order = find_optimal_order(orders, :down, floor - 1)
+      order
     end
   end
 
@@ -467,36 +503,33 @@ defmodule BareElevator do
   Starts the door-timer, which signals that the elevator should
   close the door
   """
-  defp start_door_timer(%BareElevator{timer: timer} = elevator_data)
+  defp start_door_timer(elevator_data)
   do
+    timer = Map.get(elevator_data, :timer)
     Process.cancel_timer(timer)
     timer = Process.send_after(self(), :door_timer, @door_time)
-    new_elevator_data = Map.put(elevator_data, :timer, timer)
-
-    new_elevator_data
+    Map.put(elevator_data, :timer, timer)
   end
 
 
   @doc """
   Function that starts a timer to check if we are moving
-
-  last_floor Int used to indicate the last registered floor
   """
-  defp start_moving_timer(%BareElevator{timer: timer} = elevator_data)
+  defp start_moving_timer(elevator_data)
   do
+    timer = Map.get(elevator_data, :timer)
     Process.cancel_timer(timer)
     timer = Process.send_after(self(), :moving_timer, @moving_time)
-    new_elevator_data = Map.put(elevator_data, :timer, timer)
-
-    new_elevator_data
+    Map.put(elevator_data, :timer, timer)
   end
 
 
   @doc """
   Function that starts a timer to check if init takes too long
   """
-  defp start_init_timer(%BareElevator{timer: timer} = elevator_data)
+  defp start_init_timer(elevator_data)
   do
+    timer = Map.get(elevator_data, :timer)
     Process.cancel_timer(timer)
     timer = Process.send_after(self(), :init_timer, @init_time)
     new_elevator_data = Map.put(elevator_data, :timer, timer)

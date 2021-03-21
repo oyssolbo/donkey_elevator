@@ -12,7 +12,6 @@ defmodule Order do
     order_id: :nil,
     order_type: :nil,
     order_floor: :nil,
-    order_served: :nil,
     delegated_elevator: :nil
   ]
 
@@ -22,49 +21,44 @@ defmodule Order do
   order_ids           List of each order's ID. For example time the order is given
   order_types         List of each order's type; :up, :down, :cab
   order_floors        List of each order's floor; 0, 1, 2, 3, ...
-  order_served        List of bool containing information if each order has been served or not
-  delegated_elevators List of elevator delegated to serve the order
+  delegated_elevators List of elevator delegated to serve each order
 
   Example
     l1 = [make_ref(), make_ref()]
     l2 = [:up, :down]
     l3 = [1, 4]
-    l4 = [:false, :false]
-    l5 = [1, 1]
+    l4 = [1, 2]
 
-    orders = Order.zip(l1, l2, l3)
+    orders = Order.zip(l1, l2, l3, l4)
   """
   def zip(
         order_ids,
         order_types,
         order_floors,
-        order_served,
         delegated_elevators)
   do
-    zip(order_ids, order_types, order_floors, order_served, delegated_elevators, [])
+    zip(order_ids, order_types, order_floors, delegated_elevators, [])
   end
 
   defp zip(
         [order_id | rest_id],
         [order_type | rest_types],
         [order_floor | rest_floors],
-        [order_served | rest_served],
         [order_delegated | rest_delegated],
         orders)
   do
-    zip(rest_id, rest_types, rest_floors, rest_served, rest_delegated,
+    zip(rest_id, rest_types, rest_floors, rest_delegated,
     [
       %Order{
         order_id: order_id,
         order_type: order_type,
         order_floor: order_floor,
-        order_served: order_served,
         delegated_elevator: order_delegated
       } | orders
     ])
   end
 
-  defp zip(_, _, _, _, _, orders) do
+  defp zip(_, _, _, _, orders) do
     :lists.reverse(orders)
   end
 

@@ -148,11 +148,12 @@ defmodule BareElevator do
         elevator_data)
   do
     floor = Driver.get_floor_sensor_state()
-    new_elevator_data = calculate_target_floor(elevator_data, floor)
+    temp_elevator_data = calculate_target_floor(elevator_data, floor)
 
-    target_order = Map.get(new_elevator_data, :target_order)
+    target_order = Map.get(temp_elevator_data, :target_order)
 
     if target_order != :nil do
+      new_elevator_data = start_moving_timer(temp_elevator_data)
       {:next_state, :moving_state, new_elevator_data}
     end
 
@@ -175,31 +176,27 @@ defmodule BareElevator do
         :moving_state,
         elevator_data)
   do
-    # I cannot understand how we should reset the timer when one get to a new floor.
-    # We must check if the new floor is not equal the old floor, but at the same time one
-    # could have the old floor also have an order in it, and therefore one cannot just disregard
-    # the floor if last_floor != floor
-
-    _last_floor = Map.get(elevator_data, :last_floor, floor)
     target_order = Map.get(elevator_data, :target_order)
     dir = Map.get(elevator_data, :dir)
 
     if target_order == :nil do
-      # Invalid order here! Restart
+      # Invalid order here! Restart as we should not be in 'moving_state' with invalid order
       {:next_state, :restart_state, elevator_data}
     end
 
+    # Updating moving-timer and last_floor
+    temp_elevator_data = check_if_at_new_floor(elevator_data, floor)
+
     # Checking if at target floor and if there is a valid order to stop on
-    # Must be a better way to implement this! Ugly to keep one order as a priority/target
     if Map.get(target_order, :order_floor) != floor do
-      {:keep_state, elevator_data}
+      {:keep_state, temp_elevator_data}
     end
 
     if Map.get(target_order, :order_type) not in [dir, :cab] do
-      {:keep_state, elevator_data}
+      {:keep_state, temp_elevator_data}
     end
 
-    new_elevator_data = reached_target_floor(elevator_data, floor)
+    new_elevator_data = reached_target_floor(temp_elevator_data, floor)
     {:next_state, :door_state, new_elevator_data}
   end
 
@@ -372,6 +369,29 @@ defmodule BareElevator do
   do
     Driver.set_floor_indicator(floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})
+  end
+
+
+  @doc """
+  Function to check if the floor 'floor' is not equivalent to the 'last_floor' in
+  the struct elevator_data.
+
+  If the floors are different, the timer is reset and 'last_floor' is updated
+  """
+  defp check_if_at_new_floor(
+        elevator_data,
+        floor)
+  do
+    last_floor = Map.get(elevator_data, :last_floor)
+
+    if last_floor != floor do
+      temp_elevator_data = start_moving_timer(elevator_data)
+      new_elevator_data = Map.put(temp_elevator_data, :last_floor, floor)
+
+      new_elevator_data
+    end
+
+    elevator_data
   end
 
 

@@ -1,6 +1,9 @@
 defmodule Master.Supervisor do
   @moduledoc """
-  Supervisor for the elevator
+  Supervisor for the master. Restarts the module if a bug or something
+  else causes it to crash.
+
+  It is a one-to-one relationship between the master and the supervisor
   """
 
   use Supervisor
@@ -15,7 +18,7 @@ defmodule Master.Supervisor do
 
 
   @doc """
-  Function for initializing the supervisor and children
+  Function for initializing the supervisor and 'children' (child = master)
   """
   @impl true
   def init(_init_arg) do
@@ -23,11 +26,11 @@ defmodule Master.Supervisor do
       {Master, []}
     ]
 
-    # one_for_one: One supervisor for one elevator
+    # one_for_one: One supervisor for one master
     # max_seconds: Number of seconds we allow max_restarts to occur.
     #               Defaults to 5
     # max_restarts: Number of restarts we allow within max_seconds.
     #               Defaults to 3
     Supervisor.init(children, [strategy: :one_for_one, :max_seconds 2])
-
+  end
 end

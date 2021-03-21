@@ -19,7 +19,7 @@ defmodule BareElevator.Supervisor do
 
 
   @doc """
-  Function for initializing the supervisor and 'children' (child - elevator)
+  Function for initializing the supervisor and 'children' (child = elevator)
   """
   @impl true
   def init(_init_arg)

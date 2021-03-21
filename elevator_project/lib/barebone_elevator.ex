@@ -94,42 +94,69 @@ defmodule BareElevator do
 
 
 
-################################################## Events #####################################################
+################################################## Events and transitions #####################################################
+
+
+
+
+##### init_state #####
 
   @doc """
-  Function to handle if a new order is received
+  Function to handle when the elevator has received a floor in init-state
 
-  This event should be handled if the elevator is in idle, moving or door-state and NOT when
-  the elevator is initializing or restarting. Could pherhaps be best to send both internal and
-  external orders over UDP then... It does simplify the elevator, but adds larger requirements
-  to the order-panel
+  Transitions into the state 'idle_state'
   """
   def handle_event(
-        {:call, from},
-        {:received_order, %Order{order_id: id} = new_order},
-        _,
-        %BareElevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
+        :cast,
+        {:at_floor, _floor},
+        :init_state,
+        %BareElevator{timer: timer} = elevator_data)
   do
-    # First check if the order is valid - throws an error if not (will trigger a crash)
-    Order.check_valid_orders([new_order])
 
-    # Checking if order already exists - if not, add to list, calculate next target and ack
-    if new_order not in prev_orders do
-      new_orders = [prev_orders | new_order]
-      temp_elevator_data = Map.put(elevator_data, :orders, new_orders)
-
-      # We have a potential bug here. Since we are using a functional language, the elevator_data that is
-      # inside of the if is not equivalent to the elevator_data outside of the scope...
-
-      new_elevator_data = calculate_target_floor(temp_elevator_data, last_floor)
-
-      {:keep_state, new_elevator_data, [{:reply, from, {:ack, id}}]}
-    end
-
-    # Ack if already in list
-    {:keep_state, elevator_data, [{:reply, from, {:ack, id}}]}
+    Process.cancel_timer(timer)
+    {:next_state, :idle_state, elevator_data}
   end
 
+  @doc """
+  Function to handle if we are stuck at init for too long
+
+  Transitions into the state 'restart_state'
+  """
+  def handle_event(
+        :cast,
+        :init_timer,
+        :init_state,
+        elevator_data)
+  do
+    {:next_state, :restart_state, elevator_data}
+  end
+
+
+
+
+##### idle_state #####
+
+  @doc """
+  Function to handle when the elevator is in init.
+  It checks for any orders, and - if there are - transitions into the state 'moving_state'
+  """
+  def handle_event(
+        :cast,
+        _,
+        :idle_state,
+        elevator_data)
+  do
+    # Must check if there are any orders
+
+    # If there are any orders, calculate the optimal direction and transition into 
+
+    # Transition into the moving with the optimal direction
+  end
+
+
+
+
+##### moving_state #####
 
   @doc """
   Function to handle when the elevator is at the desired floor in moving state
@@ -172,23 +199,6 @@ defmodule BareElevator do
 
 
   @doc """
-  Function to handle when the elevator has received a floor in init-state
-
-  Transitions into the state 'idle_state'
-  """
-  def handle_event(
-        :cast,
-        {:at_floor, _floor},
-        :init_state,
-        %BareElevator{timer: timer} = elevator_data)
-  do
-
-    Process.cancel_timer(timer)
-    {:next_state, :idle_state, elevator_data}
-  end
-
-
-  @doc """
   Functions to handle if we have reached the top- or bottom-floor without an
   order there. These functions should not be triggered if we have an order at
   the floor, as that event should be handled above.
@@ -218,18 +228,23 @@ defmodule BareElevator do
 
 
   @doc """
-  Function to handle if the elevator enters a restart
+  Function to handle if the elevator hasn't reached a floor
+
+  Transitions into restart
   """
   def handle_event(
         :cast,
-         _,
-         :restart_state,
-         elevator_data)
+        :moving_timer,
+        :moving_state,
+        elevator_data)
   do
-    restart_process()
-    {:next_state, :init_state, elevator_data}
+    {:next_state, :restart_state, elevator_data}
   end
 
+
+
+
+##### door_state #####
 
   @doc """
   Function that handles if the door has been open for too long
@@ -247,18 +262,60 @@ defmodule BareElevator do
   end
 
 
-  @doc """
-  Function to handle if the elevator hasn't reached a floor
 
-  Transitions into restart
+
+##### restart_state #####
+
+  @doc """
+  Function to handle if the elevator enters a restart
   """
   def handle_event(
         :cast,
-        :moving_timer,
-        :moving_state,
+         _,
+        :restart_state,
         elevator_data)
   do
-    {:next_state, :restart_state, elevator_data}
+    restart_process()
+    {:next_state, :init_state, elevator_data}
+  end
+
+
+
+
+##### all_states #####
+
+  @doc """
+  Function to handle if a new order is received
+
+  This event should be handled if the elevator is in idle, moving or door-state and NOT when
+  the elevator is initializing or restarting. Could pherhaps be best to send both internal and
+  external orders over UDP then... It does simplify the elevator, but adds larger requirements
+  to the order-panel
+  """
+  def handle_event(
+        {:call, from},
+        {:received_order, %Order{order_id: id} = new_order},
+        _,
+        %BareElevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
+  do
+    # First check if the order is valid - throws an error if not (will trigger a crash)
+    Order.check_valid_orders([new_order])
+
+    # Checking if order already exists - if not, add to list, calculate next target and ack
+    if new_order not in prev_orders do
+      new_orders = [prev_orders | new_order]
+      temp_elevator_data = Map.put(elevator_data, :orders, new_orders)
+
+      # We have a potential bug here. Since we are using a functional language, the elevator_data that is
+      # inside of the if is not equivalent to the elevator_data outside of the scope...
+
+      new_elevator_data = calculate_target_floor(temp_elevator_data, last_floor)
+
+      {:keep_state, new_elevator_data, [{:reply, from, {:ack, id}}]}
+    end
+
+    # Ack if already in list
+    {:keep_state, elevator_data, [{:reply, from, {:ack, id}}]}
   end
 
 
@@ -282,23 +339,11 @@ defmodule BareElevator do
   end
 
 
-  @doc """
-  Function to handle if we are stuck at init for too long
-
-  Restarts the process
-  """
-  def handle_event(
-        :cast,
-        :init_timer,
-        :init_state,
-        elevator_data)
-  do
-    {:next_state, :restart_state, elevator_data}
-  end
-
-
 
 ################################################ Actions ######################################################
+
+
+##### Checking floor #####
 
   @doc """
   Function to read the current floor indefinetly
@@ -363,37 +408,7 @@ defmodule BareElevator do
   end
 
 
-  @doc """
-  Function to remove all orders from the list with the current floor and direction
-
-  first_order First order in the order-list
-  rest_orders Rest of the orders in the order-list
-  dir Direction of elevator
-  floor Current floor the elevator is in
-
-  Returns
-  updated_orders List of orders where the old ones are deleted
-  """
-  defp remove_orders(
-        [%Order{order_type: order_type, order_floor: order_floor} = first_order | rest_orders],
-        dir,
-        floor)
-  do
-    if order_type not in [dir, :cab] or order_floor != floor do
-      [first_order | remove_orders(rest_orders, dir, floor)]
-    else
-      remove_orders(rest_orders, dir, floor)
-    end
-  end
-
-  defp remove_orders(
-        [],
-        _dir,
-        _floor)
-  do
-    []
-  end
-
+##### Calculating optimal order/direction #####
 
   @doc """
   Function to calculate the next target floor and direction
@@ -437,6 +452,40 @@ defmodule BareElevator do
     else
       :down
     end
+  end
+
+
+##### Order #####
+
+  @doc """
+  Function to remove all orders from the list with the current floor and direction
+
+  first_order First order in the order-list
+  rest_orders Rest of the orders in the order-list
+  dir Direction of elevator
+  floor Current floor the elevator is in
+
+  Returns
+  updated_orders List of orders where the old ones are deleted
+  """
+  defp remove_orders(
+        [%Order{order_type: order_type, order_floor: order_floor} = first_order | rest_orders],
+        dir,
+        floor)
+  do
+    if order_type not in [dir, :cab] or order_floor != floor do
+      [first_order | remove_orders(rest_orders, dir, floor)]
+    else
+      remove_orders(rest_orders, dir, floor)
+    end
+  end
+
+  defp remove_orders(
+        [],
+        _dir,
+        _floor)
+  do
+    []
   end
 
 
@@ -499,6 +548,9 @@ defmodule BareElevator do
   end
 
 
+##### Timer #####
+
+
   @doc """
   Starts the door-timer, which signals that the elevator should
   close the door
@@ -546,6 +598,9 @@ defmodule BareElevator do
   end
 
 
+##### Door #####
+
+
   @doc """
   Function to open/close door
   """
@@ -557,6 +612,9 @@ defmodule BareElevator do
   do
     Driver.set_door_open_light(:off)
   end
+
+
+##### Restart #####
 
 
   @doc """

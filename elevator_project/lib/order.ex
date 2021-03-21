@@ -4,43 +4,67 @@ defmodule Order do
   list. This makes it easier to send
   """
 
-  defstruct [order_id: :nil, order_type: :nil, order_floor: :nil]
+  @min_floor Application.fetch_env!(:elevator_project, :min_floor)
+  @max_floor @min_floor + Application.fetch_env!(:elevator_project, :num_floors) - 1
+
+
+  defstruct [
+    order_id: :nil,
+    order_type: :nil,
+    order_floor: :nil,
+    order_served: :nil,
+    delegated_elevator: :nil
+  ]
 
   @doc """
   Zips multiple orders into a list
 
-  order_ids     List of each order's ID. For example time the order is given
-  order_types   List of each order's type; :up, :down, :cab
-  order_floors  List of each order's floor; 0, 1, 2, 3, ...
+  order_ids           List of each order's ID. For example time the order is given
+  order_types         List of each order's type; :up, :down, :cab
+  order_floors        List of each order's floor; 0, 1, 2, 3, ...
+  order_served        List of bool containing information if each order has been served or not
+  delegated_elevators List of elevator delegated to serve the order
 
   Example
     l1 = [make_ref(), make_ref()]
     l2 = [:up, :down]
     l3 = [1, 4]
+    l4 = [:false, :false]
+    l5 = [1, 1]
 
     orders = Order.zip(l1, l2, l3)
   """
   def zip(
         order_ids,
         order_types,
-        order_floors)
+        order_floors,
+        order_served,
+        delegated_elevators)
   do
-    zip(order_ids, order_types, order_floors, [])
+    zip(order_ids, order_types, order_floors, order_served, delegated_elevators, [])
   end
 
   defp zip(
         [order_id | rest_id],
         [order_type | rest_types],
         [order_floor | rest_floors],
+        [order_served | rest_served],
+        [order_delegated | rest_delegated],
         orders)
   do
-    zip(rest_id, rest_types, rest_floors,
+    zip(rest_id, rest_types, rest_floors, rest_served, rest_delegated,
     [
-      %Order{order_id: order_id, order_type: order_type, order_floor: order_floor} | orders
+      %Order{
+        order_id: order_id,
+        order_type: order_type,
+        order_floor: order_floor,
+        order_served: order_served,
+        delegated_elevator: order_delegated
+      } | orders
     ])
   end
 
-  defp zip(_, _, _, orders) do
+  defp zip(_, _, _, _, _, orders) do
     :lists.reverse(orders)
   end
 
@@ -69,12 +93,10 @@ defmodule Order do
     :ok
   end
 
-  defp check_valid_order(%Order{order_id: id, order_type: type, order_floor: floor})
+  defp check_valid_order(%Order{order_id: id, order_type: type, order_floor: floor} = _order)
   do
-    min_floor = Application.fetch_env!(:elevator_project, :min_floor)
-    num_floors = Application.fetch_env!(:elevator_project, :num_floors)
 
-    if floor < min_floor or floor > min_floor + num_floors - 1 do
+    if floor < @min_floor or floor > @max_floor do
       IO.puts("Order floor out of range. Received the floor")
       IO.inspect(floor)
       {:error, id}

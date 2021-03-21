@@ -9,8 +9,7 @@ defmodule SystemNode do
 
   require Logger
 
-  @default_tick_time 15000
-
+  @default_tick_time 500 #Interval between pings (Testing needed to find optimum)
 
   @doc """
   @brief            Initializing a node
@@ -22,19 +21,20 @@ defmodule SystemNode do
                   :pid                  If started in distributed mode
                   self()                If not possible to start in distributed mode
   """
-  def start_node(name, cookie) when name and cookie |> is_atom do
+  def start_node(name, cookie) when cookie |> is_atom do
     # Accessing ip, starting node and setting cookie
-    {:recv, ip} = GetIP.get_ip()
-    name = name <> ip
+    ip = Network.get_ip()
+    name = String.to_atom(name <> "@" <> ip)
     case Node.start(name, :longnames, @default_tick_time) do
-      {:ok, pid} ->
-        Node.set_cookie(pid, cookie)
-        pid
+      {:ok, _pid} ->
+        Node.set_cookie(Node.self(), cookie)
+        Node.self()
       {:error, _} ->
         Logger.error("An error occured when starting the node #{name} as a distributed node")
         {:error, self()}
     end
   end
+
 
   @doc """
   @brief            Connecting a node to a function
@@ -48,11 +48,23 @@ defmodule SystemNode do
   @retval           Returns the PID (sadly not -controller) of the spawned function
   """
   def node_spawn_function(pid, module, function, args \\ [], opts \\ []) do
-    # Spawning desired function
+    # Spawning desired function as a process
     pid = Node.spawn(pid, module, function, args, opts)
-    Logger.info("Node spawned")
+    Logger.info("Link established")
     pid
   end
+
+
+
+
+  def node_spawn_function_linked(pid, module, function, args \\ []) do
+    # Spawning desired function as a process
+    #pid = Node.spawn_link(node, module, fun, args)
+    Logger.info("Link established")
+    pid
+  end
+
+
 
   @doc """
   @brief        Closing a given node. The other nodes on the distributed system will
@@ -75,7 +87,7 @@ defmodule SystemNode do
   @doc """
   @brief        Connects the nodes on the network
   """
-  def connect_nodes(node) do
+  def connect_nodes(node) do # should mby be renamed to discover nodes. Does not seem to actually connect to the node network
     case Network.detect_nodes() do
       {:error, :node_not_running} ->
         Logger.error("No nodes available to connect")
@@ -84,6 +96,14 @@ defmodule SystemNode do
         Logger.info("Connecting to nodes")
         Node.connect(head)
     end
+  end
+
+  @doc """
+  @brief        Connects the node to node-network
+  Just a sketch for now
+  """
+  def connect_node_network(node) do
+    Node.ping(node)
   end
 
 

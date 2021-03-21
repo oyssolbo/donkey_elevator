@@ -26,7 +26,6 @@ defmodule UDP do
     open_connection(@local_port)
   end
 
-
   @doc """
   @brief        Function that opens socket at the port @local_port
 
@@ -38,8 +37,8 @@ defmodule UDP do
                   {:ok, socket}                 If socket opened
                   {:nil, 0}                     If an error occured
   """
-  def open_connection(port, opts \\ [:binary, active: :false, reuseaddr: :true])
-        when port |> is_integer and opts |> is_list do
+  def open_connection(port, opts \\ [:binary, active: :true, reuseaddr: :true])
+      when port |> is_integer and opts |> is_list do
 
     case :gen_udp.open(port, opts) do
       {:ok, socket} ->
@@ -51,7 +50,6 @@ defmodule UDP do
         {:nil, 0}
     end
   end
-
 
   @doc """
   @brief        Function that sends data
@@ -65,11 +63,19 @@ defmodule UDP do
                   {:ok, socket}                 If socket opened
                   {:nil, 0}                     If an error occured
   """
-  def send_data(from_socket, to_socket, packet)
-        when from_socket |> is_tuple and to_socket |> is_tuple do
+  def send_data(from_socket, to_socket, packet) do
+        #when from_socket |> is_tuple and to_socket |> is_tuple
     Logger.info("Sent packet #{packet} from #{from_socket} to #{to_socket}")
     :gen_udp.send(from_socket, to_socket, packet)
   end
+
+
+  def send_data(from_socket, ip, port, packet) do
+    #when from_socket |> is_tuple and to_socket |> is_tuple do
+    #Logger.info("Sent packet #{packet} from #{from_socket} to #{ip} on port #{port}")
+    :gen_udp.send(from_socket, ip, port, packet)
+end
+
 
 
   @doc """

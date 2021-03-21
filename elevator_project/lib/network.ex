@@ -31,16 +31,22 @@ defmodule Network do
   def get_ip(port \\ @init_port) do
     case UDP.open_connection(port, [active: false, broadcast: true]) do
       {:ok, socket} ->
-        UDP.send_data(socket, @broadcast_address, port, "Test")
+        #UDP.send_data(socket, @broadcast_address, port, "Test")
+        :gen_udp.send(socket, {255,255,255,255}, 6789, "test packet")
+        # case UDP.receive_data(socket) do
+        #   {:recv, {ip, _port, _data}} ->
+        #     {:recv, ip}
+        #   {:error, _} ->
+        #     {:error, :could_not_get_ip}
+        # end
 
-        case UDP.receive_data(socket) do
-          {:recv, {ip, _port, _data}} ->
-            {:recv, ip}
-          {:error, _} ->
-            {:error, :could_not_get_ip}
+        ip = case :gen_udp.recv(socket, 100, 1000) do
+          {:ok, {ip, _port, _data}} -> ip
+          {:error, _} -> {:error, :could_not_get_ip}
         end
 
         UDP.close_socket(socket)
+        :inet.ntoa(ip) |> to_string()
 
         {:nil, _} ->
           if port - @init_port < @num_tries do

@@ -41,8 +41,8 @@ defmodule BareElevator do
 
   @node_name    :barebone_elevator
 
-  @enforce_keys [:orders, :target_order, :last_floor, :dir, :timer]
-  defstruct     [:orders, :target_order, :last_floor, :dir, :timer]
+  @enforce_keys [:orders, :last_floor, :dir, :timer]
+  defstruct     [:orders, :last_floor, :dir, :timer]
 
 
 
@@ -67,7 +67,6 @@ defmodule BareElevator do
     # Set correct elevator-state
     data = %BareElevator{
       orders: [],
-      target_order: :nil,
       last_floor: :nil,
       dir: :down,
       timer: make_ref()

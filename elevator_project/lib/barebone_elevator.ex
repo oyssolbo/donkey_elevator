@@ -137,7 +137,7 @@ defmodule BareElevator do
         :init_state,
         %BareElevator{timer: timer} = elevator_data)
   do
-
+    Logger.info("Elevator safe at floor after init. Transitioning into idle")
     Process.cancel_timer(timer)
     {:next_state, :idle_state, elevator_data}
   end
@@ -153,6 +153,7 @@ defmodule BareElevator do
         :init_state,
         elevator_data)
   do
+    Logger.info("Elevator did not get to a defined floor before timeout. Restarting")
     {:next_state, :restart_state, elevator_data}
   end
 
@@ -160,7 +161,7 @@ defmodule BareElevator do
 ##### idle_state #####
 
   @doc """
-  Function to handle when the elevator is in init.
+  Function to handle when the elevator is in idle
   It checks for any orders, and - if there are - transitions into the state 'moving_state'
   """
   def handle_event(
@@ -169,14 +170,18 @@ defmodule BareElevator do
         :idle_state,
         elevator_data)
   do
+    Logger.info("Elevator in idle_state")
+
+    # floor should always be an integer when in idle_state
     floor = Driver.get_floor_sensor_state()
     temp_elevator_data = calculate_target_floor(elevator_data, floor)
 
     target_order = Map.get(temp_elevator_data, :target_order)
 
     if target_order != :nil do
+      dir = Map.get(temp_elevator_data, :dir)
       new_elevator_data = start_moving_timer(temp_elevator_data)
-      {:next_state, :moving_state, new_elevator_data}
+      {:next_state, :moving_state, new_elevator_data, [Driver.set_motor_direction(dir)]}
     end
 
     {:keep_state_and_data}
@@ -196,6 +201,8 @@ defmodule BareElevator do
         :moving_state,
         elevator_data)
   do
+    Logger.info("Elevator reached a floor while in moving_state")
+
     target_order = Map.get(elevator_data, :target_order)
     dir = Map.get(elevator_data, :dir)
 
@@ -216,6 +223,7 @@ defmodule BareElevator do
       {:keep_state, temp_elevator_data}
     end
 
+    Logger.info("Elevator reached target destination")
     new_elevator_data = reached_target_floor(temp_elevator_data, floor)
     {:next_state, :door_state, new_elevator_data}
   end
@@ -235,6 +243,7 @@ defmodule BareElevator do
         :moving_state,
         %BareElevator{dir: :down} = elevator_data)
   do
+    Logger.info("Elevator reached min_floor while moving down")
     reached_floor_limit()
     {:next_state, :idle_state, elevator_data}
   end
@@ -245,6 +254,7 @@ defmodule BareElevator do
         :moving_state,
         %BareElevator{dir: :up} = elevator_data)
   do
+    Logger.info("Elevator reached max floor while moving up")
     reached_floor_limit()
     {:next_state, :idle_state, elevator_data}
   end
@@ -261,6 +271,7 @@ defmodule BareElevator do
         :moving_state,
         elevator_data)
   do
+    Logger.info("Elevator spent too long time moving. Engine failure - restarting.")
     {:next_state, :restart_state, elevator_data}
   end
 
@@ -268,9 +279,7 @@ defmodule BareElevator do
 ##### door_state #####
 
   @doc """
-  Function that handles if the door has been open for too long
-
-  Closes the door and enters idle_state
+  Closes the door and transitions into idle
   """
   def handle_event(
         :cast,
@@ -278,6 +287,7 @@ defmodule BareElevator do
         :door_state,
         elevator_data)
   do
+    Logger.info("Elevator closing door and going into idle")
     close_door()
     {:next_state, :idle_state, elevator_data}
   end
@@ -294,6 +304,7 @@ defmodule BareElevator do
         :restart_state,
         elevator_data)
   do
+    Logger.info("Elevator restarts")
     restart_process()
     {:next_state, :init_state, elevator_data}
   end
@@ -315,6 +326,8 @@ defmodule BareElevator do
         _,
         %BareElevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
   do
+    Logger.info("Elevator received order from #{from}")
+
     # First check if the order is valid - throws an error if not (will trigger a crash)
     Order.check_valid_orders([new_order])
 
@@ -328,9 +341,11 @@ defmodule BareElevator do
 
       new_elevator_data = calculate_target_floor(temp_elevator_data, last_floor)
 
+      Logger.info("Order added to list")
       {:keep_state, new_elevator_data, [{:reply, from, {:ack, id}}]}
     end
 
+    Logger.info("Order already in list")
     # Ack if already in list
     {:keep_state, elevator_data, [{:reply, from, {:ack, id}}]}
   end
@@ -430,8 +445,7 @@ defmodule BareElevator do
         floor)
   do
     Driver.set_motor_direction(:stop)
-    IO.puts("Reached target floor at floor")
-    IO.inspect(floor)
+    Logger.info("Reached target floor at floor #{floor}")
 
     # Open door and start timer
     open_door()

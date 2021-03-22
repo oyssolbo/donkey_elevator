@@ -466,7 +466,10 @@ defmodule BareElevator do
   Function to calculate the next target floor and direction
   """
   defp calculate_target_floor(
-        %BareElevator{dir: dir, orders: orders} = elevator_data,
+        %BareElevator{
+          dir: dir,
+          orders: orders
+        } = elevator_data,
         floor)
   do
     next_target_order = find_optimal_order(orders, dir, floor)
@@ -678,4 +681,53 @@ defmodule BareElevator do
     Driver.set_motor_direction(:stop)
     Process.exit(self(), :shutdown)
   end
+
+
+
+
+
+
+
+
+
+
+
+###################################### DEBUGGING FUNCTIONS ######################################
+
+##### Debugging state-transitions #####
+
+  @doc """
+  Function to set the system in a desired state, with desired data
+
+  new_state New_state for the system to be set to
+  new_data  New_data the system should handle
+  """
+  def debugging_set_state_and_data(
+        new_state,
+        new_data)
+  do
+    GenStateMachine.cast(@node_name, {:debugging, new_state, new_data})
+  end
+
+
+  def handle_event(
+        :cast,
+        {:debugging, new_state, new_data},
+        _,
+        _elevator_data)
+  do
+    {:next_state, new_state, new_data}
+  end
+
+
+
+#####  #####
+
+
+
+
+
+
+
+
 end

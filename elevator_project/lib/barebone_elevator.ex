@@ -333,10 +333,14 @@ defmodule BareElevator do
     # Checking if order already exists - if not, add to list, calculate next target and ack
     if new_order not in prev_orders do
       new_orders = [prev_orders | new_order]
-
       last_dir = Map.get(elevator_data, :dir)
-
       new_dir = calculate_optimal_direction(new_orders, last_dir, last_floor)
+
+      if new_dir == :nil do
+        # This should NOT happen! Restart!
+        Logger.error("Direction calculated as ':nil' when new order received! Restarting without ack")
+        {:next_state, :restart_state, elevator_data}
+      end
 
       temp_elevator_data = Map.put(elevator_data, :orders, new_orders)
       new_elevator_data = Map.put(temp_elevator_data, :dir, new_dir)

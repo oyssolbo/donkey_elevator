@@ -104,4 +104,66 @@ defmodule Order do
 
     :ok
   end
+
+  @doc """
+  Function to get all orders at floor 'floor' in a list of orders
+  that satisfies the required [:dir, :cab]
+
+  [order | rest_orders] List of orders to check
+  floor                 Floor to check on
+  dir                   Direction (:up, :down) to check for
+
+  Returns               If
+  list_of_orders        There are orders satisfying the requirements
+  []                    No orders satisfies the requirements
+  """
+  def get_order_at_floor(
+        [order | rest_orders],
+        floor,
+        dir)
+  do
+    order_floor = Map.get(order, :order_floor)
+    order_dir = Map.get(order, :order_type)
+
+    if order_dir in [dir, :cab] and order_floor == floor do
+      [order | get_order_at_floor(rest_orders, floor, dir)]
+    else
+      get_order_at_floor(rest_orders, floor, dir)
+    end
+  end
+
+  def get_order_at_floor(
+        [],
+        _floor,
+        _dir)
+  do
+    []
+  end
+
+
+  @doc """
+  Function to check if there are orders on floor 'floor' with the
+  direction 'dir' or ':cab'
+
+  orders  List of orders to check
+  floor   Floor to check on
+  dir     Direction (:up, :down) to check for
+
+  Returns                   If
+  {:true, list_of_orders}   There are orders satisfying the requirements
+  {:false, []}              No orders satisfies the requirements
+  """
+  def check_orders_at_floor(
+    orders,
+    floor,
+    dir)
+  do
+    satisfying_orders = get_order_at_floor(orders, floor, dir)
+
+    if length(satisfying_orders) == 0 do
+      {:false, []}
+    end
+    {:true, satisfying_orders}
+  end
+
 end

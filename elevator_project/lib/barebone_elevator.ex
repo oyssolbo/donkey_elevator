@@ -14,8 +14,12 @@ defmodule BareElevator do
 
 
   TODO:
-    Must find a way to handle motor-problems gracefully
-    Must check that the idle-state works reasonably well
+    Remove the target-order, and instead just calculate the direction (up/down), and
+      just constantly check if there is an order at a given floor everytime we get to
+      that floor
+
+    Functions for transitioning between the states
+
   """
 
 ##### Module definitions #####
@@ -61,7 +65,7 @@ defmodule BareElevator do
     Logger.info("Elevator initialized")
 
     # Set correct elevator-state
-    elevator_data = %BareElevator{
+    data = %BareElevator{
       orders: [],
       target_order: :nil,
       last_floor: :nil,
@@ -74,7 +78,7 @@ defmodule BareElevator do
     Driver.set_motor_direction(:down)
 
     # Starting process for error-handling
-    start_init_timer(elevator_data)
+    elevator_data = start_init_timer(data)
     spawn(fn-> read_current_floor() end)
 
     {:ok, :init_state, elevator_data}
@@ -108,9 +112,9 @@ defmodule BareElevator do
   @doc """
   Function for external modules (either Panel or Master) to call when a new order is detected
   """
-  def add_order()
+  def delegate_order(from, order)
   do
-    :ok
+    GenStateMachine.call(@node_name, {:received_order, order})
   end
 
   @doc """
@@ -179,9 +183,10 @@ defmodule BareElevator do
     target_order = Map.get(temp_elevator_data, :target_order)
 
     if target_order != :nil do
-      dir = Map.get(temp_elevator_data, :dir)
       new_elevator_data = start_moving_timer(temp_elevator_data)
-      {:next_state, :moving_state, new_elevator_data, [Driver.set_motor_direction(dir)]}
+      dir = Map.get(new_elevator_data, :dir)
+      Driver.set_motor_direction(dir)
+      {:next_state, :moving_state, new_elevator_data}
     end
 
     {:keep_state_and_data}
@@ -212,7 +217,7 @@ defmodule BareElevator do
     end
 
     # Updating moving-timer and last_floor
-    temp_elevator_data = check_if_at_new_floor(elevator_data, floor)
+    temp_elevator_data = check_at_new_floor(elevator_data, floor)
 
     # Checking if at target floor and if there is a valid order to stop on
     if Map.get(target_order, :order_floor) != floor do
@@ -405,7 +410,7 @@ defmodule BareElevator do
 
   If the floors are different, the timer is reset and 'last_floor' is updated
   """
-  defp check_if_at_new_floor(
+  defp check_at_new_floor(
         elevator_data,
         floor)
   do

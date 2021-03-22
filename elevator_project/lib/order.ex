@@ -160,7 +160,7 @@ defmodule Order do
   do
     satisfying_orders = get_order_at_floor(orders, floor, dir)
 
-    if length(satisfying_orders) == 0 do
+    if satisfying_orders == [] do
       {:false, []}
     end
     {:true, satisfying_orders}

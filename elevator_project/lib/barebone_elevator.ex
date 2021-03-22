@@ -29,6 +29,7 @@ defmodule BareElevator do
   require Logger
   require Driver
   require Order
+  require Lights
 
   @min_floor    Application.fetch_env!(:elevator_project, :min_floor)
   @max_floor    Application.fetch_env!(:elevator_project, :num_floors) + @min_floor - 1
@@ -345,6 +346,8 @@ defmodule BareElevator do
       temp_elevator_data = Map.put(elevator_data, :orders, new_orders)
       new_elevator_data = Map.put(temp_elevator_data, :dir, new_dir)
 
+      Lights.set_order_lights(new_orders)
+
       Logger.info("Order added to list")
       {:keep_state, new_elevator_data, [{:reply, from, {:ack, id}}]}
     end
@@ -398,7 +401,7 @@ defmodule BareElevator do
   """
   defp check_at_floor(floor) when floor |> is_integer
   do
-    Driver.set_floor_indicator(floor)
+    Lights.set_floorlight(floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
 
@@ -458,6 +461,8 @@ defmodule BareElevator do
     # Remove old order and calculate new target_order
     updated_orders = remove_orders(orders, dir, floor)
     orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
+
+    Lights.set_order_lights(updated_orders)
 
     dir_opt = calculate_optimal_direction(updated_orders, dir, floor)
     Map.put(orders_elevator_data, :dir, dir_opt)
@@ -610,11 +615,11 @@ defmodule BareElevator do
   """
   defp open_door()
   do
-    Driver.set_door_open_light(:on)
+    Lights.set_door_light(:on)
   end
   defp close_door()
   do
-    Driver.set_door_open_light(:off)
+    Lights.set_door_light(:off)
   end
 
 

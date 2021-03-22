@@ -177,15 +177,18 @@ defmodule BareElevator do
     Logger.info("Elevator in idle_state")
 
     # floor should always be an integer when in idle_state
-    floor = Driver.get_floor_sensor_state()
-    temp_elevator_data = calculate_target_floor(elevator_data, floor)
+    last_floor = Map.get(elevator_data, :last_floor)
+    last_dir = Map.get(elevator_data, :dir)
+    orders = Map.get(elevator_data, :orders)
 
-    target_order = Map.get(temp_elevator_data, :target_order)
+    new_dir = calculate_optimal_direction(orders, last_dir, last_floor)
 
-    if target_order != :nil do
+    if new_dir != :nil do
+      temp_elevator_data = Map.put(elevator_data, :dir, new_dir)
+
       new_elevator_data = start_moving_timer(temp_elevator_data)
-      dir = Map.get(new_elevator_data, :dir)
-      Driver.set_motor_direction(dir)
+      Driver.set_motor_direction(new_dir)
+
       {:next_state, :moving_state, new_elevator_data}
     end
 
@@ -208,28 +211,20 @@ defmodule BareElevator do
   do
     Logger.info("Elevator reached a floor while in moving_state")
 
-    target_order = Map.get(elevator_data, :target_order)
-    dir = Map.get(elevator_data, :dir)
+    all_orders = Map.get(elevator_data, :orders)
+    direction = Map.get(elevator_data, :dir)
 
-    if target_order == :nil do
-      # Invalid order here! Restart as we should not be in 'moving_state' with invalid order
-      {:next_state, :restart_state, elevator_data}
-    end
+    {order_at_floor, _valid_orders} = Order.check_orders_at_floor(all_orders, floor, direction)
 
     # Updating moving-timer and last_floor
     temp_elevator_data = check_at_new_floor(elevator_data, floor)
 
     # Checking if at target floor and if there is a valid order to stop on
-    if Map.get(target_order, :order_floor) != floor do
+    if not order_at_floor do
       {:keep_state, temp_elevator_data}
     end
 
-    if Map.get(target_order, :order_type) not in [dir, :cab] do
-      {:keep_state, temp_elevator_data}
-    end
-
-    Logger.info("Elevator reached target destination")
-    new_elevator_data = reached_target_floor(temp_elevator_data, floor)
+    new_elevator_data = reached_order_floor(temp_elevator_data, floor)
     {:next_state, :door_state, new_elevator_data}
   end
 
@@ -333,18 +328,19 @@ defmodule BareElevator do
   do
     Logger.info("Elevator received order from #{from}")
 
-    # First check if the order is valid - throws an error if not (will trigger a crash)
+    # First check if the order is valid - throws an error if not
     Order.check_valid_orders([new_order])
 
     # Checking if order already exists - if not, add to list, calculate next target and ack
     if new_order not in prev_orders do
       new_orders = [prev_orders | new_order]
+
+      last_dir = Map.get(elevator_data, :dir)
+
+      new_dir = calculate_optimal_direction(new_orders, last_dir, last_floor)
+
       temp_elevator_data = Map.put(elevator_data, :orders, new_orders)
-
-      # We have a potential bug here. Since we are using a functional language, the elevator_data that is
-      # inside of the if is not equivalent to the elevator_data outside of the scope...
-
-      new_elevator_data = calculate_target_floor(temp_elevator_data, last_floor)
+      new_elevator_data = Map.put(temp_elevator_data, :dir, new_dir)
 
       Logger.info("Order added to list")
       {:keep_state, new_elevator_data, [{:reply, from, {:ack, id}}]}
@@ -445,7 +441,7 @@ defmodule BareElevator do
   floor Current elevator floor
   timer Current active timer for elevator (moving)
   """
-  defp reached_target_floor(
+  defp reached_order_floor(
         %BareElevator{orders: orders, dir: dir} = elevator_data,
         floor)
   do
@@ -459,58 +455,64 @@ defmodule BareElevator do
     # Remove old order and calculate new target_order
     updated_orders = remove_orders(orders, dir, floor)
     orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
-    new_elevator_data = calculate_target_floor(orders_elevator_data, floor)
 
-    new_elevator_data
+    dir_opt = calculate_optimal_direction(updated_orders, dir, floor)
+    Map.put(orders_elevator_data, :dir, dir_opt)
   end
 
 
-##### Calculating optimal order/direction #####
+##### Calculating optimal direction #####
 
   @doc """
-  Function to calculate the next target floor and direction
+  Function to find the next optimal order. The function uses the current floor and direction
+  to return the next optimal order for the elevator to serve.
+  The function changes direction it checks in if nothing is found.
+
+  One may be worried that the function is stuck here in an endless recursion-loop since it changes
+  direction if it haven't found anything. As long as there exist an order inside the elevator-space,
+  the function will find it. It may be a possible bug if an order is outside of the elevator-space, but
+  that is directly linked to why is it here in the first place
+
+
+  orders  Orders to be scanned
+  dir     Current direction to check for orders
+  Floor   Current floor to check for order
   """
-  defp calculate_target_floor(
-        %BareElevator{
-          dir: dir,
-          orders: orders
-        } = elevator_data,
-        floor)
+  defp calculate_optimal_direction(
+        orders,
+        dir,
+        floor) when floor >= @min_floor and floor <= @max_floor
   do
-    next_target_order = find_optimal_order(orders, dir, floor)
-
-    temp_elevator_data = Map.put(elevator_data, :target_order, next_target_order)
-    new_elevator_data = calculate_target_direction(temp_elevator_data, floor)
-
-    new_elevator_data
-  end
-
-
-  @doc """
-  Function to calculate the next direction the elevator should travel in
-
-  elevator_data Struct to get the next target-floor
-  floor         Current floor the elevator is in
-  """
-  defp calculate_target_direction(
-        elevator_data,
-        floor)
-  do
-    target_order = Map.get(elevator_data, :target_order)
-
-    if target_order == :nil do
-      Map.get(elevator_data, :dir)
+    # To prevent indefinite recursion on empty orders
+    if orders == [] do
+      :nil
     end
 
-    target_order_floor = Map.get(target_order, :order_floor)
-    if target_order_floor == floor do
-      Map.get(elevator_data, :dir)
+    # Check if orders on this floor, and in correct direction
+    {bool, _order_in_dir} = Order.check_orders_at_floor(orders, dir, floor)
+    if bool == :true do
+      dir
     end
 
-    if target_order_floor > floor do
-      :up
-    else
-      :down
+    # No match found. Recurse on the next floor in same direction
+    if dir == :down and floor != @min_floor do
+      dir_opt = calculate_optimal_direction(orders, dir, floor - 1)
+      dir_opt
+    end
+    if dir == :up and floor != @max_floor do
+      dir_opt = calculate_optimal_direction(orders, dir, floor + 1)
+      dir_opt
+    end
+
+    # Max or min floor, change search direction
+    if dir == :down and floor == @min_floor do
+      dir_opt = calculate_optimal_direction(orders, dir, floor + 1)
+      dir_opt
+    end
+
+    if dir == :up and floor == @max_floor do
+      dir_opt = calculate_optimal_direction(orders, dir, floor - 1)
+      dir_opt
     end
   end
 
@@ -546,65 +548,6 @@ defmodule BareElevator do
         _floor)
   do
     []
-  end
-
-
-  @doc """
-  Function to find the next optimal order. The function uses the current floor and direction
-  to return the next optimal order for the elevator to serve.
-  The function changes direction it checks in if nothing is found.
-
-  One may be worried that the function is stuck here in an endless recursion-loop since it changes
-  direction if it haven't found anything. As long as there exist an order inside the elevator-space,
-  the function will find it. It may be a possible bug if an order is outside of the elevator-space, but
-  that is directly linked to why is it here in the first place
-
-
-  orders  Orders to be scanned
-  dir     Current direction to check for orders
-  Floor   Current floor to check for order
-  """
-  defp find_optimal_order(
-        orders,
-        dir,
-        floor) when floor >= @min_floor and floor <= @max_floor
-  do
-    # To prevent indefinite recursion on empty orders
-    if orders == [] do
-      :nil
-    end
-
-    # Check if orders on this floor, and in correct direction
-    order_in_dir = Enum.find(orders, :nil, fn(element)-> match?(%Order{order_type: dir, order_floor: floor}, element) end)
-    order_in_cab = Enum.find(orders, :nil, fn(element)-> match?(%Order{order_type: :cab, order_floor: floor}, element) end)
-
-    if order_in_cab != :nil do
-      order_in_cab
-    end
-    if order_in_dir != nil do
-      order_in_cab
-    end
-
-    # No match found. Recurse on the next floor in same direction
-    if dir == :down and floor != @min_floor do
-      order = find_optimal_order(orders, dir, floor - 1)
-      order
-    end
-    if dir == :up and floor != @max_floor do
-      order = find_optimal_order(orders, dir, floor + 1)
-      order
-    end
-
-    # Max or min floor, change search direction
-    if dir == :down and floor == @min_floor do
-      order = find_optimal_order(orders, :up, floor + 1)
-      order
-    end
-
-    if dir == :up and floor == @max_floor do
-      order = find_optimal_order(orders, :down, floor - 1)
-      order
-    end
   end
 
 
@@ -644,9 +587,7 @@ defmodule BareElevator do
     timer = Map.get(elevator_data, :timer)
     Process.cancel_timer(timer)
     timer = Process.send_after(self(), :init_timer, @init_time)
-    new_elevator_data = Map.put(elevator_data, :timer, timer)
-
-    new_elevator_data
+    Map.put(elevator_data, :timer, timer)
   end
 
   @doc """

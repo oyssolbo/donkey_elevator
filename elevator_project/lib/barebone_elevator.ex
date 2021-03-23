@@ -108,12 +108,13 @@ defmodule BareElevator do
   @doc """
   Function for external modules (either Panel or Master) to call when a new order is detected
   """
-  def delegate_order(%Order{} = order)
+  def delegate_order(order)
   do
     # If it only works with casting, we must ack here
 
     IO.puts("delegate_order invoked")
-    #GenStateMachine.call(@node_name, {:received_order, 1})
+    IO.inspect(order)
+    #GenStateMachine.call(@node_name, {:received_order, order})
     GenStateMachine.cast(@node_name, {:received_order, order})
   end
 
@@ -145,7 +146,7 @@ defmodule BareElevator do
 
     # Since we are safe at a floor, the elevator's state is secure
     Process.cancel_timer(timer)
-    new_elevator_data = Map.put(elevator_data, :last_floor, floor)
+    new_elevator_data = check_at_new_floor(elevator_data, floor)
     start_udp_timer()
 
     {:next_state, :idle_state, new_elevator_data}
@@ -181,16 +182,19 @@ defmodule BareElevator do
   do
     Logger.info("Elevator in idle_state")
 
-    # floor should always be an integer when in idle_state
     last_floor = Map.get(elevator_data, :last_floor)
     last_dir = Map.get(elevator_data, :dir)
     orders = Map.get(elevator_data, :orders)
 
+    IO.inspect(orders)
+
+    # We only get :nil (when we should have orders)
     new_dir = calculate_optimal_direction(orders, last_dir, last_floor)
 
     {new_state, new_data} =
       case new_dir do
         :nil->
+          Logger.info("No direction calculated")
           {:idle_state, elevator_data}
 
         _->
@@ -228,7 +232,9 @@ defmodule BareElevator do
     {order_at_floor, _valid_orders} = Order.check_orders_at_floor(all_orders, floor, direction)
 
     # Updating moving-timer and last_floor
+    IO.inspect(elevator_data)
     temp_elevator_data = check_at_new_floor(elevator_data, floor)
+    IO.inspect(temp_elevator_data)
 
     # Checking if at target floor and if there is a valid order to stop on
     {new_state, new_data} =
@@ -339,7 +345,7 @@ defmodule BareElevator do
   """
   def handle_event(
         :cast,
-        {:received_order, %Order{order_id: id} = new_order},
+        {:received_order, new_order},
         state,
         %BareElevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
   do
@@ -357,6 +363,31 @@ defmodule BareElevator do
 
     {:next_state, state, new_elevator_data}
   end
+
+  def handle_event(
+    :cast,
+    {:received_order, _},
+    state,
+    %BareElevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
+  do
+    #Logger.info("Elevator received order from #{from}")
+    Logger.info("Elevator received order _")
+
+    {:next_state, state, elevator_data}
+  end
+
+  def handle_event(
+    :cast,
+    {:received_order, new_order},
+    _,
+    %BareElevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
+  do
+    #Logger.info("Elevator received order from #{from}")
+    Logger.info("Elevator received order with state _")
+
+    {:next_state, :idle_state, elevator_data}
+  end
+
 
   @doc """
   Function to handle when the elevator's status must be sent to the master
@@ -432,14 +463,17 @@ defmodule BareElevator do
   do
     last_floor = Map.get(elevator_data, :last_floor)
 
-    if last_floor != floor do
-      temp_elevator_data = start_moving_timer(elevator_data)
-      new_elevator_data = Map.put(temp_elevator_data, :last_floor, floor)
+    cond do
+      last_floor == :nil->
+        Map.put(elevator_data, :last_floor, floor)
 
-      new_elevator_data
+      last_floor != floor->
+        temp_elevator_data = start_moving_timer(elevator_data)
+        Map.put(temp_elevator_data, :last_floor, floor)
+
+      last_floor == floor->
+        elevator_data
     end
-
-    elevator_data
   end
 
 
@@ -654,11 +688,24 @@ defmodule ElevatorTest do
 
   def test_elevator_idle_to_moving()
   do
+    # The elevator does not transition from idle to moving (order not registered)
     test_elevator_init_to_idle()
-    order = %Order{order_id: make_ref(), order_type: :cab, order_floor: 2}
+    opts = [order_id: make_ref(), order_type: :cab, order_floor: 2]
+    order = struct(Order, opts)
     BareElevator.delegate_order(order)
     BareElevator.check_at_floor(1)
+    Process.sleep(100)
+    BareElevator.check_at_floor(1)
+    Process.sleep(500)
   end
+
+  def test_elevator_moving_to_door()
+  do
+    test_elevator_idle_to_moving()
+    BareElevator.check_at_floor(2)
+    Process.sleep(500)
+  end
+
 
   def test_while()
   do

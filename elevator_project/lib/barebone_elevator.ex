@@ -142,8 +142,12 @@ defmodule BareElevator do
         %BareElevator{timer: timer} = elevator_data)
   do
     Logger.info("Elevator safe at floor after init. Transitioning into idle")
+
+    # Since we are safe at a floor, the elevator's state is secure
     Process.cancel_timer(timer)
     new_elevator_data = Map.put(elevator_data, :last_floor, floor)
+    start_udp_timer()
+
     {:next_state, :idle_state, new_elevator_data}
   end
 
@@ -379,17 +383,19 @@ defmodule BareElevator do
   No transition
   """
   def handle_event(
-        :cast,
+        :info,
         :udp_timer,
-        _,
-        %BareElevator{orders: orders, dir: dir, last_floor: last_floor} = _elevator_data)
+        state,
+        %BareElevator{orders: orders, dir: dir, last_floor: last_floor} = elevator_data)
   do
 
-    # IMPORTANT! We must find a way to handle init/restart
-    # Might be a bug to use self() when sending
-    Process.send(Process.whereis(:active_master), {self(), dir, last_floor, orders}, [])
     start_udp_timer()
-    {:keep_state_and_data}
+
+    active_master_pid = Process.whereis(:active_master)
+    if active_master_pid != :nil do
+      Process.send(active_master_pid, {self(), dir, last_floor, orders}, [])
+    end
+    {:next_state, state, elevator_data}
   end
 
 

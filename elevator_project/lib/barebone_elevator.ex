@@ -173,8 +173,6 @@ defmodule BareElevator do
   Function to handle when the elevator is in idle
   It checks for any orders, and - if there are - transitions into the state 'moving_state'
   """
-
-## Må omskrives
   def handle_event(
         :cast,
         _,
@@ -190,19 +188,22 @@ defmodule BareElevator do
 
     new_dir = calculate_optimal_direction(orders, last_dir, last_floor)
 
-    if new_dir != :nil do
-      Logger.info("New direction calculated")
-      temp_elevator_data = Map.put(elevator_data, :dir, new_dir)
+    {new_state, new_data} =
+      case new_dir do
+        :nil->
+          {:idle_state, elevator_data}
 
-      new_elevator_data = start_moving_timer(temp_elevator_data)
-      Driver.set_motor_direction(new_dir)
+        _->
+          Logger.info("New direction calculated")
+          temp_elevator_data = Map.put(elevator_data, :dir, new_dir)
 
-      {:next_state, :moving_state, new_elevator_data}
-    end
+          new_elevator_data = start_moving_timer(temp_elevator_data)
+          Driver.set_motor_direction(new_dir)
 
-    Logger.info("Continuing in idle_state")
+          {:moving_state, new_elevator_data}
+      end
 
-    {:keep_state_and_data}
+    {:next_state, new_state, new_data}
   end
 
 
@@ -213,8 +214,6 @@ defmodule BareElevator do
 
   Transitions into door_state
   """
-
-## Må omskrives
   def handle_event(
         :cast,
         {:at_floor, floor},
@@ -232,12 +231,18 @@ defmodule BareElevator do
     temp_elevator_data = check_at_new_floor(elevator_data, floor)
 
     # Checking if at target floor and if there is a valid order to stop on
-    if not order_at_floor do
-      {:keep_state, temp_elevator_data}
-    end
+    {new_state, new_data} =
+      case order_at_floor do
+        :true->
+          # The floor has an order. Stop and serve
+          new_elevator_data = reached_order_floor(temp_elevator_data, floor)
+          {:door_state, new_elevator_data}
 
-    new_elevator_data = reached_order_floor(temp_elevator_data, floor)
-    {:next_state, :door_state, new_elevator_data}
+        :false->
+          {:moving_state, temp_elevator_data}
+      end
+
+    {:next_state, new_state, new_data}
   end
 
 
@@ -332,58 +337,25 @@ defmodule BareElevator do
   external orders over UDP then... It does simplify the elevator, but adds larger requirements
   to the order-panel
   """
-
-## Må omskrives
   def handle_event(
         :cast,
         {:received_order, %Order{order_id: id} = new_order},
-        _,
+        state,
         %BareElevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
   do
     #Logger.info("Elevator received order from #{from}")
     Logger.info("Elevator received order")
-    IO.puts("Correct handler invoked")
 
     # First check if the order is valid - throws an error if not
     Order.check_valid_orders([new_order])
 
-    # Checking if order already exists - if not, add to list, calculate next target and ack
-    if new_order not in prev_orders do
-      new_orders = [prev_orders | new_order]
-      last_dir = Map.get(elevator_data, :dir)
-      new_dir = calculate_optimal_direction(new_orders, last_dir, last_floor)
+    # Checking if order already exists - if not, add to list and calculate next direction
+    updated_order_elevator_data = add_order(new_order)
+    new_orders = Map.get(updated_order_elevator_data, :orders)
 
-      if new_dir == :nil do
-        # This should NOT happen! Restart!
-        Logger.error("Direction calculated as ':nil' when new order received! Restarting without ack")
-        {:next_state, :restart_state, elevator_data}
-      end
+    Lights.set_order_lights(new_orders)
 
-      temp_elevator_data = Map.put(elevator_data, :orders, new_orders)
-      new_elevator_data = Map.put(temp_elevator_data, :dir, new_dir)
-
-      Lights.set_order_lights(new_orders)
-
-      Logger.info("Order added to list")
-      #{:keep_state, new_elevator_data, [{:reply, from, {:ack, id}}]}
-      {:keep_state, new_elevator_data}
-    end
-
-    Logger.info("Order already in list")
-    # Ack if already in list
-    #{:keep_state, elevator_data, [{:reply, from, {:ack, id}}]}
-    {:keep_state, elevator_data}
-  end
-
-  def handle_event(
-    :cast,
-    {:received_order, _},
-    _,
-    %BareElevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
-  do
-  Logger.info("Incorrect handler called")
-  #GenStateMachine.reply(from, :ok)
-  {:keep_state_and_data, elevator_data}
+    {:next_state, state, new_elevator_data}
   end
 
   @doc """
@@ -397,7 +369,6 @@ defmodule BareElevator do
         state,
         %BareElevator{orders: orders, dir: dir, last_floor: last_floor} = elevator_data)
   do
-
     start_udp_timer()
 
     active_master_pid = Process.whereis(:active_master)
@@ -524,6 +495,8 @@ defmodule BareElevator do
   the function will find it. It may be a possible bug if an order is outside of the elevator-space, but
   that is directly linked to why is it here in the first place
 
+  If either the current orders are [] or the given floor == :nil, :stop is returned
+
 
   orders  Orders to be scanned
   dir     Current direction to check for orders
@@ -531,14 +504,22 @@ defmodule BareElevator do
   """
   defp calculate_optimal_direction(
         [],
-        dir,
-        floor)
+        _dir,
+        _floor)
+  do
+    :nil
+  end
+
+  defp calculate_optimal_direction(
+    _orders,
+    _dir,
+    :nil = _floor)
   do
     :nil
   end
 
 
-## Må omskrive
+## Må omskrives
   defp calculate_optimal_direction(
         orders,
         dir,
@@ -605,6 +586,46 @@ defmodule BareElevator do
         _floor)
   do
     []
+  end
+
+
+  @doc """
+  Function to add a list of orders to the 'order'-list in the struct 'elevator_data'
+  """
+  defp add_order_list(
+        [order | rest_orders],
+        elevator_data)
+  do
+    temp_elevator_data = add_order(order, elevator_data)
+    add_order_list(rest_orders, temp_elevator_data)
+  end
+
+  defp add_order_list(
+        [],
+        elevator_data)
+  do
+    elevator_data
+  end
+
+
+  @doc """
+  Function to add a single order to the 'order'-list in the struct 'elevator_data'
+  """
+  defp add_order(
+        new_order,
+        elevator_data)
+  do
+    prev_orders = Map.get(elevator_data, :orders)
+
+    current_orders =
+      case new_order in prev_orders do
+        :true->
+          prev_orders
+        :false->
+          [prev_orders | new_order]
+      end
+
+    Map.put(elevator_data, :orders, current_orders)
   end
 
 

@@ -15,6 +15,7 @@ defmodule Order do
     delegated_elevator: :nil
   ]
 
+
   @doc """
   Zips multiple orders into a list
 
@@ -105,6 +106,7 @@ defmodule Order do
     :ok
   end
 
+
   @doc """
   Function to get all orders at floor 'floor' in a list of orders
   that satisfies the required [:dir, :cab]
@@ -166,4 +168,70 @@ defmodule Order do
     {:true, satisfying_orders}
   end
 
+
+  @doc """
+  Function to remove all orders from the list with the current floor and direction
+
+  first_order First order in the order-list
+  rest_orders Rest of the orders in the order-list
+  dir Direction of elevator
+  floor Current floor the elevator is in
+
+  Returns
+  updated_orders List of orders where the old ones are deleted
+  """
+  defp remove_orders(
+        [%Order{order_type: order_type, order_floor: order_floor} = first_order | rest_orders],
+        dir,
+        floor)
+  do
+    if order_type not in [dir, :cab] or order_floor != floor do
+      [first_order | remove_orders(rest_orders, dir, floor)]
+    else
+      remove_orders(rest_orders, dir, floor)
+    end
+  end
+
+  defp remove_orders(
+        [],
+        _dir,
+        _floor)
+  do
+    []
+  end
+
+
+  @doc """
+  Function to add a list of orders to another list of orders
+  """
+  defp add_order_list_to_list(
+        [order | rest_orders],
+        list)
+  do
+    updated_list = add_order(order, list)
+    add_order_list(rest_orders, updated_list)
+  end
+
+  defp add_order_list(
+        [],
+        list)
+  do
+    list
+  end
+
+
+  @doc """
+  Function to add a single order to a list 'list'
+  """
+  defp add_order(
+        new_order,
+        list)
+  do
+    case new_order in list do
+      :true->
+        list
+      :false->
+        [list | new_order]
+    end
+  end
 end

@@ -398,15 +398,20 @@ defmodule BareElevator do
 ##### Checking floor #####
 
   @doc """
-  Function to read the current floor indefinetly
+  Function to read the current floor indefinetly. The function does not take any interdiction
+  between overflow or not. If the value 'i' results in a negative number, we just keep
+  incrementing.
+
+  A while-loop is implemented, since recursion eats up the heap
 
   Invokes the function check_at_floor() with the data
   """
-  defp read_current_floor(iteration_num \\ 0)
+  defp read_current_floor()
   do
-    Driver.get_floor_sensor_state() |> check_at_floor()
-    # read_current_floor(iteration_num + 1)
-    read_current_floor()
+    Stream.iterate(0, &(&1+1)) |> Enum.reduce_while(0, fn i, acc ->
+      Driver.get_floor_sensor_state() |> check_at_floor()
+      {:cont, acc + 1}
+    end)
   end
 
 
@@ -683,6 +688,14 @@ defmodule ElevatorTest do
     order = %Order{order_id: make_ref(), order_type: :cab, order_floor: 2}
     BareElevator.delegate_order(order)
     BareElevator.check_at_floor(1)
+  end
+
+  def test_while()
+  do
+    Stream.iterate(0, &(&1+1)) |> Enum.reduce_while(0, fn i, acc ->
+      IO.inspect(i)
+      {:cont, acc + 1}
+    end)
   end
 
 end

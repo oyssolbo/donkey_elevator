@@ -14,11 +14,7 @@ defmodule BareElevator do
 
 
   TODO:
-    Remove the target-order, and instead just calculate the direction (up/down), and
-      just constantly check if there is an order at a given floor everytime we get to
-      that floor
-
-    Functions for transitioning between the states
+    Testing
 
   """
 
@@ -112,9 +108,13 @@ defmodule BareElevator do
   @doc """
   Function for external modules (either Panel or Master) to call when a new order is detected
   """
-  def delegate_order(from, order)
+  def delegate_order(%Order{} = order)
   do
-    GenStateMachine.call(@node_name, {:received_order, order})
+    # If it only works with casting, we must ack here
+
+    IO.puts("delegate_order invoked")
+    #GenStateMachine.call(@node_name, {:received_order, 1})
+    GenStateMachine.cast(@node_name, {:received_order, order})
   end
 
   @doc """
@@ -137,13 +137,14 @@ defmodule BareElevator do
   """
   def handle_event(
         :cast,
-        {:at_floor, _floor},
+        {:at_floor, floor},
         :init_state,
         %BareElevator{timer: timer} = elevator_data)
   do
     Logger.info("Elevator safe at floor after init. Transitioning into idle")
     Process.cancel_timer(timer)
-    {:next_state, :idle_state, elevator_data}
+    new_elevator_data = Map.put(elevator_data, :last_floor, floor)
+    {:next_state, :idle_state, new_elevator_data}
   end
 
   @doc """
@@ -152,7 +153,7 @@ defmodule BareElevator do
   Transitions into the state 'restart_state'
   """
   def handle_event(
-        :cast,
+        :info,
         :init_timer,
         :init_state,
         elevator_data)
@@ -321,12 +322,14 @@ defmodule BareElevator do
   to the order-panel
   """
   def handle_event(
-        {:call, from},
+        :cast,
         {:received_order, %Order{order_id: id} = new_order},
         _,
         %BareElevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
   do
-    Logger.info("Elevator received order from #{from}")
+    #Logger.info("Elevator received order from #{from}")
+    Logger.info("Elevator received order")
+    IO.puts("Correct handler invoked")
 
     # First check if the order is valid - throws an error if not
     Order.check_valid_orders([new_order])
@@ -349,14 +352,26 @@ defmodule BareElevator do
       Lights.set_order_lights(new_orders)
 
       Logger.info("Order added to list")
-      {:keep_state, new_elevator_data, [{:reply, from, {:ack, id}}]}
+      #{:keep_state, new_elevator_data, [{:reply, from, {:ack, id}}]}
+      {:keep_state, new_elevator_data}
     end
 
     Logger.info("Order already in list")
     # Ack if already in list
-    {:keep_state, elevator_data, [{:reply, from, {:ack, id}}]}
+    #{:keep_state, elevator_data, [{:reply, from, {:ack, id}}]}
+    {:keep_state, elevator_data}
   end
 
+  def handle_event(
+    :cast,
+    {:received_order, _},
+    _,
+    %BareElevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
+  do
+  Logger.info("Incorrect handler called")
+  #GenStateMachine.reply(from, :ok)
+  {:keep_state_and_data, elevator_data}
+  end
 
   @doc """
   Function to handle when the elevator's status must be sent to the master
@@ -387,9 +402,10 @@ defmodule BareElevator do
 
   Invokes the function check_at_floor() with the data
   """
-  defp read_current_floor()
+  defp read_current_floor(iteration_num \\ 0)
   do
     Driver.get_floor_sensor_state() |> check_at_floor()
+    # read_current_floor(iteration_num + 1)
     read_current_floor()
   end
 
@@ -399,11 +415,17 @@ defmodule BareElevator do
 
   If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server
   """
-  defp check_at_floor(floor) when floor |> is_integer
+  def check_at_floor(floor) when floor |> is_integer
   do
     Lights.set_floorlight(floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
+
+  # defp check_at_floor(floor) when floor |> is_integer
+  # do
+  #   Lights.set_floorlight(floor)
+  #   GenStateMachine.cast(@node_name, {:at_floor, floor})
+  # end
 
 
   @doc """
@@ -635,4 +657,32 @@ defmodule BareElevator do
     Driver.set_motor_direction(:stop)
     Process.exit(self(), :shutdown)
   end
+end
+
+
+defmodule ElevatorTest do
+
+  require BareElevator
+
+  def test_elevator_init()
+  do
+    BareElevator.start_link()
+    Process.sleep(500)
+  end
+
+  def test_elevator_init_to_idle()
+  do
+    test_elevator_init()
+    BareElevator.check_at_floor(1)
+    Process.sleep(500)
+  end
+
+  def test_elevator_idle_to_moving()
+  do
+    test_elevator_init_to_idle()
+    order = %Order{order_id: make_ref(), order_type: :cab, order_floor: 2}
+    BareElevator.delegate_order(order)
+    BareElevator.check_at_floor(1)
+  end
+
 end

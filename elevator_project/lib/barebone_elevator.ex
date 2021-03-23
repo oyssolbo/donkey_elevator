@@ -527,31 +527,62 @@ defmodule BareElevator do
   when floor >= @min_floor and floor <= @max_floor
   do
     # Check if orders on this floor, and in correct direction
-    {bool, _order_in_dir} = Order.check_orders_at_floor(orders, dir, floor)
-    if bool == :true do
-      dir
-    end
+    {bool_orders_on_floor, _matching_orders} = Order.check_orders_at_floor(orders, dir, floor)
 
-    # No match found. Recurse on the next floor in same direction
-    if dir == :down and floor != @min_floor do
-      dir_opt = calculate_optimal_direction(orders, dir, floor - 1)
-      dir_opt
-    end
-    if dir == :up and floor != @max_floor do
-      dir_opt = calculate_optimal_direction(orders, dir, floor + 1)
-      dir_opt
-    end
+    # Ugly way to recurse further
+    new_dir =
+      case {bool_orders_on_floor, dir} do
+        {:true, _}->
+          # Orders on this floor - keep the direction
+          dir
 
-    # Max or min floor, change search direction
-    if dir == :down and floor == @min_floor do
-      dir_opt = calculate_optimal_direction(orders, dir, floor + 1)
-      dir_opt
-    end
+        {:false, :down}->
+          # No orders on this floor, and direction :down
+          cond do
+            floor > @min_floor->
+              calculate_optimal_direction(orders, dir, floor - 1)
+            floor == @min_floor->
+              # Change direction to prevent the elevator to crash into the ground
+              calculate_optimal_direction(orders, :up, floor + 1)
+          end
 
-    if dir == :up and floor == @max_floor do
-      dir_opt = calculate_optimal_direction(orders, dir, floor - 1)
-      dir_opt
-    end
+        {:false, :up}->
+          # No orders on this floor and direction :up
+          cond do
+            floor < @max_floor->
+              calculate_optimal_direction(orders, dir, floor + 1)
+            floor == @max_floor->
+              # Change direction to prevent the elevator to crash into the roof
+              calculate_optimal_direction(orders, :down, floor - 1)
+          end
+      end
+
+    # Prettier - but wrong (for elixir) way to recurse further
+
+    # if bool_matching_orders == :true do
+    #   dir
+    # end
+
+    # # No match found. Recurse on the next floor in same direction
+    # if dir == :down and floor != @min_floor do
+    #   dir_opt = calculate_optimal_direction(orders, dir, floor - 1)
+    #   dir_opt
+    # end
+    # if dir == :up and floor != @max_floor do
+    #   dir_opt = calculate_optimal_direction(orders, dir, floor + 1)
+    #   dir_opt
+    # end
+
+    # # Max or min floor, change search direction
+    # if dir == :down and floor == @min_floor do
+    #   dir_opt = calculate_optimal_direction(orders, dir, floor + 1)
+    #   dir_opt
+    # end
+
+    # if dir == :up and floor == @max_floor do
+    #   dir_opt = calculate_optimal_direction(orders, dir, floor - 1)
+    #   dir_opt
+    # end
   end
 
 

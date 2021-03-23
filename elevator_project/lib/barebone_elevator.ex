@@ -173,6 +173,8 @@ defmodule BareElevator do
   Function to handle when the elevator is in idle
   It checks for any orders, and - if there are - transitions into the state 'moving_state'
   """
+
+## Må omskrives
   def handle_event(
         :cast,
         _,
@@ -189,6 +191,7 @@ defmodule BareElevator do
     new_dir = calculate_optimal_direction(orders, last_dir, last_floor)
 
     if new_dir != :nil do
+      Logger.info("New direction calculated")
       temp_elevator_data = Map.put(elevator_data, :dir, new_dir)
 
       new_elevator_data = start_moving_timer(temp_elevator_data)
@@ -196,6 +199,8 @@ defmodule BareElevator do
 
       {:next_state, :moving_state, new_elevator_data}
     end
+
+    Logger.info("Continuing in idle_state")
 
     {:keep_state_and_data}
   end
@@ -208,6 +213,8 @@ defmodule BareElevator do
 
   Transitions into door_state
   """
+
+## Må omskrives
   def handle_event(
         :cast,
         {:at_floor, floor},
@@ -325,6 +332,8 @@ defmodule BareElevator do
   external orders over UDP then... It does simplify the elevator, but adds larger requirements
   to the order-panel
   """
+
+## Må omskrives
   def handle_event(
         :cast,
         {:received_order, %Order{order_id: id} = new_order},
@@ -415,6 +424,7 @@ defmodule BareElevator do
   defp read_current_floor()
   do
     Stream.iterate(0, &(&1+1)) |> Enum.reduce_while(0, fn i, acc ->
+      Process.sleep(5)
       Driver.get_floor_sensor_state() |> check_at_floor()
       {:cont, acc + 1}
     end)
@@ -520,15 +530,21 @@ defmodule BareElevator do
   Floor   Current floor to check for order
   """
   defp calculate_optimal_direction(
+        [],
+        dir,
+        floor)
+  do
+    :nil
+  end
+
+
+## Må omskrive
+  defp calculate_optimal_direction(
         orders,
         dir,
-        floor) when floor >= @min_floor and floor <= @max_floor
+        floor)
+  when floor >= @min_floor and floor <= @max_floor
   do
-    # To prevent indefinite recursion on empty orders
-    if orders == [] do
-      :nil
-    end
-
     # Check if orders on this floor, and in correct direction
     {bool, _order_in_dir} = Order.check_orders_at_floor(orders, dir, floor)
     if bool == :true do

@@ -271,7 +271,7 @@ defmodule BareElevator do
   Transitions into restart
   """
   def handle_event(
-        :cast,
+        :info,
         :moving_timer,
         :moving_state,
         elevator_data)
@@ -287,7 +287,7 @@ defmodule BareElevator do
   Closes the door and transitions into idle
   """
   def handle_event(
-        :cast,
+        :info,
         :door_timer,
         :door_state,
         elevator_data)

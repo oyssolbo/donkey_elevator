@@ -204,15 +204,15 @@ defmodule Order do
   @doc """
   Function to add a list of orders to another list of orders
   """
-  defp add_order_list_to_list(
+  def add_order_list_to_list(
         [order | rest_orders],
         list)
   do
     updated_list = add_order(order, list)
-    add_order_list(rest_orders, updated_list)
+    add_order_list_to_list(rest_orders, updated_list)
   end
 
-  defp add_order_list(
+  def add_order_list_to_list(
         [],
         list)
   do
@@ -223,7 +223,7 @@ defmodule Order do
   @doc """
   Function to add a single order to a list 'list'
   """
-  defp add_order(
+  def add_order(
         new_order,
         list)
   do

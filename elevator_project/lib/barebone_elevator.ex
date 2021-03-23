@@ -350,10 +350,10 @@ defmodule BareElevator do
     Order.check_valid_orders([new_order])
 
     # Checking if order already exists - if not, add to list and calculate next direction
-    updated_order_elevator_data = add_order(new_order)
-    new_orders = Map.get(updated_order_elevator_data, :orders)
+    updated_order_list = Order.add_order(new_order, prev_orders)
+    new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
 
-    Lights.set_order_lights(new_orders)
+    Lights.set_order_lights(updated_order_list)
 
     {:next_state, state, new_elevator_data}
   end
@@ -473,7 +473,7 @@ defmodule BareElevator do
     timer_elevator_data = start_door_timer(elevator_data)
 
     # Remove old order and calculate new target_order
-    updated_orders = remove_orders(orders, dir, floor)
+    updated_orders = Order.remove_orders(orders, dir, floor)
     orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
 
     Lights.set_order_lights(updated_orders)
@@ -518,8 +518,6 @@ defmodule BareElevator do
     :nil
   end
 
-
-## Må omskrives
   defp calculate_optimal_direction(
         orders,
         dir,
@@ -556,109 +554,7 @@ defmodule BareElevator do
               calculate_optimal_direction(orders, :down, floor - 1)
           end
       end
-
-    # Prettier - but wrong (for elixir) way to recurse further
-
-    # if bool_matching_orders == :true do
-    #   dir
-    # end
-
-    # # No match found. Recurse on the next floor in same direction
-    # if dir == :down and floor != @min_floor do
-    #   dir_opt = calculate_optimal_direction(orders, dir, floor - 1)
-    #   dir_opt
-    # end
-    # if dir == :up and floor != @max_floor do
-    #   dir_opt = calculate_optimal_direction(orders, dir, floor + 1)
-    #   dir_opt
-    # end
-
-    # # Max or min floor, change search direction
-    # if dir == :down and floor == @min_floor do
-    #   dir_opt = calculate_optimal_direction(orders, dir, floor + 1)
-    #   dir_opt
-    # end
-
-    # if dir == :up and floor == @max_floor do
-    #   dir_opt = calculate_optimal_direction(orders, dir, floor - 1)
-    #   dir_opt
-    # end
   end
-
-
-##### Order #####
-
-  @doc """
-  Function to remove all orders from the list with the current floor and direction
-
-  first_order First order in the order-list
-  rest_orders Rest of the orders in the order-list
-  dir Direction of elevator
-  floor Current floor the elevator is in
-
-  Returns
-  updated_orders List of orders where the old ones are deleted
-  """
-  defp remove_orders(
-        [%Order{order_type: order_type, order_floor: order_floor} = first_order | rest_orders],
-        dir,
-        floor)
-  do
-    if order_type not in [dir, :cab] or order_floor != floor do
-      [first_order | remove_orders(rest_orders, dir, floor)]
-    else
-      remove_orders(rest_orders, dir, floor)
-    end
-  end
-
-  defp remove_orders(
-        [],
-        _dir,
-        _floor)
-  do
-    []
-  end
-
-
-  @doc """
-  Function to add a list of orders to the 'order'-list in the struct 'elevator_data'
-  """
-  defp add_order_list(
-        [order | rest_orders],
-        elevator_data)
-  do
-    temp_elevator_data = add_order(order, elevator_data)
-    add_order_list(rest_orders, temp_elevator_data)
-  end
-
-  defp add_order_list(
-        [],
-        elevator_data)
-  do
-    elevator_data
-  end
-
-
-  @doc """
-  Function to add a single order to the 'order'-list in the struct 'elevator_data'
-  """
-  defp add_order(
-        new_order,
-        elevator_data)
-  do
-    prev_orders = Map.get(elevator_data, :orders)
-
-    current_orders =
-      case new_order in prev_orders do
-        :true->
-          prev_orders
-        :false->
-          [prev_orders | new_order]
-      end
-
-    Map.put(elevator_data, :orders, current_orders)
-  end
-
 
 ##### Timer #####
 

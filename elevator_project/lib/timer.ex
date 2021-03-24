@@ -1,7 +1,6 @@
 defmodule Timer do
   @moduledoc """
-  Module for implementing timer for use in the different
-  modules
+  Module for implementing timer-functions
   """
 
   @doc """
@@ -26,8 +25,23 @@ defmodule Timer do
     Map.put(data_struct, :timer, new_timer)
   end
 
+
   @doc """
-  Function to interrupt
+  Function to stop a timer - if necessary
+
+  The function assumes that the struct 'data_struct' contains a field called
+  ':timer'
+  """
+  def stop_timer(data_struct)
+  do
+    timer = Map.get(data_struct, :timer)
+    Process.cancel_timer(timer)
+  end
+
+
+  @doc """
+  Function to interrupt a process 'process_name' with the interrupt
+  'interrupt_atom_name' after the time 'interrupt_time'
   """
   def interrupt_after(
         process_name,

@@ -26,6 +26,7 @@ defmodule BareElevator do
   require Driver
   require Order
   require Lights
+  require Timer
 
   @min_floor    Application.fetch_env!(:elevator_project, :min_floor)
   @max_floor    Application.fetch_env!(:elevator_project, :num_floors) + @min_floor - 1
@@ -74,7 +75,7 @@ defmodule BareElevator do
     Driver.set_motor_direction(:down)
 
     # Starting process for error-handling
-    elevator_data = start_init_timer(data)
+    elevator_data = Timer.start_timer(self(), data, :init_timer, @init_time)
     spawn(fn-> read_current_floor() end)
 
     {:ok, :init_state, elevator_data}
@@ -147,7 +148,7 @@ defmodule BareElevator do
     # Since we are safe at a floor, the elevator's state is secure
     Process.cancel_timer(timer)
     new_elevator_data = check_at_new_floor(elevator_data, floor)
-    start_udp_timer()
+    Timer.interrupt_after(self(), :udp_timer, @update_time)
 
     {:next_state, :idle_state, new_elevator_data}
   end
@@ -201,7 +202,7 @@ defmodule BareElevator do
           Logger.info("New direction calculated")
           temp_elevator_data = Map.put(elevator_data, :dir, new_dir)
 
-          new_elevator_data = start_moving_timer(temp_elevator_data)
+          new_elevator_data = Timer.start_timer(self(), temp_elevator_data, :moving_timer, @moving_time)
           Driver.set_motor_direction(new_dir)
 
           {:moving_state, new_elevator_data}
@@ -400,7 +401,7 @@ defmodule BareElevator do
         state,
         %BareElevator{orders: orders, dir: dir, last_floor: last_floor} = elevator_data)
   do
-    start_udp_timer()
+    Timer.interrupt_after(self(), :udp_timer, @update_time)
 
     active_master_pid = Process.whereis(:active_master)
     if active_master_pid != :nil do
@@ -468,7 +469,7 @@ defmodule BareElevator do
         Map.put(elevator_data, :last_floor, floor)
 
       last_floor != floor->
-        temp_elevator_data = start_moving_timer(elevator_data)
+        temp_elevator_data = Timer.start_timer(self(), elevator_data, :moving_timer, @moving_time)
         Map.put(temp_elevator_data, :last_floor, floor)
 
       last_floor == floor->
@@ -504,7 +505,7 @@ defmodule BareElevator do
 
     # Open door and start timer
     open_door()
-    timer_elevator_data = start_door_timer(elevator_data)
+    timer_elevator_data = Timer.start_timer(self(), elevator_data, :door_timer, @door_time)
 
     # Remove old order and calculate new target_order
     updated_orders = Order.remove_orders(orders, dir, floor)
@@ -570,8 +571,6 @@ defmodule BareElevator do
   the function will find it. It may be a possible bug if an order is outside of the elevator-space, but
   that is directly linked to why is it here in the first place. That bug is then related to
   calculate_optimal_direction(), as it should not invoke the function without valid orders
-
-  It is a bug here somewhere. Somehow it returns the direction when it should return the floor (int)
   """
   def calculate_optimal_floor(
         orders,
@@ -599,10 +598,10 @@ defmodule BareElevator do
           IO.inspect(floor)
           cond do
             floor > @min_floor->
-              calculate_optimal_direction(orders, dir, floor - 1)
+              calculate_optimal_floor(orders, dir, floor - 1)
             floor == @min_floor->
               # Change search direction
-              calculate_optimal_direction(orders, :up, floor)
+              calculate_optimal_floor(orders, :up, floor)
           end
 
         {:false, :up}->
@@ -611,63 +610,16 @@ defmodule BareElevator do
           IO.inspect(floor)
           cond do
             floor < @max_floor->
-              calculate_optimal_direction(orders, dir, floor + 1)
+              calculate_optimal_floor(orders, dir, floor + 1)
             floor == @max_floor->
               # Change search direction
-              calculate_optimal_direction(orders, :down, floor)
+              calculate_optimal_floor(orders, :down, floor)
           end
       end
 
       IO.puts("New calculated floor")
       IO.inspect(new_floor)
       new_floor
-  end
-
-##### Timer #####
-
-
-  @doc """
-  Starts the door-timer, which signals that the elevator should
-  close the door
-  """
-  defp start_door_timer(elevator_data)
-  do
-    timer = Map.get(elevator_data, :timer)
-    Process.cancel_timer(timer)
-    timer = Process.send_after(self(), :door_timer, @door_time)
-    Map.put(elevator_data, :timer, timer)
-  end
-
-
-  @doc """
-  Function that starts a timer to check if we are moving
-  """
-  defp start_moving_timer(elevator_data)
-  do
-    timer = Map.get(elevator_data, :timer)
-    Process.cancel_timer(timer)
-    timer = Process.send_after(self(), :moving_timer, @moving_time)
-    Map.put(elevator_data, :timer, timer)
-  end
-
-
-  @doc """
-  Function that starts a timer to check if init takes too long
-  """
-  defp start_init_timer(elevator_data)
-  do
-    timer = Map.get(elevator_data, :timer)
-    Process.cancel_timer(timer)
-    timer = Process.send_after(self(), :init_timer, @init_time)
-    Map.put(elevator_data, :timer, timer)
-  end
-
-  @doc """
-  Function to start a timer to send updates over UDP to the master
-  """
-  defp start_udp_timer()
-  do
-    Process.send_after(self(), :udp_timer, @update_time)
   end
 
 

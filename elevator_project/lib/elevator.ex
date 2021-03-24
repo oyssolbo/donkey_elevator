@@ -439,17 +439,11 @@ defmodule Elevator do
 
   If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server
   """
-  def check_at_floor(floor) when floor |> is_integer
+  defp check_at_floor(floor) when floor |> is_integer
   do
     Lights.set_floorlight(floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
-
-  # defp check_at_floor(floor) when floor |> is_integer
-  # do
-  #   Lights.set_floorlight(floor)
-  #   GenStateMachine.cast(@node_name, {:at_floor, floor})
-  # end
 
 
   @doc """
@@ -530,7 +524,7 @@ defmodule Elevator do
   dir     Current direction to check for orders
   Floor   Current floor to check for order
   """
-  def calculate_optimal_direction(
+  defp calculate_optimal_direction(
         [],
         _dir,
         _floor)
@@ -538,7 +532,7 @@ defmodule Elevator do
     :nil
   end
 
-  def calculate_optimal_direction(
+  defp calculate_optimal_direction(
     _orders,
     _dir,
     :nil = _floor)
@@ -546,7 +540,7 @@ defmodule Elevator do
     :nil
   end
 
-  def calculate_optimal_direction(
+  defp calculate_optimal_direction(
         orders,
         dir,
         floor)
@@ -572,7 +566,7 @@ defmodule Elevator do
   that is directly linked to why is it here in the first place. That bug is then related to
   calculate_optimal_direction(), as it should not invoke the function without valid orders
   """
-  def calculate_optimal_floor(
+  defp calculate_optimal_floor(
         orders,
         dir,
         floor)

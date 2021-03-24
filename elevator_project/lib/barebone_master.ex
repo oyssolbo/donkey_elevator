@@ -27,7 +27,8 @@ defmodule Master do
   @num_elevators          Application.fetch_env!(:elevator_project, :num_elevators)
   @cookie                 Application.fetch_env!(:elevator_project, :default_cookie)
 
-  @default_check_time_ms  2000 # ms
+  @update_active_time     200  # ms - How often the active master should update the backup
+  @timeout_active         4000 # ms - How long the backup will wait on active before becoming active
 
   @node_name :master
 
@@ -51,7 +52,7 @@ defmodule Master do
 
 
   @doc """
-  Function to initialize the elevator, and tries to get the elevator into a defined state.
+  Function to initialize the master, and transitions the master into backup_state
 
   The function
     - establishes connection to GenStateMachine-server
@@ -61,26 +62,20 @@ defmodule Master do
   """
   def init([])
   do
-    # Logger.info("Elevator initialized")
+    Logger.info("Master initialized")
 
-    # # Set correct elevator-state
-    # data = %Master{
-    #   orders: [],
-    #   last_floor: :nil,
-    #   dir: :down,
-    #   timer: make_ref()
-    # }
+    # Set correct master data
+    data = %Master{
+      active_orders: [],
+      master_timer: make_ref(),
+      activation_time: :nil,
+      connectionID_list: []
+    }
 
-    # # Close door and set direction down
-    # close_door()
-    # Driver.set_motor_direction(:down)
+    # Starting process for error-handling
+    master_data = Timer.start_timer(self(), data, :active_master_timeout, @init_time)
 
-    # # Starting process for error-handling
-    # elevator_data = Timer.start_timer(self(), data, :init_timer, @init_time)
-    # spawn(fn-> read_current_floor() end)
-
-    # {:ok, :init_state, elevator_data}
-    {:ok, :init_state, []}
+    {:ok, :backup_state, master_data}
   end
 
 
@@ -110,17 +105,28 @@ defmodule Master do
 
 ###################################### Events and transitions ######################################
 
-##### init_state #####
-
 
 ##### backup_state #####
-  # Listen for updates from the active master (nothing else)
+
+  @doc """
+  Function to handle if the backup-master has not received any updates from the active master
+  within the timeout. Activates the master and transitions into active
+  """
+  def handle_event(
+        :info,
+        :active_master_timeout,
+        :backup_state,
+        master_data)
+  do
+    activated_master_data = Timer.set_utc_time(master_data, :activation_time)
+
+    {:next_state, :active_state, activated_master_data}
+  end
 
 
 ##### active_state #####
-  # Listen and respond to all external messages
-  # Must send data to the backup_state
 
+  
 
 
 ##### all_states #####
@@ -128,10 +134,7 @@ defmodule Master do
 
 
 
-
-  # States and what they should do
-  # Active  -  Listen and respond to all external messages
-  # Passive -  Listen for updates from the active master
+###################################### Actions ######################################
 
 
 

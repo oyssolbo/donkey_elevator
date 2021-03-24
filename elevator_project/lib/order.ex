@@ -164,8 +164,9 @@ defmodule Order do
 
     if satisfying_orders == [] do
       {:false, []}
+    else
+      {:true, satisfying_orders}
     end
-    {:true, satisfying_orders}
   end
 
 

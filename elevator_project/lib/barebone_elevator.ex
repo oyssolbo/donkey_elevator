@@ -521,22 +521,15 @@ defmodule BareElevator do
 
   @doc """
   Function to find the next optimal order. The function uses the current floor and direction
-  to return the next optimal order for the elevator to serve.
-  The function changes direction it checks in if nothing is found.
+  to return the next optimal direction for the elevator to serve the given orders.
 
-  One may be worried that the function is stuck here in an endless recursion-loop since it changes
-  direction if it haven't found anything. As long as there exist an order inside the elevator-space,
-  the function will find it. It may be a possible bug if an order is outside of the elevator-space, but
-  that is directly linked to why is it here in the first place
-
-  If either the current orders are [] or the given floor == :nil, :stop is returned
-
+  If orders == [] or floor == :nil, :nil is returned
 
   orders  Orders to be scanned
   dir     Current direction to check for orders
   Floor   Current floor to check for order
   """
-  defp calculate_optimal_direction(
+  def calculate_optimal_direction(
         [],
         _dir,
         _floor)
@@ -544,7 +537,7 @@ defmodule BareElevator do
     :nil
   end
 
-  defp calculate_optimal_direction(
+  def calculate_optimal_direction(
     _orders,
     _dir,
     :nil = _floor)
@@ -552,42 +545,82 @@ defmodule BareElevator do
     :nil
   end
 
-  defp calculate_optimal_direction(
+  def calculate_optimal_direction(
+        orders,
+        dir,
+        floor)
+  when floor >= @min_floor and floor <= @max_floor
+  do
+    optimal_floor = calculate_optimal_floor(orders, dir, floor)
+    cond do
+      optimal_floor > floor->
+        :up
+      optimal_floor < floor->
+        :down
+      optimal_floor == floor->
+        dir
+    end
+  end
+
+  @doc """
+  Function to calculate the optimal floor the elevator should travel to next
+
+  One may be worried that the function is stuck here in an endless recursion-loop since it changes
+  direction if it haven't found anything. As long as there exist an order inside the elevator-space,
+  the function will find it. It may be a possible bug if an order is outside of the elevator-space, but
+  that is directly linked to why is it here in the first place. That bug is then related to
+  calculate_optimal_direction(), as it should not invoke the function without valid orders
+
+  It is a bug here somewhere. Somehow it returns the direction when it should return the floor (int)
+  """
+  def calculate_optimal_floor(
         orders,
         dir,
         floor)
   when floor >= @min_floor and floor <= @max_floor
   do
     # Check if orders on this floor, and in correct direction
-    {bool_orders_on_floor, _matching_orders} = Order.check_orders_at_floor(orders, dir, floor)
+    {bool_orders_on_floor, _matching_orders} = Order.check_orders_at_floor(orders, floor, dir)
+
+    IO.inspect(floor)
 
     # Ugly way to recurse further
-    new_dir =
+    new_floor =
       case {bool_orders_on_floor, dir} do
         {:true, _}->
-          # Orders on this floor - keep the direction
-          dir
+          # Orders on this floor - return the floor
+          IO.puts("Returning with floor set to")
+          IO.inspect(floor)
+          floor
 
         {:false, :down}->
           # No orders on this floor, and direction :down
+          IO.puts("Going down with floor set to")
+          IO.inspect(floor)
           cond do
             floor > @min_floor->
               calculate_optimal_direction(orders, dir, floor - 1)
             floor == @min_floor->
-              # Change direction to prevent the elevator to crash into the ground
-              calculate_optimal_direction(orders, :up, floor + 1)
+              # Change search direction
+              calculate_optimal_direction(orders, :up, floor)
           end
 
         {:false, :up}->
           # No orders on this floor and direction :up
+          IO.puts("Going up with floor set to")
+          IO.inspect(floor)
           cond do
             floor < @max_floor->
               calculate_optimal_direction(orders, dir, floor + 1)
             floor == @max_floor->
-              # Change direction to prevent the elevator to crash into the roof
-              calculate_optimal_direction(orders, :down, floor - 1)
+              # Change search direction
+              calculate_optimal_direction(orders, :down, floor)
           end
       end
+
+      IO.puts("New calculated floor")
+      IO.inspect(new_floor)
+      new_floor
   end
 
 ##### Timer #####
@@ -672,6 +705,7 @@ end
 defmodule ElevatorTest do
 
   require BareElevator
+  require Order
 
   def test_elevator_init()
   do
@@ -715,4 +749,114 @@ defmodule ElevatorTest do
     end)
   end
 
+
+  def test_optimal_floor()
+  do
+    opts1 = [order_type: :up, order_floor: 1]
+    order1 = struct(Order, opts1)
+
+    opts2 = [order_type: :down, order_floor: 3]
+    order2 = struct(Order, opts2)
+
+    dir1 = :down
+    floor = 2
+
+    # Optimal floor should be floor 2
+    opt_floor_test_1 = BareElevator.calculate_optimal_floor([order1, order2], dir1, floor)
+    #IO.puts("Optimal should be 2")
+    #IO.inspect(opt_floor_test_1)
+    #IO.puts(" WHAT?? ")
+
+    dir2 = :up
+    # Optimal floor should be floor 3
+    opt_floor_test_2 = BareElevator.calculate_optimal_floor([order1, order2], dir2, floor)
+    #IO.puts("Optimal should be 3")
+    #IO.inspect(opt_floor_test_2)
+
+    # Optimal floor should be floor 3
+    opt_floor_test_3 = BareElevator.calculate_optimal_floor([order1], dir1, floor)
+    #IO.puts("Optimal should be 3")
+    #IO.inspect(opt_floor_test_3)
+  end
+
+
+  def test_optimal_direction()
+  do
+    opts1 = [order_id: make_ref(), order_type: :up, order_floor: 1]
+    order1 = struct(Order, opts1)
+
+    opts2 = [order_id: make_ref(), order_type: :down, order_floor: 3]
+    order2 = struct(Order, opts2)
+
+    dir1 = :down
+    floor = 2
+
+    # Optimal dir should be :down
+    opt_dir_test_1 = BareElevator.calculate_optimal_direction([order1, order2], dir1, floor)
+    IO.puts("Optimal should be :down")
+    IO.inspect(opt_dir_test_1)
+
+    dir2 = :up
+    # Optimal dir should be :up
+    opt_dir_test_2 = BareElevator.calculate_optimal_direction([order1, order2], dir2, floor)
+    IO.puts("Optimal should be :up")
+    IO.inspect(opt_dir_test_2)
+
+    # Optimal dir should be :up
+    opt_dir_test_3 = BareElevator.calculate_optimal_direction([order1], dir1, floor)
+    IO.puts("Optimal should be :up")
+    IO.inspect(opt_dir_test_3)
+
+  end
+
+  def test_get_order_at_floor()
+  do
+    opts1 = [order_id: make_ref(), order_type: :up, order_floor: 1]
+    order1 = struct(Order, opts1)
+
+    opts2 = [order_id: make_ref(), order_type: :down, order_floor: 3]
+    order2 = struct(Order, opts2)
+
+    order_floor_1_down = Order.get_order_at_floor([order1, order2], 1, :down)
+    IO.puts("Orders at floor 1 going down")
+    IO.inspect(order_floor_1_down)
+
+    order_floor_1_up = Order.get_order_at_floor([order1, order2], 1, :up)
+    IO.puts("Orders at floor 1 going up")
+    IO.inspect(order_floor_1_up)
+
+    order_floor_3_down = Order.get_order_at_floor([order1, order2], 3, :down)
+    IO.puts("Orders at floor 3 going down")
+    IO.inspect(order_floor_3_down)
+
+    order_floor_3_up = Order.get_order_at_floor([order1, order2], 3, :up)
+    IO.puts("Orders at floor 3 going up")
+    IO.inspect(order_floor_3_up)
+
+
+    IO.puts("Checking orders at floor")
+
+  end
+
+
+  def test_check_order_at_floor()
+  do
+    opts1 = [order_type: :up, order_floor: 1]
+    order1 = struct(Order, opts1)
+
+    opts2 = [order_type: :down, order_floor: 3]
+    order2 = struct(Order, opts2)
+
+    dir = :down
+
+    {bool, order} = Order.check_orders_at_floor([order1, order2], 1, :up)
+    case {bool, dir} do
+      {:true, _} ->
+        IO.puts("OK")
+      {:false, :up} ->
+        IO.puts("Not OK - up")
+      {:false, :down} ->
+        IO.puts("Not OK - down")
+    end
+  end
 end

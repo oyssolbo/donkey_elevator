@@ -16,7 +16,7 @@ defmodule Panel do
     defp order_checker(old_order_matrix) do
 
         # Update order matrix by reading all HW order buttons
-        [new_up, new_down, new_cab] = [up_checker, down_checker, cab_checker]
+        [new_up, new_down, new_cab] = [up_checker(), down_checker(), cab_checker()]
         new_order_matrix = Matriks.from_list([new_up, new_down, new_cab])
         updated_matrix = Matriks.orderMatrixOR(old_order_matrix, new_order_matrix)
 
@@ -46,14 +46,16 @@ defmodule Panel do
             # ... and wait for an ack
             receive do
                 {:ack, from, sentID} ->
-                    # When ack is recieved, send request to checker for latest order matrix
-                    send(checkerAddr, {:gibOrdersPls, self()})
+                    # When ack is recieved, send ack back. Send request to checker for latest order matrix
+                    """
+                    Shouldn't really be necessary! See what I wrote on miro
+                    """
+                    send(from, {:ack, sentID})
+                    send(checker_addr, {:gibOrdersPls, self()})
                     receive do
                         # When latest order matrix is received, recurse with new orders and iterated sendID
-                        {:orderChecker, updatedMatrix} ->
-                            orderSender(mid, eid, checkerAddr, sendID+1, updatedMatrix)
-                            after
-                                2000 -> # Send some kind of error, "no response from orderChecker"
+                        {:order_checker, updated_matrix} ->
+                            order_sender(mid, eid, checker_addr, sendID+1, updated_matrix)
                     end
                 # If no ack is received after 1.5 sec: Recurse and repeat
                 after

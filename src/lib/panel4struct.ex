@@ -1,4 +1,5 @@
 require Driver
+require UDP
 import Matriks
 
 """ Order-struct
@@ -8,6 +9,9 @@ Example
     l3 = [1, 4]
 
     orders = Order.zip(l1, l2, l3)
+
+Syntax
+    @Order{order_ID, order_type, order_floor}
 """
 
 defmodule Panel do
@@ -16,33 +20,34 @@ defmodule Panel do
     @direction_map %{:up => 1, :down => 255, :stop => 0}
 
     numFloors = 4 # Get this from config somehow
-    floorTable = Enum.to_list(1..numFloors) # Creates an array of the floors; makes it easier to iterate through
-    
-    def init(mid, eid) do
+    floorTable = Enum.to_list(0..numFloors-1) # Creates an array of the floors; makes it easier to iterate through
+    mySocket = nil
+    #myPort = nil
+
+    def init(mid, eid, port \\ []) do
+        mySocket = UDP.open_connection(port)
+
         checkerID = spawn(fn -> orderChecker(Matriks.falseOrderMatrix) end)
         senderID = spawn(fn -> orderSender(mid, eid, checkerID, 0, Matriks.falseOrderMatrix) end)
         {senderID, checkerID}
     end
 
 
-    defp orderChecker(oldOrderMatrix) do
+    defp orderChecker(---) do
         
         # Update order matrix by reading all HW order buttons
-        [newUp, newDown, newCab] = [upChecker, downChecker, cabChecker]
-        newOrderMatrix = Matriks.from_list([newUp, newDown, newCab])
-        updatedMatrix = Matriks.orderMatrixOR(oldOrderMatrix, newOrderMatrix)
+        
 
         # Check for request from sender. If there is, send order matrix and recurse with reset matrix
         receive do
             {:gibOrdersPls, senderAddr} ->
-                send(senderAddr, {:orderChecker, updatedMatrix})
-                orderChecker(Matriks.falseOrderMatrix)
+                
             after
                 0 -> :ok
         end
 
         # If no send request, requrse with current matrix (output buffer)
-        orderChecker(updatedMatrix)
+        orderChecker(---)
     end
 
     defp orderSender(mid, eid, checkerAddr, sendID, outGoingMatrix) do
@@ -51,8 +56,7 @@ defmodule Panel do
         if outGoingMatrix != Matriks.falseOrderMatrix do
 
             # ... send the respective  orders to master and elevator
-            send(mid, {self(), :newOrders, sendID, [Matriks.to_list(outGoingMatrix[0]), Matriks.to_list(outGoingMatrix[1])]})
-            send(eid, {self(), :newOrders, sendID, Matriks.to_list(outGoingMatrix[2])})
+            ...
 
             # ... and wait for an ack
             receive do
@@ -84,8 +88,7 @@ defmodule Panel do
 
 
     defp upChecker do
-        sensorStates = Enum.to_list(1..numFloors)
-        Enum.each(floorTable, fn x -> get_floor_sensor_state(x, :hall_up))
+        sensorStates = Enum.map(floorTable, fn x -> get_order_button_state(x, :hall_up) end)
     end
 
     defp downChecker do
@@ -104,14 +107,3 @@ defmodule Panel do
 end
 
 # Driver.get_floor_sensor_state(floor, button_type) |> state
-
-"""
-    Panel order matrix (boolean):
-    Floor   1  2  3  4
-    UP    [ 0  0  0  0 ]
-    DOWN  [ 0  0  0  0 ]
-    CAB   [ 0  0  0  0 ]
-
-    Enum.random {0, 1}
-
-"""

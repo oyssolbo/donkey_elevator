@@ -3,6 +3,9 @@ defmodule Timer do
   Module for implementing timer-functions
   """
 
+  require Time
+
+
   @doc """
   Function to start a timer
 
@@ -49,6 +52,19 @@ defmodule Timer do
         interrupt_time)
   do
     Process.send_after(process_name, interrupt_atom_name, interrupt_time)
+  end
+
+
+  @doc """
+  Function for setting current UTC-time to a struct
+
+  Sets the variable 'variable_name' in the struct 'data_struct' to
+  the current UTC-time
+  """
+  def set_utc_time(data_struct, variable_name)
+  do
+    utc_time = Time.utc_now()
+    Map.put(data_struct, variable_name, utc_time)
   end
 
 end

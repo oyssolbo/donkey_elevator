@@ -1,8 +1,22 @@
-#import Driver
+require Driver
 import Matriks
 
+""" Order-struct
+Example
+    l1 = [ID-1, ID-2]
+    l2 = [:up, :down]
+    l3 = [1, 4]
+
+    orders = Order.zip(l1, l2, l3)
+"""
+
 defmodule Panel do
-    @state_map  %{:on => true, :off => false}
+    @button_map %{:hall_up => 0, :hall_down => 1, :cab => 2}
+    @state_map  %{:on => 1, :off => 0}
+    @direction_map %{:up => 1, :down => 255, :stop => 0}
+
+    numFloors = 4 # Get this from config somehow
+    floorTable = Enum.to_list(1..numFloors) # Creates an array of the floors; makes it easier to iterate through
     
     def init(mid, eid) do
         checkerID = spawn(fn -> orderChecker(Matriks.falseOrderMatrix) end)
@@ -70,7 +84,8 @@ defmodule Panel do
 
 
     defp upChecker do
-        [floor1, floor2, floor3, floor4] = [Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])]
+        sensorStates = Enum.to_list(1..numFloors)
+        Enum.each(floorTable, fn x -> get_floor_sensor_state(x, :hall_up))
     end
 
     defp downChecker do

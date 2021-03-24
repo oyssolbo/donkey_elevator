@@ -581,45 +581,32 @@ defmodule BareElevator do
     # Check if orders on this floor, and in correct direction
     {bool_orders_on_floor, _matching_orders} = Order.check_orders_at_floor(orders, floor, dir)
 
-    IO.inspect(floor)
-
     # Ugly way to recurse further
-    new_floor =
-      case {bool_orders_on_floor, dir} do
-        {:true, _}->
-          # Orders on this floor - return the floor
-          IO.puts("Returning with floor set to")
-          IO.inspect(floor)
-          floor
+    case {bool_orders_on_floor, dir} do
+      {:true, _}->
+        # Orders on this floor - return the floor
+        floor
 
-        {:false, :down}->
-          # No orders on this floor, and direction :down
-          IO.puts("Going down with floor set to")
-          IO.inspect(floor)
-          cond do
-            floor > @min_floor->
-              calculate_optimal_floor(orders, dir, floor - 1)
-            floor == @min_floor->
-              # Change search direction
-              calculate_optimal_floor(orders, :up, floor)
-          end
+      {:false, :down}->
+        # No orders on this floor, and direction :down
+        cond do
+          floor > @min_floor->
+            calculate_optimal_floor(orders, dir, floor - 1)
+          floor == @min_floor->
+            # Change search direction
+            calculate_optimal_floor(orders, :up, floor)
+        end
 
-        {:false, :up}->
-          # No orders on this floor and direction :up
-          IO.puts("Going up with floor set to")
-          IO.inspect(floor)
-          cond do
-            floor < @max_floor->
-              calculate_optimal_floor(orders, dir, floor + 1)
-            floor == @max_floor->
-              # Change search direction
-              calculate_optimal_floor(orders, :down, floor)
-          end
-      end
-
-      IO.puts("New calculated floor")
-      IO.inspect(new_floor)
-      new_floor
+      {:false, :up}->
+        # No orders on this floor and direction :up
+        cond do
+          floor < @max_floor->
+            calculate_optimal_floor(orders, dir, floor + 1)
+          floor == @max_floor->
+            # Change search direction
+            calculate_optimal_floor(orders, :down, floor)
+        end
+    end
   end
 
 
@@ -714,19 +701,19 @@ defmodule ElevatorTest do
     floor = 2
 
     # Optimal floor should be floor 2
-    opt_floor_test_1 = BareElevator.calculate_optimal_floor([order1, order2], dir1, floor)
+    #opt_floor_test_1 = BareElevator.calculate_optimal_floor([order1, order2], dir1, floor)
     #IO.puts("Optimal should be 2")
     #IO.inspect(opt_floor_test_1)
     #IO.puts(" WHAT?? ")
 
-    dir2 = :up
+    #dir2 = :up
     # Optimal floor should be floor 3
-    opt_floor_test_2 = BareElevator.calculate_optimal_floor([order1, order2], dir2, floor)
+    #opt_floor_test_2 = BareElevator.calculate_optimal_floor([order1, order2], dir2, floor)
     #IO.puts("Optimal should be 3")
     #IO.inspect(opt_floor_test_2)
 
     # Optimal floor should be floor 3
-    opt_floor_test_3 = BareElevator.calculate_optimal_floor([order1], dir1, floor)
+    opt_floor_test_3 = BareElevator.calculate_optimal_floor([order2], dir1, floor)
     #IO.puts("Optimal should be 3")
     #IO.inspect(opt_floor_test_3)
   end
@@ -755,7 +742,7 @@ defmodule ElevatorTest do
     IO.inspect(opt_dir_test_2)
 
     # Optimal dir should be :up
-    opt_dir_test_3 = BareElevator.calculate_optimal_direction([order1], dir1, floor)
+    opt_dir_test_3 = BareElevator.calculate_optimal_direction([order2], dir1, floor)
     IO.puts("Optimal should be :up")
     IO.inspect(opt_dir_test_3)
 

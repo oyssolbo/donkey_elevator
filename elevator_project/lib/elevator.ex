@@ -32,10 +32,10 @@ defmodule Elevator do
   @max_floor    Application.fetch_env!(:elevator_project, :num_floors) + @min_floor - 1
   @cookie       Application.fetch_env!(:elevator_project, :default_cookie)
 
-  @door_time    3000  # ms
-  @moving_time  5000  # ms
-  @update_time  250   # ms
-  @init_time    @moving_time
+  @door_time            3000  # ms
+  @moving_time          5000  # ms
+  @status_update_time   250   # ms
+  @init_time            @moving_time
 
   @node_name    :elevator
 
@@ -111,10 +111,6 @@ defmodule Elevator do
   """
   def delegate_order(order)
   do
-    # If it only works with casting, we must ack here
-
-    IO.puts("delegate_order invoked")
-    IO.inspect(order)
     #GenStateMachine.call(@node_name, {:received_order, order})
     GenStateMachine.cast(@node_name, {:received_order, order})
   end
@@ -130,8 +126,60 @@ defmodule Elevator do
 
 ###################################### Events and transitions ######################################
 
-##### init_state #####
+##### all_states #####
+# received_order #
+  @doc """
+  Function to handle if a new order is received
 
+  This event should be handled if the elevator is in idle, moving or door-state and NOT when
+  the elevator is initializing or restarting. Could pherhaps be best to send both internal and
+  external orders over UDP then... It does simplify the elevator, but adds larger requirements
+  to the order-panel
+  """
+  def handle_event(
+        :cast,
+        {:received_order, new_order},
+        state,
+        %Elevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
+  do
+    #Logger.info("Elevator received order from #{from}")
+    Logger.info("Elevator received order")
+
+    # First check if the order is valid - throws an error if not
+    Order.check_valid_orders([new_order])
+
+    # Checking if order already exists - if not, add to list and calculate next direction
+    updated_order_list = Order.add_order(new_order, prev_orders)
+    new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
+
+    Lights.set_order_lights(updated_order_list)
+
+    {:next_state, state, new_elevator_data}
+  end
+
+# udp_timer #
+  @doc """
+  Function to handle when the elevator's status must be sent to the master
+
+  No transition
+  """
+  def handle_event(
+        :info,
+        :udp_timer,
+        state,
+        %Elevator{orders: orders, dir: dir, last_floor: last_floor} = elevator_data)
+  do
+    Timer.interrupt_after(self(), :udp_timer, @status_update_time)
+
+    active_master_pid = Process.whereis(:active_master)
+    if active_master_pid != :nil do
+      Process.send(active_master_pid, {self(), dir, last_floor, orders}, [])
+    end
+    {:next_state, state, elevator_data}
+  end
+
+##### init_state #####
+# at_floor #
   @doc """
   Function to handle when the elevator has received a floor in init-state
 
@@ -148,11 +196,12 @@ defmodule Elevator do
     # Since we are safe at a floor, the elevator's state is secure
     Process.cancel_timer(timer)
     new_elevator_data = check_at_new_floor(elevator_data, floor)
-    Timer.interrupt_after(self(), :udp_timer, @update_time)
+    Timer.interrupt_after(self(), :udp_timer, @status_update_time)
 
     {:next_state, :idle_state, new_elevator_data}
   end
 
+# timeout #
   @doc """
   Function to handle if we are stuck at init for too long
 
@@ -169,7 +218,8 @@ defmodule Elevator do
   end
 
 
-##### idle_state #####
+
+  ##### idle_state #####
 
   @doc """
   Function to handle when the elevator is in idle
@@ -213,7 +263,7 @@ defmodule Elevator do
 
 
 ##### moving_state #####
-
+# at floor #
   @doc """
   Function to handle when the elevator is at the desired floor in moving state
 
@@ -252,7 +302,7 @@ defmodule Elevator do
     {:next_state, new_state, new_data}
   end
 
-
+# min or max floor reached #
   @doc """
   Functions to handle if we have reached the top- or bottom-floor without an
   order there. These functions should not be triggered if we have an order at
@@ -283,7 +333,7 @@ defmodule Elevator do
     {:next_state, :idle_state, elevator_data}
   end
 
-
+# timeout #
   @doc """
   Function to handle if the elevator hasn't reached a floor
 
@@ -334,83 +384,6 @@ defmodule Elevator do
   end
 
 
-##### all_states #####
-
-  @doc """
-  Function to handle if a new order is received
-
-  This event should be handled if the elevator is in idle, moving or door-state and NOT when
-  the elevator is initializing or restarting. Could pherhaps be best to send both internal and
-  external orders over UDP then... It does simplify the elevator, but adds larger requirements
-  to the order-panel
-  """
-  def handle_event(
-        :cast,
-        {:received_order, new_order},
-        state,
-        %Elevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
-  do
-    #Logger.info("Elevator received order from #{from}")
-    Logger.info("Elevator received order")
-
-    # First check if the order is valid - throws an error if not
-    Order.check_valid_orders([new_order])
-
-    # Checking if order already exists - if not, add to list and calculate next direction
-    updated_order_list = Order.add_order(new_order, prev_orders)
-    new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
-
-    Lights.set_order_lights(updated_order_list)
-
-    {:next_state, state, new_elevator_data}
-  end
-
-  def handle_event(
-    :cast,
-    {:received_order, _},
-    state,
-    %Elevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
-  do
-    #Logger.info("Elevator received order from #{from}")
-    Logger.info("Elevator received order _")
-
-    {:next_state, state, elevator_data}
-  end
-
-  def handle_event(
-    :cast,
-    {:received_order, new_order},
-    _,
-    %Elevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
-  do
-    #Logger.info("Elevator received order from #{from}")
-    Logger.info("Elevator received order with state _")
-
-    {:next_state, :idle_state, elevator_data}
-  end
-
-
-  @doc """
-  Function to handle when the elevator's status must be sent to the master
-
-  No transition
-  """
-  def handle_event(
-        :info,
-        :udp_timer,
-        state,
-        %Elevator{orders: orders, dir: dir, last_floor: last_floor} = elevator_data)
-  do
-    Timer.interrupt_after(self(), :udp_timer, @update_time)
-
-    active_master_pid = Process.whereis(:active_master)
-    if active_master_pid != :nil do
-      Process.send(active_master_pid, {self(), dir, last_floor, orders}, [])
-    end
-    {:next_state, state, elevator_data}
-  end
-
-
 ###################################### Actions ######################################
 
 ##### Checking floor #####
@@ -439,7 +412,7 @@ defmodule Elevator do
 
   If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server
   """
-  defp check_at_floor(floor) when floor |> is_integer
+  def check_at_floor(floor) when floor |> is_integer
   do
     Lights.set_floorlight(floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})

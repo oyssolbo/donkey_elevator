@@ -51,6 +51,12 @@ defmodule ElevatorTest do
   end
 
 
+  def test_udp()
+  do
+    test_elevator_init_to_idle()
+  end
+
+
   def test_while()
   do
     Stream.iterate(0, &(&1+1)) |> Enum.reduce_while(0, fn i, acc ->

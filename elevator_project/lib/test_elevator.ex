@@ -1,5 +1,6 @@
 defmodule ElevatorTest do
 
+  require Logger
   require Elevator
   require Order
 
@@ -34,6 +35,19 @@ defmodule ElevatorTest do
     test_elevator_idle_to_moving()
     Elevator.check_at_floor(2)
     Process.sleep(500)
+  end
+
+  def test_engine_failure()
+  do
+    test_elevator_idle_to_moving()
+    Elevator.check_at_floor(1)
+    Process.sleep(2000)
+    Elevator.check_at_floor(1)
+    Process.sleep(2000)
+    Elevator.check_at_floor(1)
+    Process.sleep(2000)
+    Elevator.check_at_floor(2)
+    Process.sleep(2000)
   end
 
 
@@ -155,4 +169,32 @@ defmodule ElevatorTest do
         IO.puts("Not OK - down")
     end
   end
+
+  def test_received_order()
+  do
+    test_elevator_init_to_idle()
+
+    opts = [order_type: :up, order_floor: 2]
+    order = struct(Order, opts)
+
+    Elevator.check_at_floor(1)
+
+    #Logger.info("Done check elevator at floor")
+    Process.sleep(100)
+
+    Logger.info("Starting delegating to elevator")
+    Elevator.delegate_order(order)
+    Logger.info("Done delegating to elevator")
+
+    Process.sleep(50)
+
+    #Logger.info("Check elevator at floor")
+    #Elevator.check_at_floor(1)
+    Process.sleep(100)
+
+    #Elevator.check_at_floor(2)
+    Process.sleep(500)
+  end
+
+
 end

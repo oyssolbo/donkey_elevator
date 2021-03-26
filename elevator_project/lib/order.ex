@@ -181,7 +181,7 @@ defmodule Order do
   Returns
   updated_orders List of orders where the old ones are deleted
   """
-  defp remove_orders(
+  def remove_orders(
         [%Order{order_type: order_type, order_floor: order_floor} = first_order | rest_orders],
         dir,
         floor)
@@ -193,7 +193,7 @@ defmodule Order do
     end
   end
 
-  defp remove_orders(
+  def remove_orders(
         [],
         _dir,
         _floor)
@@ -228,10 +228,12 @@ defmodule Order do
         new_order,
         list)
   do
-    case new_order in list do
-      :true->
+    cond do
+      list == []->
+        [new_order]
+      new_order in list->
         list
-      :false->
+      new_order not in list->
         [list | new_order]
     end
   end

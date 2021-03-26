@@ -14,7 +14,8 @@ defmodule Elevator do
 
 
   TODO:
-    Testing
+    More testing
+    Writing code for combining with Master and Panel
 
   """
 
@@ -28,14 +29,14 @@ defmodule Elevator do
   require Lights
   require Timer
 
-  @min_floor    Application.fetch_env!(:elevator_project, :min_floor)
-  @max_floor    Application.fetch_env!(:elevator_project, :num_floors) + @min_floor - 1
-  @cookie       Application.fetch_env!(:elevator_project, :default_cookie)
+  @min_floor            Application.fetch_env!(:elevator_project, :project_min_floor)
+  @max_floor            Application.fetch_env!(:elevator_project, :project_num_floors) + @min_floor - 1
+  @cookie               Application.fetch_env!(:elevator_project, :project_cookie_name)
 
-  @door_time            3000  # ms
-  @moving_time          5000  # ms
-  @status_update_time   250   # ms
-  @init_time            @moving_time
+  @init_time            Application.fetch_env!(:elevator_project, :elevator_timeout_init_ms)
+  @door_time            Application.fetch_env!(:elevator_project, :elevator_timeout_door_ms)
+  @moving_time          Application.fetch_env!(:elevator_project, :elevator_timeout_moving_ms)
+  @status_update_time   Application.fetch_env!(:elevator_project, :elevator_update_status_time_ms)
 
   @node_name    :elevator
 
@@ -142,6 +143,8 @@ defmodule Elevator do
         state,
         %Elevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
   do
+    IO.inspect(@init_time)
+
     #Logger.info("Elevator received order from #{from}")
     Logger.info("Elevator received order")
 

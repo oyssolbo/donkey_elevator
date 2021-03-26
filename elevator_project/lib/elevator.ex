@@ -6,12 +6,12 @@ defmodule Elevator do
     - Driver
     - Network
     - Order
-
-  To be implemented:
+    - Panel
     - Lights
-    - Orderpanel
-    - Storage
+    - Timer
 
+  Could be used:
+    - Storage
 
   TODO:
     More testing
@@ -24,10 +24,15 @@ defmodule Elevator do
   use GenStateMachine
 
   require Logger
+
   require Driver
+  require Network
   require Order
+  require Panel
   require Lights
   require Timer
+
+  require Storage
 
   @min_floor            Application.fetch_env!(:elevator_project, :project_min_floor)
   @max_floor            Application.fetch_env!(:elevator_project, :project_num_floors) + @min_floor - 1

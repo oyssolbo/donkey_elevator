@@ -7,6 +7,7 @@ defmodule Master do
     - Order
     - Elevator
     - Panel
+    - Timer
 
   Could be used:
     - Storage
@@ -17,10 +18,14 @@ defmodule Master do
   use GenStateMachine
 
   require Logger
-  require Elevator
+
   require Network
-  require Storage
+  require Elevator
   require Order
+  require Panel
+  require Timer
+
+  require Storage
 
   @min_floor          Application.fetch_env!(:elevator_project, :project_min_floor)
   @max_floor          Application.fetch_env!(:elevator_project, :project_num_floors) + @min_floor - 1
@@ -138,6 +143,7 @@ defmodule Master do
 
 ##### active_state #####
 
+  # Handle if received status-update from an elevator
   def handle_event(
         :cast,
         {:status_update, elevator_id, status},
@@ -149,12 +155,74 @@ defmodule Master do
   end
 
 
-  def handle_event()
+  # Handle if received an external order
+  def handle_event(
+        :cast
+        {:received_order, order},
+        :active_state,
+        master_data)
+  do
+    # Check if the order is valid
+
+    # Add to list of orders
+
+    # Delegate the order to an elevator
+
+    # Wait for return-ack from said elevator
+
+    {:next_state, :active_state, master_data}
+  end
 
 
+  # Handle if two masters are active simultaneously
+  def handle_event(
+        :info,
+        {:update_active_master, update_id, active_order_list, connectionID_list},
+        :active_state,
+        master_data)
+  do
+    # Somehow there are two active masters simultaneously
 
+    # Use a logical OR to merge the orders - since we don't want any orders being lost
+
+    # Update the connectionID-list
+
+    # Check which master was activated first. If activated first, resume master. If not become backup
+    # If both activated at the same time, use a magic algorithm to demote one
+  end
+
+
+  # Handle if an elevator is inited (reset)
+  def handle_event(
+        {:call, from}
+        {:elevator_init, elevator_id},
+        :active_state,
+        master_data)
+  do
+    # Check if there are any registered orders belonging to that elevator
+
+    # Respond with a list of orders that elevator must serve
+  end
 
 ##### all_states #####
+
+  # Handle if no updates from an elevator within a certain time-frame
+  # Both states could do this. It would allow the backup to already have the cost set
+  # to infty if it becomes active
+  def handle_event(
+        :info,
+        {:elevator_timeout, elevator_id},
+        state,
+        master_data)
+  do
+    # Set the cost of the given elevator to infty
+
+    # Find a list of affected orders (that are not cab)
+
+    # Distribute these orders to the other elevators
+
+    {:next_state, state, master_data}
+  end
 
 
 

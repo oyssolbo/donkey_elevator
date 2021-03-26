@@ -20,7 +20,7 @@ defmodule Lights do
     Driver.set_floor_indicator(floor)
   end
 
-  
+
   @doc """
   Set the doorlight to the state 'state'
   """

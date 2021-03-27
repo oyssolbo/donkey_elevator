@@ -7,9 +7,12 @@ defmodule SystemNode do
     -GetIP
   """
 
+  #epmd -daemon if you get the error econ refused
+
   require Logger
 
   @default_tick_time 500 #Interval between pings (Testing needed to find optimum)
+  @default_cookie :TTK4115
 
   @doc """
   Initializing a node
@@ -23,7 +26,7 @@ defmodule SystemNode do
   """
   def start_node(
         name,
-        cookie)
+        cookie \\ @default_cookie)
   when cookie |> is_atom
   do
     case Node.start(name, :longnames, @default_tick_time) do
@@ -97,7 +100,7 @@ defmodule SystemNode do
   """
   def connect_nodes(node)
   do
-    case Network.detect_nodes() do
+    case Node.detect_nodes() do
       {:error, :node_not_running} ->
         Logger.error("No nodes available to connect")
         :ok
@@ -109,10 +112,12 @@ defmodule SystemNode do
 
   @doc """
   @brief        Connects the node to node-network
-  Just a sketch for now
+
   """
   def connect_node_network(node) do
-    Node.ping(node)
+    case Node.ping(node)
+    {:pong} -> Logger.info("Succesfully connected to #{node}")
+    {:pang} -> Logger.info("Unable to conenct to #{node}")
   end
 
 
@@ -132,4 +137,6 @@ defmodule SystemNode do
     Logger.info("Node disconnected from the network")
   end
 
+  def register_process(id) when id |> is_atom
+    Process.register(self(), id)
 end

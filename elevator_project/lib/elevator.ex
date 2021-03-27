@@ -202,6 +202,7 @@ defmodule Elevator do
     Logger.info("Elevator safe at floor after init. Transitioning into idle")
 
     # Since we are safe at a floor, the elevator's state is secure
+    Driver.set_motor_direction(:stop)
     Process.cancel_timer(timer)
     new_elevator_data = check_at_new_floor(elevator_data, floor)
     Timer.interrupt_after(self(), :udp_timer, @status_update_time)
@@ -424,6 +425,16 @@ defmodule Elevator do
   do
     Lights.set_floorlight(floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})
+  end
+
+    @doc """
+  Function that check if we are not a floor
+
+  If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server
+  """
+  def check_at_floor(floor) when floor |> is_atom
+  do
+    floor
   end
 
 

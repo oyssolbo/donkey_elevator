@@ -157,7 +157,7 @@ defmodule Master do
 
   # Handle if received an external order
   def handle_event(
-        :cast
+        :cast,
         {:received_order, order},
         :active_state,
         master_data)
@@ -194,7 +194,7 @@ defmodule Master do
 
   # Handle if an elevator is inited (reset)
   def handle_event(
-        {:call, from}
+        {:call, from},
         {:elevator_init, elevator_id},
         :active_state,
         master_data)

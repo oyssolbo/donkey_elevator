@@ -84,7 +84,7 @@ defmodule UDP_discover do
 
 
   @doc """
-  @brief        Function that will receive node_name from the broadcast_cast function above, and connect to the node
+  @brief        Function that will receive node_name from the broadcast_cast function above, and connect to the node, should be called at master init
   """
   def broadcast_listen(port \\ @broadcast_port)
     do
@@ -103,12 +103,12 @@ defmodule UDP_discover do
       case :gen_udp.recv(socket, 0)  do
         {:ok, recv_packet} ->
           data = Kernel.elem(recv_packet, 2)
-          Logger.info("Received the node #{data}")
+          Logger.info("Connecting to the node #{data}")
           Node.ping(String.to_atom(to_string(data))) |> IO.puts()
-          broadcast_receive_and_connect(socket) # While loop to keep the tread alive and alway listeninng for new connection
 
         {:error, reason} ->
           Logger.error("Failed to receive due to #{reason}")
       end
+      broadcast_receive_and_connect(socket) # While loop to keep the tread alive and alway listeninng for new connection
     end
 end

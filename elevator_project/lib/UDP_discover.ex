@@ -17,6 +17,7 @@ defmodule UDP_discover do
   @doc """
   @brief        Function that hopefully returns the IP-address of the system
 
+
   @param port   Port we should try to access. Default param set to @init_port
 
   @retval       RETURNS:                        IF:
@@ -54,6 +55,9 @@ defmodule UDP_discover do
     end
   end
 
+  @doc """
+  @brief        Helper function to open UDP socket on the broadcast port with the broadcast options
+  """
   def broadcast_open_connection(port \\ @broadcast_port)
   do
     case UDP.open_connection(port, [active: false, broadcast: true, reuseaddr: :true]) do
@@ -65,6 +69,10 @@ defmodule UDP_discover do
     end
   end
 
+
+  @doc """
+  @brief        Function that will broadcast the node_name on the broadcast port
+  """
   def broadcast_cast(node_name, port \\ @broadcast_port) do
     case broadcast_open_connection() do
       {:ok, socket} ->
@@ -74,6 +82,10 @@ defmodule UDP_discover do
     end
   end
 
+
+  @doc """
+  @brief        Function that will receive node_name from the broadcast_cast function above, and connect to the node
+  """
   def broadcast_listen(port \\ @broadcast_port)
     do
       case broadcast_open_connection() do
@@ -82,14 +94,18 @@ defmodule UDP_discover do
       end
     end
 
-    def broadcast_receive(socket)
+
+@doc """
+@brief Helper function tp broadcast_receive and connect
+"""
+  def broadcast_receive_and_connect(socket)
     do
-      case :gen_udp.recv(socket, 0, @default_timeout)  do
+      case :gen_udp.recv(socket, 0)  do
         {:ok, recv_packet} ->
           data = Kernel.elem(recv_packet, 2)
           Logger.info("Received the node #{data}")
-          Node.ping(String.to_atom(Kernel.inspect(data)))
-          {:recv, recv_packet}
+          Node.ping(String.to_atom(to_string(data))) |> IO.puts()
+          broadcast_receive_and_connect(socket) # While loop to keep the tread alive and alway listeninng for new connection
 
         {:error, reason} ->
           Logger.error("Failed to receive due to #{reason}")

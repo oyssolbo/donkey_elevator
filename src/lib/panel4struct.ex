@@ -2,7 +2,8 @@ require Driver
 require UDP
 import Matriks
 
-""" Order-struct
+"""
+Order-struct
 Example
     l1 = [ID-1, ID-2]
     l2 = [:up, :down]
@@ -20,90 +21,107 @@ defmodule Panel do
     @direction_map %{:up => 1, :down => 255, :stop => 0}
 
     numFloors = 4 # Get this from config somehow
-    floorTable = Enum.to_list(0..numFloors-1) # Creates an array of the floors; makes it easier to iterate through
-    mySocket = nil
+    floor_table = Enum.to_list(0..numFloors-1) # Creates an array of the floors; makes it easier to iterate through
+    my_socket = nil
     #myPort = nil
 
-    def init(mid, eid, port \\ []) do
-        mySocket = UDP.open_connection(port)
+    def init(mid1, mid2, eid, port \\ []) do
+        my_socket = UDP.open_connection(port)
 
-        checkerID = spawn(fn -> orderChecker(Matriks.falseOrderMatrix) end)
-        senderID = spawn(fn -> orderSender(mid, eid, checkerID, 0, Matriks.falseOrderMatrix) end)
-        {senderID, checkerID}
+        checker_ID = spawn(fn -> order_checker([]) end)
+        sender_ID = spawn(fn -> order_sender(mid1, mid2, eid, checker_ID, 0, []) end)
+        {sender_ID, checker_ID}
     end
 
 
-    defp orderChecker(---) do
-        
-        # Update order matrix by reading all HW order buttons
-        
+    defp order_checker(old_orders) when is_list(old_orders) do
 
-        # Check for request from sender. If there is, send order matrix and recurse with reset matrix
+        # Update order list by reading all HW order buttons
+        if old_orders == [] do
+            orders = check_4_orders()
+        else
+            orders = old_orders++check_4_orders()
+        end
+
+        # Check for request from sender. If there is, send order list and recurse with reset list
         receive do
-            {:gibOrdersPls, senderAddr} ->
-                
+            {:gibOrdersPls, sender_addr} ->
+                send(sender_addr, {:order_checker, orders})
+                order_checker([])
             after
                 0 -> :ok
         end
 
-        # If no send request, requrse with current matrix (output buffer)
-        orderChecker(---)
+        # If no send request, requrse with current list (output buffer)
+        order_checker(orders)
     end
 
-    defp orderSender(mid, eid, checkerAddr, sendID, outGoingMatrix) do
+    defp order_sender(mid, mid2, eid, checker_addr, send_ID, outgoing_orders) when is_list(outgoing_orders) do
 
         # If the order matrix isnt empty ...
-        if outGoingMatrix != Matriks.falseOrderMatrix do
+        if outgoing_orders != [] do
 
             # ... send the respective  orders to master and elevator
-            ...
+            UDP.send_data(my_socket, mid1, outgoing_orders)
+            UDP.send_data(my_socket, mid2, outgoing_orders)
+            UDP.send_data(my_socket, eid, outgoing_orders)
 
             # ... and wait for an ack
             receive do
                 {:ack, from, sentID} ->
                     # When ack is recieved, send request to checker for latest order matrix
-                    send(checkerAddr, {:gibOrdersPls, self()})
+                    send(checker_addr, {:gibOrdersPls, self()})
                     receive do
-                        # When latest order matrix is received, recurse with new orders and iterated sendID
-                        {:orderChecker, updatedMatrix} ->
-                            orderSender(mid, eid, checkerAddr, sendID+1, updatedMatrix)
+                        # When latest order matrix is received, recurse with new orders and iterated send_ID
+                        {:order_checker, updated_orders} ->
+                            order_sender(mid1, mid2, eid, checker_addr, send_ID+1, updated_orders)
                             after
-                                2000 -> # Send some kind of error, "no response from orderChecker"
+                                2000 -> # Send some kind of error, "no response from order_checker"
                     end
                 # If no ack is received after 1.5 sec: Recurse and repeat
                 after
-                    1500 -> orderSender(mid, eid, checkerAddr, sendID, outGoingMatrix)
+                    1500 -> order_sender(mid1, mid2, eid, checker_addr, send_ID, outgoing_orders)
             end
 
         else 
             # If order matrix is empty, send request to checker for latest orders. Recurse with those (but same sender ID)
-            send(checkerAddr, {:gibOrdersPls, self()})
+            send(checker_addr, {:gibOrdersPls, self()})
                     receive do
-                        {:orderChecker, updatedMatrix} ->
-                            orderSender(mid, eid, checkerAddr, sendID, updatedMatrix)
+                        {:order_checker, updated_orders} ->
+                            order_sender(mid1, mid2, eid, checker_addr, send_ID, updated_orders)
                     end
         end
      
     end
 
 
-    defp upChecker do
-        sensorStates = Enum.map(floorTable, fn x -> get_order_button_state(x, :hall_up) end)
+    defp up_checker do
+        sendor_states = Enum.map(floor_table, fn x -> order_formatter(x, :hall_up) end)
+        orders = Enum.filter(sendor_states, fn x -> x == [] end)
     end
 
-    defp downChecker do
-        [floor1, floor2, floor3, floor4] = [Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])]
+    defp down_checker do
+        sendor_states = Enum.map(floor_table, fn x -> order_formatter(x, :hall_up) end)
+        orders = Enum.filter(sendor_states, fn x -> x == [] end)    
     end
 
-    defp cabChecker do
-        [floor1, floor2, floor3, floor4] = [Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])]
+    defp cab_checker do
+        sendor_states = Enum.map(floor_table, fn x -> order_formatter(x, :hall_up) end)
+        orders = Enum.filter(sendor_states, fn x -> x == [] end)
     end
 
-    defp orderMatrixUpdater(mn, mo) do
-        updated = [[mn[0][0] or mo[0][0], mn[0][1] or mo[0][1], mn[0][2] or mo[0][2], mn[0][3] or mo[0][3]],
-                   [mn[1][0] or mo[1][0], mn[1][1] or mo[1][1], mn[1][2] or mo[1][2], mn[1][3] or mo[1][3]],
-                   [mn[2][0] or mo[2][0], mn[2][1] or mo[2][1], mn[2][2] or mo[2][2], mn[2][3] or mo[2][3]]]
+    defp order_formatter(floor, type) do
+        if Driver.get_order_button_state(floor, type) == :on do
+            order = struct(Order, [order_id: Kernel.make_ref(), order_type: type, order_floor: floor])
+        else
+            order = []
+        end
     end
+
+    defp check_4_orders do
+        orders = up_checker++down_checker++cab_checker
+    end
+
 end
 
 # Driver.get_floor_sensor_state(floor, button_type) |> state

@@ -45,6 +45,15 @@ defmodule Storage do
 
     end
 
+    def write(data, fileName \\ "save_data.txt") do
+        # TODO: Format order struct into string
+        result = File.write(fileName, data)
+    end
+
+    def read(fileName \\ "save_data.txt") do
+        result = File.read(fileName)
+    end
+
 @doc """
 Notes:
 File.write accepts only(?) _a_ string as argument, so process all data before passing.

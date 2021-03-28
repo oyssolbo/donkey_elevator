@@ -1,6 +1,3 @@
-require Driver
-require UDP
-import Matriks
 
 """
 Order-struct
@@ -16,6 +13,11 @@ Syntax
 """
 
 defmodule Panel do
+    require Driver
+    require UDP
+    require Order
+    import Matriks
+
     @button_map %{:hall_up => 0, :hall_down => 1, :cab => 2}
     @state_map  %{:on => 1, :off => 0}
     @direction_map %{:up => 1, :down => 255, :stop => 0}

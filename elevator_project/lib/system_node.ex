@@ -140,6 +140,8 @@ defmodule SystemNode do
     Logger.info("Node disconnected from the network")
   end
 
-  def register_process(id) when id |> is_atom
+  def register_process(id) when id |> is_atom()
+  do
     Process.register(self(), id)
+  end
 end

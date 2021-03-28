@@ -645,19 +645,20 @@ defmodule Elevator do
 
   def send_status_to_masters(elevator_status)
   do
+    message_id = 0;
     #calculation of message_id
-
+    #Need øysteins' magic code here
     #This should be sent very often, and therefore no acks are needed
 
-    send({:master_1, :"machine_1@127.0.0.1"}, {:elevator_1, {message_id, elevator_status }}) #master_1 and _master_2 should have a fixed hardcoded id
-    send({:master_2, :"machine_2@127.0.0.1"}, {:elevator_1, {message_id, elevator_status }})
+    send({:master, :"machine_1@127.0.0.1"}, {:elevator_1, {message_id, elevator_status }})
+    send({:master, :"machine_2@127.0.0.1"}, {:elevator_1, {message_id, elevator_status }})
 
   end
 
   def receive_thread()
   do
     receive do
-      {_from, {message_id, data}} -> IO.puts("Got the following data from master")
+      {:master, {message_id, data}} -> IO.puts("Got the following data from master")
       IO.puts(data)
 
     after

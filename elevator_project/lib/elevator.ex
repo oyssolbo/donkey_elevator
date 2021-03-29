@@ -649,7 +649,7 @@ defmodule Elevator do
     #calculation of message_id
     #Need øysteins' magic code here
     #This should be sent very often, and therefore no acks are needed
-
+    network_list = SystemNode.nodes_in_network()
     send({:master, :"machine_1@127.0.0.1"}, {:elevator_1, {message_id, elevator_status }})
     send({:master, :"machine_2@127.0.0.1"}, {:elevator_1, {message_id, elevator_status }})
 

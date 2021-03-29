@@ -90,7 +90,7 @@ defmodule UDP_discover do
     do
       case broadcast_open_connection() do
         {:ok, socket} ->
-          spawn( fn -> broadcast_receive(socket) end)
+          spawn( fn -> broadcast_receive_and_connect(socket) end)
       end
     end
 

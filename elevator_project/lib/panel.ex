@@ -16,18 +16,18 @@ defmodule Panel do
     require Driver
     require UDP
     require Order
-    import Matriks
 
     @button_map %{:hall_up => 0, :hall_down => 1, :cab => 2}
     @state_map  %{:on => 1, :off => 0}
     @direction_map %{:up => 1, :down => 255, :stop => 0}
 
-    numFloors = 4 # Get this from config somehow
-    floor_table = Enum.to_list(0..numFloors-1) # Creates an array of the floors; makes it easier to iterate through
+    #numFloors = 4 # Get this from config somehow
+    @num_floors Application.fetch_env!(:elevator_project, :num_floors)
+    floor_table = Enum.to_list(0..@num_floors-1) # Creates an array of the floors; makes it easier to iterate through
     my_socket = nil
     #myPort = nil
 
-    def init(mid1, mid2, eid, port \\ [], floor_table) do
+    def init(mid1, mid2, eid, port \\ [], floor_table \\ Enum.to_list(0..@num_floors-1)) do
         my_socket = UDP.open_connection(port)
 
         checker_ID = spawn(fn -> order_checker([], floor_table) end)
@@ -36,7 +36,7 @@ defmodule Panel do
     end
 
 
-    defp order_checker(old_orders, floor_table) when is_list(old_orders) do
+    defp order_checker(old_orders, floor_table \\ Enum.to_list(0..@num_floors-1)) when is_list(old_orders) do
         orders = []
         # Update order list by reading all HW order buttons
         if old_orders == [] do
@@ -96,23 +96,7 @@ defmodule Panel do
      
     end
 
-
-    defp up_checker(floor_table) do
-        sendor_states = Enum.map(floor_table, fn x -> order_formatter(x, :hall_up) end)
-        orders = Enum.filter(sendor_states, fn x -> x == [] end)
-    end
-
-    defp down_checker(floor_table) do
-        sendor_states = Enum.map(floor_table, fn x -> order_formatter(x, :hall_up) end)
-        orders = Enum.filter(sendor_states, fn x -> x == [] end)    
-    end
-
-    defp cab_checker(floor_table) do
-        sendor_states = Enum.map(floor_table, fn x -> order_formatter(x, :hall_up) end)
-        orders = Enum.filter(sendor_states, fn x -> x == [] end)
-    end
-
-    defp order_formatter(floor, type) do
+    defp hardware_order_checker(floor, type) do
         if Driver.get_order_button_state(floor, type) == :on do
             order = struct(Order, [order_id: Kernel.make_ref(), order_type: type, order_floor: floor])
         else
@@ -120,8 +104,13 @@ defmodule Panel do
         end
     end
 
-    defp check_4_orders(floor_table) do
-        orders = up_checker(floor_table)++down_checker(floor_table)++cab_checker(floor_table)
+    defp check_order(orderType, table \\ Enum.to_list(0..@num_floors-1)) do
+        sendor_states = Enum.map(table, fn x -> hardware_order_checker(x, orderType) end)
+        orders = Enum.filter(sendor_states, fn x -> x == [] end)
+    end
+
+    defp check_4_orders(table \\ Enum.to_list(0..@num_floors-1)) do
+        orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
     end
 
 end

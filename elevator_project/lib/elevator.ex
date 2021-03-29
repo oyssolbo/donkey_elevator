@@ -635,7 +635,8 @@ defmodule Elevator do
 
 
   ###### Network interfacing #####
-#Should probalby be moved to a different module ()
+  #Sketch of network interfacing
+  #Should probalby be moved to a different module and needs further development
 
 
   @doc """
@@ -643,26 +644,27 @@ defmodule Elevator do
   on the elevators states
   """
 
-  def send_status_to_masters(elevator_status)
+  def send_data_to_all_nodes(sender_id, receiver_id,data, iteration \\ 1)
   do
     message_id = 0;
     #calculation of message_id
     #Need øysteins' magic code here
     #This should be sent very often, and therefore no acks are needed
     network_list = SystemNode.nodes_in_network()
-    send({:master, :"machine_1@127.0.0.1"}, {:elevator_1, {message_id, elevator_status }})
-    send({:master, :"machine_2@127.0.0.1"}, {:elevator_1, {message_id, elevator_status }})
-
+    {node, network_list = List.pop_at(network_list, iteration)
+    if node != :nil do
+      send({receiver_id, node}, {sender_id, {message_id, data}})
+      send_data_to_all_nodes(sender_id, receiver_id, data, iteration + 1)
+    end
   end
 
   def receive_thread()
   do
     receive do
-      {:master, {message_id, data}} -> IO.puts("Got the following data from master")
-      IO.puts(data)
+      {:master, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
 
-    after
-      2_000 -> IO.puts("Connection timeout")
+    #after
+    #  10_000 -> IO.puts("Connection timeout")
 
     end
   end

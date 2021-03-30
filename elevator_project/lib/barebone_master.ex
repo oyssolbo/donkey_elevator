@@ -348,7 +348,7 @@ defmodule Master do
 
     other_orders =
       undelegated_orders |>
-      Order.remove_order_list_from_list(order_list)
+      Order.remove_orders(order_list)
 
     delegated_orders = delegate_orders(undelegated_orders, updated_elevator_list)
 
@@ -385,7 +385,7 @@ defmodule Master do
     # Find a list of affected orders and unaffected orders
     order_list = Map.get(master_data, :active_order_list)
     affected_orders = get_assigned_elevator_orders(order_list, elevator_id)
-    unaffected_orders = Order.remove_order_list_from_list(affected_orders, order_list)
+    unaffected_orders = Order.remove_orders(affected_orders, order_list)
 
     # Distribute these orders to the other elevators
     delegated_orders = delegate_orders(affected_orders, updated_elevator_list)

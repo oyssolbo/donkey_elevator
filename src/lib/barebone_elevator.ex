@@ -97,3 +97,51 @@ defmodule BareElevator do
   end
 
 end
+
+
+##### Timer #####
+
+
+  @doc """
+  Starts the door-timer, which signals that the elevator should
+  close the door
+  """
+  # defp start_door_timer(elevator_data)
+  # do
+  #   timer = Map.get(elevator_data, :timer)
+  #   Process.cancel_timer(timer)
+  #   timer = Process.send_after(self(), :door_timer, @door_time)
+  #   Map.put(elevator_data, :timer, timer)
+  # end
+
+
+  @doc """
+  Function that starts a timer to check if we are moving
+  """
+  # defp start_moving_timer(elevator_data)
+  # do
+  #   timer = Map.get(elevator_data, :timer)
+  #   Process.cancel_timer(timer)
+  #   timer = Process.send_after(self(), :moving_timer, @moving_time)
+  #   Map.put(elevator_data, :timer, timer)
+  # end
+
+
+  @doc """
+  Function that starts a timer to check if init takes too long
+  """
+  # defp start_init_timer(elevator_data)
+  # do
+  #   timer = Map.get(elevator_data, :timer)
+  #   Process.cancel_timer(timer)
+  #   new_timer = Process.send_after(self(), :init_timer, @init_time)
+  #   Map.put(elevator_data, :timer, new_timer)
+  # end
+
+  @doc """
+  Function to start a timer to send updates over UDP to the master
+  """
+  # defp start_udp_timer()
+  # do
+  #   Process.send_after(self(), :udp_timer, @update_time)
+  # end

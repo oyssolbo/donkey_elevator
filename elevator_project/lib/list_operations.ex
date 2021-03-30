@@ -56,7 +56,7 @@ defmodule ListOperations do
         element,
         list)
   do
-    List.delete(list, var)
+    List.delete(list, element)
   end
 
   @doc """
@@ -69,7 +69,7 @@ defmodule ListOperations do
         list)
   do
     original_length = length(list)
-    new_list = List.delete(list, var)
+    new_list = List.delete(list, element)
     new_length = length(new_list)
 
     case new_length < original_length do
@@ -121,7 +121,7 @@ defmodule ListOperations do
   The function assumes that each element in list
   """
   def find_element_with_value(
-        [first | rest_list]
+        [first | rest_list],
         field,
         value)
   do
@@ -130,12 +130,12 @@ defmodule ListOperations do
     if value_first == value do
       [first | find_element_with_value(rest_list, field, value)]
     else
-      find_element_with_value(rest_lits, field, value)
+      find_element_with_value(rest_list, field, value)
     end
   end
 
   def find_element_with_value(
-        []
+        [],
         field,
         value)
   do

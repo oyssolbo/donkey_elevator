@@ -96,26 +96,27 @@ defmodule Order do
   @doc """
   Function to add a list of orders to another list of orders
   """
-  # def add_order_list_to_list(
-  #       [order | rest_orders],
-  #       list)
-  # do
-  #   updated_list = add_order_to_list(order, list)
-  #   add_order_list_to_list(rest_orders, updated_list)
-  # end
+  def add_order(
+        orders,
+        order_list)
+  when orders |> is_list()
+  do
+    ListOperations.add_list_to_list(orders, order_list)
+  end
 
-  # def add_order_list_to_list(
-  #       [],
-  #       list)
-  # do
-  #   list
-  # end
+  def add_order(
+        order,
+        order_list)
+  when order |> is_struct()
+  do
+    ListOperations.add_single_element_to_list(order, order_list)
+  end
 
 
   @doc """
   Function to add a single order to a list 'list'
   """
-  # def add_order_to_list(
+  # def add_orders_to_list(
   #       new_order,
   #       list)
   # do
@@ -277,7 +278,7 @@ defmodule Order do
   @doc """
   Assigns all of the orders to the elevator 'elevator_id'
   """
-  def set_delegated_elevator
+  def set_delegated_elevator(
         orders,
         elevator_id)
   do

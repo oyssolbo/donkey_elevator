@@ -81,11 +81,11 @@ defmodule Network do
   """
   def node_network_init()
   do
-    node_name_s = Kernel.inspect(:rand.uniform(10000)) <> "@" <> get_ip()
+    node_name_s = Kernel.inspect(:rand.uniform(10000)) <> "@" <> UDP_discover.get_ip()
     node_name_a = String.to_atom(node_name_s)
     SystemNode.start_node(node_name_a)
     UDP_discover.broadcast_listen() #listen for other nodes forever
-    spawn( fn -> UDP_discover.broadcast_cast(node_name_s) end) #cast node names forever
+    UDP_discover.broadcast_cast(node_name_s) #cast node names forever
   end
 
   @doc """

@@ -43,11 +43,10 @@ defmodule Elevator do
   @moving_time          Application.fetch_env!(:elevator_project, :elevator_timeout_moving_ms)
   @status_update_time   Application.fetch_env!(:elevator_project, :elevator_update_status_time_ms)
 
-  @node_name    :elevator
+  @node_name            :elevator
 
-  @enforce_keys [:orders, :last_floor, :dir, :timer]
-  defstruct     [:orders, :last_floor, :dir, :timer]
-
+  @enforce_keys         [:orders, :last_floor, :dir, :timer, :elevator_id]
+  defstruct             [:orders, :last_floor, :dir, :timer, :elevator_id]
 
 
 ###################################### External functions ######################################
@@ -66,14 +65,15 @@ defmodule Elevator do
   """
   def init([])
   do
-    Logger.info("Elevator initialized")
+    Logger.info("Elevator initializing")
 
     # Set correct elevator-state
     data = %Elevator{
       orders: [],
       last_floor: :nil,
       dir: :down,
-      timer: make_ref()
+      timer: make_ref(),
+      elevator_id: Network.get_ip()
     }
 
     # Close door and set direction down
@@ -81,9 +81,10 @@ defmodule Elevator do
     Driver.set_motor_direction(:down)
 
     # Starting process for error-handling
-    elevator_data = Timer.start_timer(self(), data, :init_timer, @init_time)
+    elevator_data = Timer.start_timer(self(), data, :timer, :init_timer, @init_time)
     spawn(fn-> read_current_floor() end)
 
+    Logger.info("Elevator initialized")
     {:ok, :init_state, elevator_data}
   end
 
@@ -157,7 +158,7 @@ defmodule Elevator do
     Order.check_valid_orders([new_order])
 
     # Checking if order already exists - if not, add to list and calculate next direction
-    updated_order_list = Order.add_order(new_order, prev_orders)
+    updated_order_list = Order.add_order_to_list(new_order, prev_orders)
     new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
 
     Lights.set_order_lights(updated_order_list)
@@ -175,13 +176,13 @@ defmodule Elevator do
         :info,
         :udp_timer,
         state,
-        %Elevator{orders: orders, dir: dir, last_floor: last_floor} = elevator_data)
+        %Elevator{dir: dir, last_floor: last_floor} = elevator_data)
   do
     Timer.interrupt_after(self(), :udp_timer, @status_update_time)
 
     active_master_pid = Process.whereis(:active_master)
     if active_master_pid != :nil do
-      Process.send(active_master_pid, {self(), dir, last_floor, orders}, [])
+      Process.send(active_master_pid, {self(), dir, last_floor}, [])
     end
     {:next_state, state, elevator_data}
   end
@@ -260,7 +261,7 @@ defmodule Elevator do
           Logger.info("New direction calculated")
           temp_elevator_data = Map.put(elevator_data, :dir, new_dir)
 
-          new_elevator_data = Timer.start_timer(self(), temp_elevator_data, :moving_timer, @moving_time)
+          new_elevator_data = Timer.start_timer(self(), temp_elevator_data, :timer, :moving_timer, @moving_time)
           Driver.set_motor_direction(new_dir)
 
           {:moving_state, new_elevator_data}
@@ -444,7 +445,7 @@ defmodule Elevator do
         Map.put(elevator_data, :last_floor, floor)
 
       last_floor != floor->
-        temp_elevator_data = Timer.start_timer(self(), elevator_data, :moving_timer, @moving_time)
+        temp_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :moving_timer, @moving_time)
         Map.put(temp_elevator_data, :last_floor, floor)
 
       last_floor == floor->
@@ -480,10 +481,10 @@ defmodule Elevator do
 
     # Open door and start timer
     open_door()
-    timer_elevator_data = Timer.start_timer(self(), elevator_data, :door_timer, @door_time)
+    timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
 
     # Remove old order and calculate new target_order
-    updated_orders = Order.remove_orders(orders, dir, floor)
+    updated_orders = Order.remove_orders_from_list(orders, dir, floor)
     orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
 
     Lights.set_order_lights(updated_orders)

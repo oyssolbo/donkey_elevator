@@ -23,7 +23,7 @@ defmodule Panel do
 
     @num_floors Application.fetch_env!(:elevator_project, :num_floors)
     # floor_table: Array of the floors; makes it easier to iterate through
-    
+
     # TODO: Replace mid1, mid2, eid with send_local_node func. For master send; send_data_to_all_nodes.
     def init(floor_table \\ Enum.to_list(0..@num_floors-1)) do
 
@@ -38,7 +38,7 @@ defmodule Panel do
     end
 
 
-    defp order_checker(old_orders, floor_table)) when is_list(old_orders) do
+    defp order_checker(old_orders, floor_table) when is_list(old_orders) do
         orders = []
         # Update order list by reading all HW order buttons
         if old_orders == [] do
@@ -66,7 +66,7 @@ defmodule Panel do
         if outgoing_orders != [] do
 
             # ... send the respective  orders to master and elevator
-            
+
             # send_data_to_all_nodes(:master, orders)
             #send({:elevator, node}, {:cab_orders, :panel, self(), extract_cab_orders(orders)})
 
@@ -89,7 +89,7 @@ defmodule Panel do
                     1500 -> order_sender(checker_addr, floor_table, send_ID, outgoing_orders)
             end
 
-        else 
+        else
             # If order matrix is empty, send request to checker for latest orders. Recurse with those (but same sender ID)
             send(checker_addr, {:gibOrdersPls, self()})
             receive do
@@ -97,7 +97,7 @@ defmodule Panel do
                     order_sender(checker_addr, floor_table, send_ID, updated_orders)
             end
         end
-     
+
     end
 
     defp hardware_order_checker(floor, type) do
@@ -117,5 +117,5 @@ defmodule Panel do
     defp check_4_orders(table \\ Enum.to_list(0..@num_floors-1)) do
         orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
     end
-    
+
 end

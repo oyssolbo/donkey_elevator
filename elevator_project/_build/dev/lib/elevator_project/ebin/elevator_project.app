@@ -6,7 +6,7 @@
                         'Elixir.GenStateMachine.Application',
                         'Elixir.GenStateMachine.Translator','Elixir.Lights',
                         'Elixir.ListOperations','Elixir.Master',
-                        'Elixir.Matriks','Elixir.Network','Elixir.Order',
+                        'Elixir.MasterTest','Elixir.Network','Elixir.Order',
                         'Elixir.Panel','Elixir.Storage','Elixir.SystemNode',
                         'Elixir.Timer','Elixir.UDP','Elixir.UDP_discover']},
               {registered,[]},

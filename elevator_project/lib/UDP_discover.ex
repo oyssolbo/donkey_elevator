@@ -82,7 +82,7 @@ defmodule UDP_discover do
         Logger.error("The error #{reason} occured while trying to broadcast #{node_name}")
     end
     Process.sleep(@default_timeout)
-    broadcast_cast(node_name)
+    broadcast_cast(node_name) # while loop to keep casting the nodename to all other nodes.
   end
 
 

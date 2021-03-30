@@ -1,13 +1,4 @@
-
 """
-Order-struct
-Example
-    l1 = [ID-1, ID-2]
-    l2 = [:up, :down]
-    l3 = [1, 4]
-
-    orders = Order.zip(l1, l2, l3)
-
 Syntax
     @Order{order_ID, order_type, order_floor}
 """
@@ -15,11 +6,12 @@ Syntax
 defmodule Panel do
     require Driver
     require UDP
+    require Network
     require Order
 
-    @button_map %{:hall_up => 0, :hall_down => 1, :cab => 2}
-    @state_map  %{:on => 1, :off => 0}
-    @direction_map %{:up => 1, :down => 255, :stop => 0}
+    #@button_map %{:hall_up => 0, :hall_down => 1, :cab => 2}
+    #@state_map  %{:on => 1, :off => 0}
+    #@direction_map %{:up => 1, :down => 255, :stop => 0}
 
     @num_floors Application.fetch_env!(:elevator_project, :num_floors)
     # floor_table: Array of the floors; makes it easier to iterate through
@@ -34,11 +26,10 @@ defmodule Panel do
         Process.register(checker_ID, :order_checker)
         Process.register(sender_ID, :order_sender)
 
-        {sender_ID, checker_ID}
+        {checker_ID, sender_ID}
     end
 
-
-    defp order_checker(old_orders, floor_table)) when is_list(old_orders) do
+    defp order_checker(old_orders, floor_table) when is_list(old_orders) do
         orders = []
         # Update order list by reading all HW order buttons
         if old_orders == [] do

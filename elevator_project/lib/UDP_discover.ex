@@ -72,6 +72,7 @@ defmodule UDP_discover do
 
   @doc """
   @brief        Function that will broadcast the node_name on the broadcast port
+                Should only be spawned as a new independent process!!
   """
   def broadcast_cast(node_name, port \\ @broadcast_port) do
     case broadcast_open_connection() do

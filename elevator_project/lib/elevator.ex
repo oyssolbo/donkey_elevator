@@ -604,3 +604,4 @@ defmodule Elevator do
     Driver.set_motor_direction(:stop)
     Process.exit(self(), :shutdown)
   end
+end

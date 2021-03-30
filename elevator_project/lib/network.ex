@@ -92,7 +92,7 @@ defmodule Network do
     SystemNode.start_node(node_name_ip_a)
 
     UDP_discover.broadcast_listen() #listen for other nodes forever
-    spawn( fn -> UDP_discover.broadcast_cast(node_name_ip_s)) #cast node names forever
+    spawn( fn -> UDP_discover.broadcast_cast(node_name_ip_s) end) #cast node names forever
 
   end
 
@@ -101,7 +101,7 @@ defmodule Network do
   """
   def send_data_to_all_nodes(sender_id, receiver_id,data, iteration \\ 0)
   do
-    message_id = 0; # replace with get utc time now
+    message_id = Timer.get_utc_time() # time as id
     network_list = SystemNode.nodes_in_network()
     {node, network_list} = List.pop_at(network_list, iteration)
     if node != :nil do
@@ -115,7 +115,7 @@ defmodule Network do
   """
   def send_data_inside_node(sender_id, receiver_id, data)
   do
-    message_id = 0; # replace with get UTC time now
+    message_id = Timer.get_utc_time() # time as id
     send({receiver_id, Node.self()}, {sender_id, {message_id, data}})
   end
 

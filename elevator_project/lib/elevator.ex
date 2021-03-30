@@ -69,11 +69,11 @@ defmodule Elevator do
 
     # Set correct elevator-state
     data = %Elevator{
-      orders: [],
-      last_floor: :nil,
-      dir: :down,
-      timer: make_ref(),
-      elevator_id: Network.get_ip()
+      orders:       [],
+      last_floor:   :nil,
+      dir:          :down,
+      timer:        Timer.get_utc_now(),
+      elevator_id:  Network.get_ip()
     }
 
     # Close door and set direction down

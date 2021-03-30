@@ -19,25 +19,25 @@ defmodule Timer do
   def start_timer(
         process_name,
         data_struct,
+        timer_atom_name,
         interrupt_atom_name,
         timeout_time)
   do
-    timer = Map.get(data_struct, :timer)
+    timer = Map.get(data_struct, timer_atom_name)
     Process.cancel_timer(timer)
     new_timer = Process.send_after(process_name, interrupt_atom_name, timeout_time)
-    Map.put(data_struct, :timer, new_timer)
+    Map.put(data_struct, timer_atom_name, new_timer)
   end
 
 
   @doc """
   Function to stop a timer - if necessary
-
-  The function assumes that the struct 'data_struct' contains a field called
-  ':timer'
   """
-  def stop_timer(data_struct)
+  def stop_timer(
+        data_struct,
+        timer_atom_name)
   do
-    timer = Map.get(data_struct, :timer)
+    timer = Map.get(data_struct, timer_atom_name)
     Process.cancel_timer(timer)
   end
 
@@ -65,6 +65,31 @@ defmodule Timer do
   do
     utc_time = Time.utc_now()
     Map.put(data_struct, variable_name, utc_time)
+  end
+
+
+  @doc """
+  Function for getting the current UTC-time
+  """
+  def get_utc_time()
+  do
+    Time.utc_now()
+  end
+
+
+  @doc """
+  Compares to utc times with each other
+
+  Returns
+    :lt   if time1 'older' than time2
+    :eq   if time1 equal to time2
+    :gt   if time1 'younger' than time2
+  """
+  def compare_utc_time(
+        time1,
+        time2)
+  do
+    Time.compare(time1, time2)
   end
 
 end

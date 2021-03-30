@@ -6,16 +6,15 @@ defmodule Elevator do
     - Driver
     - Network
     - Order
-    - Panel
-    - Lights
-    - Timer
 
-  Could be used:
+  To be implemented:
+    - Lights
+    - Orderpanel
     - Storage
 
+
   TODO:
-    More testing
-    Writing code for combining with Master and Panel
+    Testing
 
   """
 
@@ -24,29 +23,25 @@ defmodule Elevator do
   use GenStateMachine
 
   require Logger
-
   require Driver
-  require Network
   require Order
-  require Panel
   require Lights
   require Timer
 
-  require Storage
+  @min_floor    Application.fetch_env!(:elevator_project, :min_floor)
+  @max_floor    Application.fetch_env!(:elevator_project, :num_floors) + @min_floor - 1
+  @cookie       Application.fetch_env!(:elevator_project, :default_cookie)
 
-  @min_floor            Application.fetch_env!(:elevator_project, :project_min_floor)
-  @max_floor            Application.fetch_env!(:elevator_project, :project_num_floors) + @min_floor - 1
-  @cookie               Application.fetch_env!(:elevator_project, :project_cookie_name)
+  @door_time    3000  # ms
+  @moving_time  5000  # ms
+  @update_time  250   # ms
+  @init_time    @moving_time
 
-  @init_time            Application.fetch_env!(:elevator_project, :elevator_timeout_init_ms)
-  @door_time            Application.fetch_env!(:elevator_project, :elevator_timeout_door_ms)
-  @moving_time          Application.fetch_env!(:elevator_project, :elevator_timeout_moving_ms)
-  @status_update_time   Application.fetch_env!(:elevator_project, :elevator_update_status_time_ms)
+  @node_name    :elevator
 
-  @node_name            :elevator
+  @enforce_keys [:orders, :last_floor, :dir, :timer]
+  defstruct     [:orders, :last_floor, :dir, :timer]
 
-  @enforce_keys         [:orders, :last_floor, :dir, :timer, :elevator_id]
-  defstruct             [:orders, :last_floor, :dir, :timer, :elevator_id]
 
 
 ###################################### External functions ######################################
@@ -65,15 +60,14 @@ defmodule Elevator do
   """
   def init([])
   do
-    Logger.info("Elevator initializing")
+    Logger.info("Elevator initialized")
 
     # Set correct elevator-state
     data = %Elevator{
-      orders:       [],
-      last_floor:   :nil,
-      dir:          :down,
-      timer:        Timer.get_utc_now(),
-      elevator_id:  Network.get_ip()
+      orders: [],
+      last_floor: :nil,
+      dir: :down,
+      timer: make_ref()
     }
 
     # Close door and set direction down
@@ -81,10 +75,9 @@ defmodule Elevator do
     Driver.set_motor_direction(:down)
 
     # Starting process for error-handling
-    elevator_data = Timer.start_timer(self(), data, :timer, :init_timer, @init_time)
+    elevator_data = Timer.start_timer(self(), data, :init_timer, @init_time)
     spawn(fn-> read_current_floor() end)
 
-    Logger.info("Elevator initialized")
     {:ok, :init_state, elevator_data}
   end
 
@@ -118,6 +111,10 @@ defmodule Elevator do
   """
   def delegate_order(order)
   do
+    # If it only works with casting, we must ack here
+
+    IO.puts("delegate_order invoked")
+    IO.inspect(order)
     #GenStateMachine.call(@node_name, {:received_order, order})
     GenStateMachine.cast(@node_name, {:received_order, order})
   end
@@ -133,62 +130,8 @@ defmodule Elevator do
 
 ###################################### Events and transitions ######################################
 
-##### all_states #####
-# received_order #
-  @doc """
-  Function to handle if a new order is received
-
-  This event should be handled if the elevator is in idle, moving or door-state and NOT when
-  the elevator is initializing or restarting. Could pherhaps be best to send both internal and
-  external orders over UDP then... It does simplify the elevator, but adds larger requirements
-  to the order-panel
-  """
-  def handle_event(
-        :cast,
-        {:received_order, new_order},
-        state,
-        %Elevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
-  do
-    IO.inspect(@init_time)
-
-    #Logger.info("Elevator received order from #{from}")
-    Logger.info("Elevator received order")
-
-    # First check if the order is valid - throws an error if not
-    Order.check_valid_orders([new_order])
-
-    # Checking if order already exists - if not, add to list and calculate next direction
-    updated_order_list = Order.add_order_to_list(new_order, prev_orders)
-    new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
-
-    Lights.set_order_lights(updated_order_list)
-
-    {:next_state, state, new_elevator_data}
-  end
-
-# udp_timer #
-  @doc """
-  Function to handle when the elevator's status must be sent to the master
-
-  No transition
-  """
-  def handle_event(
-        :info,
-        :udp_timer,
-        state,
-        %Elevator{dir: dir, last_floor: last_floor} = elevator_data)
-  do
-    Timer.interrupt_after(self(), :udp_timer, @status_update_time)
-
-    active_master_pid = Process.whereis(:active_master)
-    if active_master_pid != :nil do
-      Process.send(active_master_pid, {self(), dir, last_floor}, [])
-    end
-    {:next_state, state, elevator_data}
-  end
-
 ##### init_state #####
-# at_floor #
+
   @doc """
   Function to handle when the elevator has received a floor in init-state
 
@@ -203,15 +146,13 @@ defmodule Elevator do
     Logger.info("Elevator safe at floor after init. Transitioning into idle")
 
     # Since we are safe at a floor, the elevator's state is secure
-    Driver.set_motor_direction(:stop)
     Process.cancel_timer(timer)
     new_elevator_data = check_at_new_floor(elevator_data, floor)
-    Timer.interrupt_after(self(), :udp_timer, @status_update_time)
+    Timer.interrupt_after(self(), :udp_timer, @update_time)
 
     {:next_state, :idle_state, new_elevator_data}
   end
 
-# timeout #
   @doc """
   Function to handle if we are stuck at init for too long
 
@@ -228,8 +169,7 @@ defmodule Elevator do
   end
 
 
-
-  ##### idle_state #####
+##### idle_state #####
 
   @doc """
   Function to handle when the elevator is in idle
@@ -262,7 +202,7 @@ defmodule Elevator do
           Logger.info("New direction calculated")
           temp_elevator_data = Map.put(elevator_data, :dir, new_dir)
 
-          new_elevator_data = Timer.start_timer(self(), temp_elevator_data, :timer, :moving_timer, @moving_time)
+          new_elevator_data = Timer.start_timer(self(), temp_elevator_data, :moving_timer, @moving_time)
           Driver.set_motor_direction(new_dir)
 
           {:moving_state, new_elevator_data}
@@ -273,7 +213,7 @@ defmodule Elevator do
 
 
 ##### moving_state #####
-# at floor #
+
   @doc """
   Function to handle when the elevator is at the desired floor in moving state
 
@@ -312,7 +252,7 @@ defmodule Elevator do
     {:next_state, new_state, new_data}
   end
 
-# min or max floor reached #
+
   @doc """
   Functions to handle if we have reached the top- or bottom-floor without an
   order there. These functions should not be triggered if we have an order at
@@ -343,7 +283,7 @@ defmodule Elevator do
     {:next_state, :idle_state, elevator_data}
   end
 
-# timeout #
+
   @doc """
   Function to handle if the elevator hasn't reached a floor
 
@@ -394,6 +334,83 @@ defmodule Elevator do
   end
 
 
+##### all_states #####
+
+  @doc """
+  Function to handle if a new order is received
+
+  This event should be handled if the elevator is in idle, moving or door-state and NOT when
+  the elevator is initializing or restarting. Could pherhaps be best to send both internal and
+  external orders over UDP then... It does simplify the elevator, but adds larger requirements
+  to the order-panel
+  """
+  def handle_event(
+        :cast,
+        {:received_order, new_order},
+        state,
+        %Elevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
+  do
+    #Logger.info("Elevator received order from #{from}")
+    Logger.info("Elevator received order")
+
+    # First check if the order is valid - throws an error if not
+    Order.check_valid_orders([new_order])
+
+    # Checking if order already exists - if not, add to list and calculate next direction
+    updated_order_list = Order.add_order(new_order, prev_orders)
+    new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
+
+    Lights.set_order_lights(updated_order_list)
+
+    {:next_state, state, new_elevator_data}
+  end
+
+  def handle_event(
+    :cast,
+    {:received_order, _},
+    state,
+    %Elevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
+  do
+    #Logger.info("Elevator received order from #{from}")
+    Logger.info("Elevator received order _")
+
+    {:next_state, state, elevator_data}
+  end
+
+  def handle_event(
+    :cast,
+    {:received_order, new_order},
+    _,
+    %Elevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
+  do
+    #Logger.info("Elevator received order from #{from}")
+    Logger.info("Elevator received order with state _")
+
+    {:next_state, :idle_state, elevator_data}
+  end
+
+
+  @doc """
+  Function to handle when the elevator's status must be sent to the master
+
+  No transition
+  """
+  def handle_event(
+        :info,
+        :udp_timer,
+        state,
+        %Elevator{orders: orders, dir: dir, last_floor: last_floor} = elevator_data)
+  do
+    Timer.interrupt_after(self(), :udp_timer, @update_time)
+
+    active_master_pid = Process.whereis(:active_master)
+    if active_master_pid != :nil do
+      Process.send(active_master_pid, {self(), dir, last_floor, orders}, [])
+    end
+    {:next_state, state, elevator_data}
+  end
+
+
 ###################################### Actions ######################################
 
 ##### Checking floor #####
@@ -422,20 +439,10 @@ defmodule Elevator do
 
   If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server
   """
-  def check_at_floor(floor) when floor |> is_integer
+  defp check_at_floor(floor) when floor |> is_integer
   do
     Lights.set_floorlight(floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})
-  end
-
-    @doc """
-  Function that check if we are not a floor
-
-  If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server
-  """
-  def check_at_floor(floor) when floor |> is_atom
-  do
-    floor
   end
 
 
@@ -456,7 +463,7 @@ defmodule Elevator do
         Map.put(elevator_data, :last_floor, floor)
 
       last_floor != floor->
-        temp_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :moving_timer, @moving_time)
+        temp_elevator_data = Timer.start_timer(self(), elevator_data, :moving_timer, @moving_time)
         Map.put(temp_elevator_data, :last_floor, floor)
 
       last_floor == floor->
@@ -492,10 +499,10 @@ defmodule Elevator do
 
     # Open door and start timer
     open_door()
-    timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
+    timer_elevator_data = Timer.start_timer(self(), elevator_data, :door_timer, @door_time)
 
     # Remove old order and calculate new target_order
-    updated_orders = Order.remove_floor_orders(orders, dir, floor)
+    updated_orders = Order.remove_orders(orders, dir, floor)
     orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
 
     Lights.set_order_lights(updated_orders)
@@ -631,44 +638,4 @@ defmodule Elevator do
   #Sketch of network interfacing
   #Should probalby be moved to a different module and needs further development
 
-
-  @doc """
-  Hard coded funciton (for now) to update the masters
-  on the elevators states
-  """
-
-  def send_data_to_all_nodes(sender_id, receiver_id,data, iteration \\ 0)
-  do
-    message_id = 0;
-    #calculation of message_id
-    #Need øysteins' magic code here
-    #This should be sent very often, and therefore no acks are needed
-    network_list = SystemNode.nodes_in_network()
-    {node, network_list} = List.pop_at(network_list, iteration)
-    if node != :nil do
-      send({receiver_id, node}, {sender_id, {message_id, data}})
-      send_data_to_all_nodes(sender_id, receiver_id, data, iteration + 1)
-    end
-  end
-
-  def send_data_inside_node(sender_id, receiver_id, data, iteration \\ 0)
-  do
-    message_id = 0;
-    #calculation of message_id
-    #Need øysteins' magic code here
-    #This should be sent very often, and therefore no acks are needed
-    send({receiver_id, Node.self()}, {sender_id, {message_id, data}})
-  end
-
-  def receive_thread()
-  do
-    receive do
-      {:master, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
-      {:panel, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
-
-    #after
-    #  10_000 -> IO.puts("Connection timeout")
-
-    end
-  end
 end

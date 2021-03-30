@@ -96,6 +96,9 @@ defmodule Network do
 
   end
 
+  @doc """
+  Send data to all known nodes on the network to the process receiver_id
+  """
   def send_data_to_all_nodes(sender_id, receiver_id,data, iteration \\ 0)
   do
     message_id = 0; # replace with get utc time now
@@ -107,12 +110,18 @@ defmodule Network do
     end
   end
 
+  @doc """
+  Send data locally (on the same node) to the process receiver_id
+  """
   def send_data_inside_node(sender_id, receiver_id, data)
   do
     message_id = 0; # replace with get UTC time now
     send({receiver_id, Node.self()}, {sender_id, {message_id, data}})
   end
 
+   @doc """
+  Prof of concept function to demonstrate receive_functionallity
+  """
   def receive_thread(sender_id, handler)
   do
     receive do

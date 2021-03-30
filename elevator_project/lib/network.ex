@@ -25,34 +25,32 @@ defmodule Network do
 
   RETURNS:                        IF:
     ip                              If the IP-address was found
-    {:error, :could_not_get_ip}     If the IP-address could not be
+    :could_not_get_ip               If the IP-address could not be
                                       resolved
   """
   def get_ip(port \\ @init_port)
+  when port - @init_port < 10
   do
-    case UDP.open_connection(port, [active: false, broadcast: true]) do
-      {:ok, socket} ->
-        UDP.send_data(socket, @broadcast_address, port, "Test")
+    {:ok, socket} = :gen_udp.open(port, [active: false, broadcast: true])
+    :gen_udp.send(socket, @broadcast_address, port, "Getting ip")
 
-        case UDP.receive_data(socket) do
-          {:recv, {ip, _port, _data}} ->
-            {:recv, ip}
-          {:error, _} ->
-            {:error, :could_not_get_ip}
-        end
-
-        UDP.close_socket(socket)
-
-        {:nil, _} ->
-          if port - @init_port < @num_tries do
-            get_ip(port + 1)
-          else
-            Logger.error("Could not find ip-address")
-            {:error, :could_not_get_ip}
-          end
+    ip =
+    case :gen_udp.recv(socket, 0, 100) do
+      {:ok, {ip, _port, _data}} ->
+        ip
+      {:error, _reason} ->
+        get_ip(port + 1)
     end
+
+    :gen_udp.close(socket)
+    ip
   end
 
+  def get_ip(_port)
+  do
+    IO.puts("Couldn't get local ip-address")
+    :could_not_get_ip
+  end
 
   @doc """
   Formats an IP-address to a bytestring

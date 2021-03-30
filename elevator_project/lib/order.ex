@@ -4,6 +4,8 @@ defmodule Order do
   list. This makes it easier to send
   """
 
+  require ListOperations
+
   @min_floor Application.fetch_env!(:elevator_project, :project_min_floor)
   @max_floor Application.fetch_env!(:elevator_project, :project_num_floors) + @min_floor - 1
 
@@ -37,9 +39,11 @@ defmodule Order do
     order_in_dir = get_orders_with_value(orders_at_floor, :order_type, dir)
     order_in_cab = get_orders_with_value(orders_at_floor, :order_type, :cab)
 
-    temp_orders = remove_order_list_from_list(order_in_dir, orders)
-    remove_order_list_from_list(order_in_cab, temp_orders)
+    #temp_orders = remove_order_list_from_list(order_in_dir, orders)
+    #remove_order_list_from_list(order_in_cab, temp_orders)
 
+    temp_orders = ListOperations.remove_list_from_list(order_in_dir, orders)
+    ListOperations.remove_list_from_list(order_in_cab, temp_orders)
 
   #       [%Order{order_type: order_type, order_floor: order_floor} = first_order | rest_orders],
   #       dir,
@@ -68,57 +72,62 @@ defmodule Order do
 
   It is assumed that there is only one copy of each order in the list
   """
-  def remove_order_list_from_list(
-        [order | rest_orders],
-        list)
+  def remove_orders(
+        orders,
+        order_list)
+  when orders |> is_list()
   do
-    new_list = List.delete(list, order)
-    remove_order_list_from_list(rest_orders, new_list)
+    # new_list = List.delete(list, order)
+    # remove_order_list_from_list(rest_orders, new_list)
+
+    ListOperations.remove_list_from_list(orders, order_list)
+
   end
 
-  def remove_order_list_from_list(
-        [],
-        list)
+  def remove_orders(
+        order,
+        order_list)
+  when order |> is_struct()
   do
-    list
+    ListOperations.remove_element_from_list(order, order_list)
   end
 
 
   @doc """
   Function to add a list of orders to another list of orders
   """
-  def add_order_list_to_list(
-        [order | rest_orders],
-        list)
-  do
-    updated_list = add_order_to_list(order, list)
-    add_order_list_to_list(rest_orders, updated_list)
-  end
+  # def add_order_list_to_list(
+  #       [order | rest_orders],
+  #       list)
+  # do
+  #   updated_list = add_order_to_list(order, list)
+  #   add_order_list_to_list(rest_orders, updated_list)
+  # end
 
-  def add_order_list_to_list(
-        [],
-        list)
-  do
-    list
-  end
+  # def add_order_list_to_list(
+  #       [],
+  #       list)
+  # do
+  #   list
+  # end
 
 
   @doc """
   Function to add a single order to a list 'list'
   """
-  def add_order_to_list(
-        new_order,
-        list)
-  do
-    cond do
-      list == []->
-        [new_order]
-      new_order in list->
-        list
-      new_order not in list->
-        [list | new_order]
-    end
-  end
+  # def add_order_to_list(
+  #       new_order,
+  #       list)
+  # do
+  #   cond do
+  #     list == []->
+  #       [new_order]
+  #     new_order in list->
+  #       list
+  #     new_order not in list->
+  #       [list | new_order]
+  #   end
+  # end
 
 
 ## Valid orders ##
@@ -239,16 +248,19 @@ defmodule Order do
   Returns a list of orders with the desired value in the field
   """
   def get_orders_with_value(
-        [order | rest_orders],
+        orders,
+        #[order | rest_orders],
         field,
         value)
   do
-    order_value = Map.get(order, field, value)
-    if order_value == value do
-      [order | get_orders_with_value(rest_orders, field, value)]
-    else
-      get_orders_with_value(rest_orders, field, value)
-    end
+    ListOperations.find_element_with_value(orders, field, value)
+
+    # order_value = Map.get(order, field, value)
+    # if order_value == value do
+    #   [order | get_orders_with_value(rest_orders, field, value)]
+    # else
+    #   get_orders_with_value(rest_orders, field, value)
+    # end
   end
 
   def get_orders_with_value(
@@ -269,7 +281,8 @@ defmodule Order do
         orders,
         elevator_id)
   do
-    set_order_field(orders, :delegated_elevator, elevator_id)
+    #set_order_field(orders, :delegated_elevator, elevator_id)
+    ListOperations.set_element_field(orders, :delegated_elevator, elevator_id)
   end
 
 
@@ -281,23 +294,23 @@ defmodule Order do
 
   Returns the new list
   """
-  defp set_order_field(
-        [order | rest_orders],
-        field,
-        value)
-  do
-    [
-      Map.put(order, field, value) |
-      set_delegated__elevator(rest_orders, elevator_id)
-    ]
-  end
+  # defp set_order_field(
+  #       [order | rest_orders],
+  #       field,
+  #       value)
+  # do
+  #   [
+  #     Map.put(order, field, value) |
+  #     set_order_field(rest_orders, field, value)
+  #   ]
+  # end
 
-  defp set_order_field(
-        [order, rest_orders],
-        field,
-        value)
-  do
-    []
-  end
+  # defp set_order_field(
+  #       [],
+  #       field,
+  #       value)
+  # do
+  #   []
+  # end
 
 end

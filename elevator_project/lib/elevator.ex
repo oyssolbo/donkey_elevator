@@ -72,7 +72,7 @@ defmodule Elevator do
       orders:       [],
       last_floor:   :nil,
       dir:          :down,
-      timer:        Timer.get_utc_now(),
+      timer:        Timer.get_utc_time(),
       elevator_id:  Network.get_ip()
     }
 
@@ -155,10 +155,10 @@ defmodule Elevator do
     Logger.info("Elevator received order")
 
     # First check if the order is valid - throws an error if not
-    Order.check_valid_orders([new_order])
+    Order.check_valid_order(new_order)
 
     # Checking if order already exists - if not, add to list and calculate next direction
-    updated_order_list = Order.add_order_to_list(new_order, prev_orders)
+    updated_order_list = Order.add_order(new_order, prev_orders)
     new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
 
     Lights.set_order_lights(updated_order_list)
@@ -428,7 +428,7 @@ defmodule Elevator do
     GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
 
-    @doc """
+  @doc """
   Function that check if we are not a floor
 
   If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server

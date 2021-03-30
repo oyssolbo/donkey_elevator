@@ -490,11 +490,13 @@ defmodule Master do
         connected_elevators)
   do
     # Determine which elevator is must suitable for a given order
-    optimal_elevator = find_optimal_elevator(order, connected_elevators, :nil)
+    optimal_elevator_id =
+      find_optimal_elevator(order, connected_elevators, struct(Client)) |>
+      Map.get(:client_id)
 
     # Delegate the order to the optimal elevator
-    delegated_order = Order.set_delegated_elevator(order, optimal_elevator)
-    spawn(fn-> send_order_to_elevator(delegated_order, optimal_elevator) end)
+    delegated_order = Order.set_delegated_elevator(order, optimal_elevator_id)
+    spawn(fn-> send_order_to_elevator(delegated_order, optimal_elevator_id) end)
 
     [delegated_order | delegate_orders(rest_orders, connected_elevators)]
   end
@@ -536,30 +538,30 @@ defmodule Master do
   defp find_optimal_elevator( # BUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUG
         order,
         [check_elevator | rest_elevator],
-        optimal_elevator_id)
+        optimal_elevator)
   do
-    # optimal_data = Map.get(optimal_elevator, :data)
+    optimal_data = Map.get(optimal_elevator, :data)
 
-    # if optimal_data == :nil do
-    #   find_optimal_elevator(order, rest_elevator, check_elevator)
+    if optimal_data == :nil do
+      find_optimal_elevator(order, rest_elevator, check_elevator)
 
-    # else
-    #   cost_optimal_elevator = calculate_elevator_cost(order, optimal_elevator)
-    #   cost_check_elevator = calculate_elevator_cost(order, check_elevator)
+    else
+      cost_optimal_elevator = calculate_elevator_cost(order, optimal_elevator)
+      cost_check_elevator = calculate_elevator_cost(order, check_elevator)
 
-    #   if cost_optimal_elevator <= cost_elevator_elevator do
-    #     find_optimal_elevator(order, rest_elevator, optimal_elevator)
+      if cost_optimal_elevator <= cost_elevator_elevator do
+        find_optimal_elevator(order, rest_elevator, optimal_elevator)
 
-    #   else
-    #     find_optimal_elevator(order, rest_elevator, check_elevator)
-    #   end
-    # end
+      else
+        find_optimal_elevator(order, rest_elevator, check_elevator)
+      end
+    end
   end
 
   defp find_optimal_elevator(
         _order,
         [],
-        optimal_elevator_id)
+        optimal_elevator)
   do
     optimal_elevator_id
   end

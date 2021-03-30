@@ -235,4 +235,31 @@ defmodule Order do
         [list | new_order]
     end
   end
+
+    def gib_rnd_order() do
+        rnd_id = Time.utc_now()
+        rnd_type = Enum.random([:hall_up, :hall_down, :cab])
+        rnd_floor = Enum.random(0..@max_floor)
+        rnd_order = struct(Order, [order_id: rnd_id, order_type: rnd_type, order_floor: rnd_floor])
+    end
+
+    @doc """
+    Function that returns a list of the cab orders in a list of orders. Returns empty list if none are present
+    """
+    def extract_cab_orders(order_list) when is_list(order_list) do
+        if is_order_list(order_list) do
+            cab_orders = Enum.filter(order_list, fn x -> x.order_type == :cab end)
+        end
+    end
+
+    @doc """
+    Function to check whether list contains only orders or not
+    """
+    def is_order_list(list) when is_list(list) do
+        Enum.all?(list, fn
+            %Order{} -> true
+            _ -> false
+    end)
+  end
+
 end

@@ -549,7 +549,7 @@ defmodule Master do
       cost_optimal_elevator = calculate_elevator_cost(order, optimal_elevator)
       cost_check_elevator = calculate_elevator_cost(order, check_elevator)
 
-      if cost_optimal_elevator <= cost_elevator_elevator do
+      if cost_optimal_elevator <= cost_check_elevator do
         find_optimal_elevator(order, rest_elevator, optimal_elevator)
 
       else
@@ -563,7 +563,7 @@ defmodule Master do
         [],
         optimal_elevator)
   do
-    optimal_elevator_id
+    optimal_elevator
   end
 
 

@@ -24,7 +24,7 @@ defmodule Panel do
 
         # Register the processes in the local node
         Process.register(checker_ID, :order_checker)
-        Process.register(sender_ID, :order_sender)
+        Process.register(sender_ID, :panel)
 
         {checker_ID, sender_ID}
     end
@@ -58,7 +58,8 @@ defmodule Panel do
 
             # ... send the respective  orders to master and elevator
             
-            # send_data_to_all_nodes(:master, orders)
+            send_data_to_all_nodes(:panel, :master, outgoing_orders)
+            send_data_inside_node(:panel, :master, extract_cab_orders(outgoing_orders))
             #send({:elevator, node}, {:cab_orders, :panel, self(), extract_cab_orders(orders)})
 
             # ... and wait for an ack

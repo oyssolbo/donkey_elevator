@@ -295,7 +295,6 @@ defmodule Order do
 
   Returns the new list
   """
-<<<<<<< HEAD
   def add_order(
         new_order,
         list)
@@ -333,7 +332,6 @@ defmodule Order do
             _ -> false
     end)
   end
-=======
   # defp set_order_field(
   #       [order | rest_orders],
   #       field,
@@ -352,6 +350,5 @@ defmodule Order do
   # do
   #   []
   # end
->>>>>>> master
 
 end

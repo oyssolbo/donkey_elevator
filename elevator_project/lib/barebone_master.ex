@@ -266,7 +266,7 @@ defmodule Master do
   when order_list |> is_list()
   do
     # Check if valid, and delegate
-    Order.check_valid_order_list(order_list)
+    Order.check_valid_order(order_list)
 
     temp_order_list = Order.set_delegated_elevator(order_list, :nil)
     undelegated_orders = get_undelegated_orders(master_data, temp_order_list)
@@ -631,7 +631,7 @@ defmodule Master do
         order_list,
         elevator_id)
   do
-    Order.get_orders_with_value(order_list, :delegated_elevator, elevator_id)
+    Order.get_delegated_elevator(order_list, elevator_id)
   end
 
 end

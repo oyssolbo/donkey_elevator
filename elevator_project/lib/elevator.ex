@@ -495,7 +495,7 @@ defmodule Elevator do
     timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
 
     # Remove old order and calculate new target_order
-    updated_orders = Order.remove_orders_from_list(orders, dir, floor)
+    updated_orders = Order.remove_floor_orders(orders, dir, floor)
     orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
 
     Lights.set_order_lights(updated_orders)

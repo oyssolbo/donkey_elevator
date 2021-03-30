@@ -148,7 +148,7 @@ defmodule SystemNode do
   end
 
   @doc """
-  @brief Registrer the process to the following node
+  @brief Registrer the process as a atom on the following node
   """
   def register_process(id) when id |> is_atom()
   do

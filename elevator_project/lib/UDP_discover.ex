@@ -12,7 +12,7 @@ defmodule UDP_discover do
   @broadcast_port 9876
   @init_port 6789
   @num_tries 5
-  @default_timeout 5000
+  @default_timeout 15000
 
   @doc """
   @brief        Function that hopefully returns the IP-address of the system
@@ -80,6 +80,8 @@ defmodule UDP_discover do
       {:error, reason} ->
         Logger.error("The error #{reason} occured while trying to broadcast #{node_name}")
     end
+    Process.sleep(@default_timeout)
+    broadcast_cast(node_name)
   end
 
 
@@ -104,7 +106,7 @@ defmodule UDP_discover do
         {:ok, recv_packet} ->
           data = Kernel.elem(recv_packet, 2)
           Logger.info("Connecting to the node #{data}")
-          Node.ping(String.to_atom(to_string(data))) |> IO.puts()
+          Node.ping(String.to_atom(to_string(data)))
 
         {:error, reason} ->
           Logger.error("Failed to receive due to #{reason}")

@@ -625,4 +625,41 @@ defmodule Elevator do
     Driver.set_motor_direction(:stop)
     Process.exit(self(), :shutdown)
   end
+
+
+  ###### Network interfacing #####
+  #Sketch of network interfacing
+  #Should probalby be moved to a different module and needs further development
+
+
+  @doc """
+  Hard coded funciton (for now) to update the masters
+  on the elevators states
+  """
+
+  def send_data_to_all_nodes(sender_id, receiver_id,data, iteration \\ 0)
+  do
+    message_id = 0;
+    #calculation of message_id
+    #Need øysteins' magic code here
+    #This should be sent very often, and therefore no acks are needed
+    network_list = SystemNode.nodes_in_network()
+    {node, network_list} = List.pop_at(network_list, iteration)
+    if node != :nil do
+      send({receiver_id, node}, {sender_id, {message_id, data}})
+      send_data_to_all_nodes(sender_id, receiver_id, data, iteration + 1)
+    end
+  end
+
+  def receive_thread()
+  do
+    receive do
+      {:master, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
+
+    #after
+    #  10_000 -> IO.puts("Connection timeout")
+
+    end
+  end
+
 end

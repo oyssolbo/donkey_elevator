@@ -35,7 +35,7 @@ defmodule Network do
     :gen_udp.send(socket, @broadcast_address, port, "Getting ip")
 
     ip =
-    case :gen_udp.recv(socket, 0, 100) do
+    case :gen_udp.recv(socket, 100, 1000) do
       {:ok, {ip, _port, _data}} ->
         ip
       {:error, _reason} ->
@@ -79,5 +79,21 @@ defmodule Network do
       nodes ->
         nodes
     end
+  end
+
+
+  @doc """
+  Init the node nettork on the machine
+  """
+  def node_network_init()
+  do
+    node_name = Kernel.inspect(:rand.uniform(10000))
+    node_name_ip_s = node_name <> "@" <> get_ip()
+    node_name_ip_a = String.to_atom(node_name_ip_s)
+    SystemNode.start_node(node_name_ip_a)
+
+    UDP_discover.broadcast_listen() #listen for other nodes forever
+    UDP_discover.broadcast_cast(node_name_ip_s) #cast nodename to all other nodes listening
+
   end
 end

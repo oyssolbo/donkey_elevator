@@ -27,7 +27,6 @@ defmodule UDP do
     open_connection(@local_port)
   end
 
-
   @doc """
   Function that opens socket at the port 'port'
 
@@ -55,7 +54,6 @@ defmodule UDP do
         {:nil, 0}
     end
   end
-
 
   @doc """
   Function that sends data

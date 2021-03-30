@@ -7,10 +7,12 @@ defmodule SystemNode do
     -GetIP
   """
 
+  #epmd -daemon if you get the error econ refused
+
   require Logger
 
-  @default_tick_time 15000
-
+  @default_tick_time 500 #Interval between pings (Testing needed to find optimum)
+  @default_cookie :TTK4115
 
   @doc """
   Initializing a node
@@ -24,21 +26,19 @@ defmodule SystemNode do
   """
   def start_node(
         name,
-        cookie)
+        cookie \\ @default_cookie)
   when cookie |> is_atom
   do
-    # Accessing ip, starting node and setting cookie
-    {:recv, ip} = Network.get_ip()
-    name = name <> ip
     case Node.start(name, :longnames, @default_tick_time) do
-      {:ok, pid} ->
-        Node.set_cookie(pid, cookie)
-        pid
+      {:ok, _pid} ->
+        Node.set_cookie(Node.self(), cookie)
+        Node.self()
       {:error, _} ->
         Logger.error("An error occured when starting the node #{name} as a distributed node")
         {:error, self()}
     end
   end
+
 
   @doc """
   Connecting a node to a function
@@ -60,9 +60,21 @@ defmodule SystemNode do
   do
     # Spawning desired function
     pid = Node.spawn(pid, module, function, args, opts)
-    Logger.info("Node spawned")
+    Logger.info("Link established")
     pid
   end
+
+
+
+
+  def node_spawn_function_linked(pid, module, function, args \\ []) do
+    # Spawning desired function as a process
+    #pid = Node.spawn_link(node, module, fun, args)
+    Logger.info("Link established")
+    pid
+  end
+
+
 
   @doc """
   Closing a given node. The other nodes on the distributed system will
@@ -84,11 +96,11 @@ defmodule SystemNode do
 
 
   @doc """
-  Connects the nodes on the network
+  Connects the nodes on the network, this is unfinished, Node.detect_nodes() does not seem to exist.
   """
   def connect_nodes(node)
   do
-    case Network.detect_nodes() do
+    case Node.detect_nodes() do
       {:error, :node_not_running} ->
         Logger.error("No nodes available to connect")
         :ok
@@ -96,6 +108,26 @@ defmodule SystemNode do
         Logger.info("Connecting to nodes")
         Node.connect(head)
     end
+  end
+
+  @doc """
+  @brief Connects the node to node-network
+  """
+  def connect_node_network(node) do
+    case Node.ping(node) do
+    {:pong} ->
+      Logger.info("Succesfully connected to #{node}")
+    {:pang} ->
+      Logger.info("Unable to conenct to #{node}")
+    end
+  end
+
+  @doc """
+  @brief List all the current nodes, including the node the process is running on
+  """
+  def nodes_in_network()
+  do
+    Node.list([:visible, :this])
   end
 
 
@@ -115,4 +147,11 @@ defmodule SystemNode do
     Logger.info("Node disconnected from the network")
   end
 
+  @doc """
+  @brief Registrer the process to the following node
+  """
+  def register_process(id) when id |> is_atom()
+  do
+    Process.register(self(), id)
+  end
 end

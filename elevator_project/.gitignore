@@ -27,6 +27,8 @@ elevator_project-*.tar
 
 # Compiled files not included by /_build/
 *.beam
+*.app
+*.app_tracer
 
 
 

@@ -658,15 +658,24 @@ defmodule Elevator do
     end
   end
 
+  def send_data_inside_node(sender_id, receiver_id, data, iteration \\ 0)
+  do
+    message_id = 0;
+    #calculation of message_id
+    #Need øysteins' magic code here
+    #This should be sent very often, and therefore no acks are needed
+    send({receiver_id, Node.self()}, {sender_id, {message_id, data}})
+  end
+
   def receive_thread()
   do
     receive do
       {:master, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
+      {:panel, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
 
     #after
     #  10_000 -> IO.puts("Connection timeout")
 
     end
   end
-
 end

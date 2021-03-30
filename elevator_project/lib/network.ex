@@ -101,7 +101,7 @@ defmodule Network do
     SystemNode.start_node(node_name_ip_a)
 
     UDP_discover.broadcast_listen() #listen for other nodes forever
-    UDP_discover.broadcast_cast(node_name_ip_s) #cast nodename to all other nodes listening
+    spawn( fn -> UDP_discover.broadcast_cast(node_name_ip_s)) #cast node names forever
 
   end
 end

@@ -103,7 +103,5 @@ defmodule Network do
     UDP_discover.broadcast_listen() #listen for other nodes forever
     UDP_discover.broadcast_cast(node_name_ip_s) #cast nodename to all other nodes listening
 
-
-
   end
 end

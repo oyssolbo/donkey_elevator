@@ -644,14 +644,14 @@ defmodule Elevator do
   on the elevators states
   """
 
-  def send_data_to_all_nodes(sender_id, receiver_id,data, iteration \\ 1)
+  def send_data_to_all_nodes(sender_id, receiver_id,data, iteration \\ 0)
   do
     message_id = 0;
     #calculation of message_id
     #Need øysteins' magic code here
     #This should be sent very often, and therefore no acks are needed
     network_list = SystemNode.nodes_in_network()
-    {node, network_list = List.pop_at(network_list, iteration)
+    {node, network_list} = List.pop_at(network_list, iteration)
     if node != :nil do
       send({receiver_id, node}, {sender_id, {message_id, data}})
       send_data_to_all_nodes(sender_id, receiver_id, data, iteration + 1)

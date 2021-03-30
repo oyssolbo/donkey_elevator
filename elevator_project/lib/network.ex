@@ -88,4 +88,20 @@ defmodule Network do
         nodes
     end
   end
+
+
+    @doc """
+  Init the node nettork on the machine
+  """
+  def node_network_init()
+  do
+    node_name = Kernel.inspect(:rand.uniform(10000))
+    node_name_ip_s = node_name <> "@" <> get_ip()
+    node_name_ip_a = String.to_atom(node_name_ip_s)
+    SystemNode.start_node(node_name_ip_a)
+
+    UDP_discover.broadcast_listen() #listen for other nodes forever
+    UDP_discover.broadcast_cast(node_name_ip_s) #cast nodename to all other nodes listening
+
+  end
 end

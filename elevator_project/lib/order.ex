@@ -139,25 +139,28 @@ defmodule Order do
     - order_floor is between min and max
     - order_type is either :cab, :up, :down
   """
-  def check_valid_order_list([order | rest_orders])
+  def check_valid_order([order | rest_orders])
   do
     case check_valid_order(order) do
       :ok->
-        check_valid_order_list(rest_orders)
+        check_valid_order(rest_orders)
       :error->
         IO.puts("Invalid order found!")
         :error
     end
   end
 
-  def check_valid_order_list([])
+  def check_valid_order([])
   do
     :ok
   end
 
 
-  defp check_valid_order(%Order{order_type: type, order_floor: floor} = _order)
+  def check_valid_order(order)
+  when order |> is_struct()
   do
+    floor = Map.get(order, :order_floor)
+    type = Map.get(order, :order_type)
     cond do
       floor < @min_floor->
         IO.puts("Invalid floor")
@@ -284,6 +287,18 @@ defmodule Order do
   do
     #set_order_field(orders, :delegated_elevator, elevator_id)
     ListOperations.set_element_field(orders, :delegated_elevator, elevator_id)
+  end
+
+
+  @doc """
+  Functions that gets all orders which are assigned to an elevator with the id
+  'elevator_id'
+  """
+  def get_delegated_elevator(
+        orders,
+        elevator_id)
+  do
+    ListOperations.find_element_with_value(orders, :delegated_elevator, elevator_id)
   end
 
 

@@ -63,7 +63,6 @@ defmodule Network do
   end
 
 
-
   @doc """
   Detects all nodes on the network
 

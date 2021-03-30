@@ -104,4 +104,33 @@ defmodule Network do
     spawn( fn -> UDP_discover.broadcast_cast(node_name_ip_s)) #cast node names forever
 
   end
+
+  def send_data_to_all_nodes(sender_id, receiver_id,data, iteration \\ 0)
+  do
+    message_id = 0; # replace with get utc time now
+    network_list = SystemNode.nodes_in_network()
+    {node, network_list} = List.pop_at(network_list, iteration)
+    if node != :nil do
+      send({receiver_id, node}, {sender_id, {message_id, data}})
+      send_data_to_all_nodes(sender_id, receiver_id, data, iteration + 1)
+    end
+  end
+
+  def send_data_inside_node(sender_id, receiver_id, data)
+  do
+    message_id = 0; # replace with get UTC time now
+    send({receiver_id, Node.self()}, {sender_id, {message_id, data}})
+  end
+
+  def receive_thread(sender_id, handler)
+  do
+    receive do
+      {:master, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
+      {:panel, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
+
+    #after
+    #  10_000 -> IO.puts("Connection timeout")
+
+    end
+  end
 end

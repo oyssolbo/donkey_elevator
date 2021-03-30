@@ -106,7 +106,7 @@ defmodule UDP_discover do
         {:ok, recv_packet} ->
           data = Kernel.elem(recv_packet, 2)
           Logger.info("Connecting to the node #{data}")
-          Node.ping(String.to_atom(to_string(data))) |> IO.puts()
+          Node.ping(String.to_atom(to_string(data)))
 
         {:error, reason} ->
           Logger.error("Failed to receive due to #{reason}")

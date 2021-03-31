@@ -63,10 +63,17 @@ File.write accepts only(?) _a_ string as argument, so process all data before pa
 As far as I know, only Enum.join can consistently combine various elements of a _list_ together as a string
 without giving you errors and bad_args up the ass. If you wanna write a tuple, conver tto list first; tuple.to_list()
 Also, the '<>' operator for combining strings doesnt like working with numbers. To avoid enforcing 'Master ID' etc
-be converted to strings before sending, I just pass the whole damn thing through Enum.join() (it seems to eat everything)
+be converted to strings before sending, I just pass the whole damn thing through Enum.join() (it seems to eat everything).
+Bigbrain syntax for converting to string: "#/{inspect <var>}", without the /
 """
 # Enum.at(<list>, index)
 # Kernel.elem(tuple, index)
+# Kernel.to_string(term)
+# Map.values(<map>) >> List of values
+# Map.from_struct(<struct>)
+# String.split()
+
+# order |> Map.from_struct() |> Map.values() |> valueList
 
     # Data structure, in:   {ext_orders, int_orders, masterID, versID}
     #   Extern order:       {bool_orderMatrix}

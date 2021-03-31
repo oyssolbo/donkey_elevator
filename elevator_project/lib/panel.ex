@@ -1,106 +1,109 @@
-# Should one import, or should one try to use require inside the Module? What is the difference here?
-
-#import Driver
-#import Matriks
-
+"""
+Syntax
+    @Order{order_ID, order_type, order_floor}
+"""
 defmodule Panel do
-    @state_map  %{:on => true, :off => false}
+    require Driver
+    require UDP
+    require Network
+    require Order
 
-    def init(mid, eid) do
-        checkerID = spawn(fn -> order_checker(Matriks.false_order_matrix) end)
-        senderID = spawn(fn -> order_sender(mid, eid, checkerID, 0, Matriks.false_order_matrix) end)
-        {senderID, checkerID}
+    #@button_map %{:hall_up => 0, :hall_down => 1, :cab => 2}
+    #@state_map  %{:on => 1, :off => 0}
+    #@direction_map %{:up => 1, :down => 255, :stop => 0}
+
+    @num_floors Application.fetch_env!(:elevator_project, :num_floors)
+    # floor_table: Array of the floors; makes it easier to iterate through
+
+    # TODO: Replace mid1, mid2, eid with send_local_node func. For master send; send_data_to_all_nodes.
+    def init(floor_table \\ Enum.to_list(0..@num_floors-1)) do
+
+        checker_ID = spawn(fn -> order_checker([], floor_table) end)
+        sender_ID = spawn(fn -> order_sender(checker_ID, floor_table, 0, []) end)
+
+        # Register the processes in the local node
+        Process.register(checker_ID, :order_checker)
+        Process.register(sender_ID, :panel)
+
+        {checker_ID, sender_ID}
     end
 
+    defp order_checker(old_orders, floor_table) when is_list(old_orders) do
+        orders = []
+        # Update order list by reading all HW order buttons
+        if old_orders == [] do
+            orders = check_4_orders(floor_table)
+        else
+            orders = old_orders++check_4_orders(floor_table)
+        end
 
-    defp order_checker(old_order_matrix) do
-
-        # Update order matrix by reading all HW order buttons
-        [new_up, new_down, new_cab] = [up_checker(), down_checker(), cab_checker()]
-        new_order_matrix = Matriks.from_list([new_up, new_down, new_cab])
-        updated_matrix = Matriks.orderMatrixOR(old_order_matrix, new_order_matrix)
-
-        # Check for request from sender. If there is, send order matrix and recurse with reset matrix
+        # Check for request from sender. If there is, send order list and recurse with reset list
         receive do
-            {:gibOrdersPls, senderAddr} ->
-                send(senderAddr, {:order_checker, updated_matrix})
-                order_checker(Matriks.false_order_matrix)
+            {:gibOrdersPls, sender_addr} ->
+                send(sender_addr, {:order_checker, orders})
+                order_checker([], floor_table)
             after
                 0 -> :ok
         end
 
-        # If no send request, requrse with current matrix (output buffer)
-        order_checker(updated_matrix)
+        # If no send request, requrse with current list (output buffer)
+        order_checker(orders, floor_table)
     end
 
-    defp order_sender(mid, eid, checker_addr, sendID, outgoing_matrix) do
+    defp order_sender(checker_addr, floor_table, send_ID, outgoing_orders) when is_list(outgoing_orders) do
 
         # If the order matrix isnt empty ...
-        if outgoing_matrix != Matriks.false_order_matrix do
-
-            # ... send the respective  orders to master and elevator
-            # Should have an enum or variable indicating idx for master and idx for elevator
-            send(mid, {self(), :newOrders, sendID, [Matriks.to_list(outgoing_matrix[0]), Matriks.to_list(outgoing_matrix[1])]})
-            send(eid, {self(), :newOrders, sendID, Matriks.to_list(outgoing_matrix[2])})
+        if outgoing_orders != [] do
+            send_data_to_all_nodes(:panel, :master, outgoing_orders)
+            send_data_inside_node(:panel, :master, extract_cab_orders(outgoing_orders))
+            #send({:elevator, node}, {:cab_orders, :panel, self(), extract_cab_orders(orders)})
 
             # ... and wait for an ack
             receive do
                 {:ack, from, sentID} ->
-                    # When ack is recieved, send ack back. Send request to checker for latest order matrix
-                    """
-                    Shouldn't really be necessary! See what I wrote on miro
-                    """
-                    send(from, {:ack, sentID})
-                    send(checker_addr, {:gibOrdersPls, self()})
+                    # When ack is recieved for current send_ID, send request to checker for latest order matrix
+                    if sentID == send_ID do
+                        send(checker_addr, {:gibOrdersPls, self()})
+                    end
                     receive do
-                        # When latest order matrix is received, recurse with new orders and iterated sendID
-                        {:order_checker, updated_matrix} ->
-                            order_sender(mid, eid, checker_addr, sendID+1, updated_matrix)
+                        # When latest order matrix is received, recurse with new orders and iterated send_ID
+                        {:order_checker, updated_orders} ->
+                            order_sender(checker_addr, floor_table, send_ID+1, updated_orders)
+                            after
+                                2000 -> # Send some kind of error, "no response from order_checker"
                     end
                 # If no ack is received after 1.5 sec: Recurse and repeat
                 after
-                    # Should have the timer as a standard-value
-                    1500 -> order_sender(mid, eid, checker_addr, sendID, outgoing_matrix)
+                    1500 -> order_sender(checker_addr, floor_table, send_ID, outgoing_orders)
             end
 
         else
             # If order matrix is empty, send request to checker for latest orders. Recurse with those (but same sender ID)
             send(checker_addr, {:gibOrdersPls, self()})
-                    receive do
-                        {:order_checker, updated_matrix} ->
-                            order_sender(mid, eid, checker_addr, sendID, updated_matrix)
-                    end
+            receive do
+                {:order_checker, updated_orders} ->
+                    order_sender(checker_addr, floor_table, send_ID, updated_orders)
+            end
         end
 
     end
 
-
-    defp up_checker do
-        [floor1, floor2, floor3, floor4] = [Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])]
+    defp hardware_order_checker(floor, type) do
+        if Driver.get_order_button_state(floor, type) == :on do
+            # TODO: Replace Time.utc_now() with wrapper func from Timer module
+            order = struct(Order, [order_id: Time.utc_now(), order_type: type, order_floor: floor])
+        else
+            order = []
+        end
     end
 
-    defp down_checker do
-        [floor1, floor2, floor3, floor4] = [Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])]
+    defp check_order(orderType, table \\ Enum.to_list(0..@num_floors-1)) do
+        sendor_states = Enum.map(table, fn x -> hardware_order_checker(x, orderType) end)
+        orders = Enum.filter(sendor_states, fn x -> x == [] end)
     end
 
-    defp cab_checker do
-        [floor1, floor2, floor3, floor4] = [Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true]), Enum.random([false,true])]
+    defp check_4_orders(table \\ Enum.to_list(0..@num_floors-1)) do
+        orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
     end
 
-    defp order_matrix_updater(mn, mo) do
-        updated = [[mn[0][0] or mo[0][0], mn[0][1] or mo[0][1], mn[0][2] or mo[0][2], mn[0][3] or mo[0][3]],
-                   [mn[1][0] or mo[1][0], mn[1][1] or mo[1][1], mn[1][2] or mo[1][2], mn[1][3] or mo[1][3]],
-                   [mn[2][0] or mo[2][0], mn[2][1] or mo[2][1], mn[2][2] or mo[2][2], mn[2][3] or mo[2][3]]]
-    end
 end
-
-# Driver.get_floor_sensor_state(floor, button_type) |> state
-
-"""
-    Panel order matrix (boolean):
-    Floor   1  2  3  4
-    UP    [ 0  0  0  0 ]
-    DOWN  [ 0  0  0  0 ]
-    CAB   [ 0  0  0  0 ]
-    Enum.random {0, 1}
-"""

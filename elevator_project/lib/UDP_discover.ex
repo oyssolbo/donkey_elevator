@@ -72,17 +72,28 @@ defmodule UDP_discover do
 
   @doc """
   @brief        Function that will broadcast the node_name on the broadcast port
-                Should only be spawned as a new independent process!!
+                It will spawn it's own process for looping in infinity
   """
-  def broadcast_cast(node_name, port \\ @broadcast_port) do
+  def broadcast_cast(node_name, port \\ @broadcast_port)
+  do
     case broadcast_open_connection() do
       {:ok, socket} ->
-        :gen_udp.send(socket, @broadcast_address, @broadcast_port, node_name)
+        #:gen_udp.send(socket, @broadcast_address, @broadcast_port, node_name)
+        spawn (fn -> broadcast_cast_loop(node_name,socket) end)
       {:error, reason} ->
         Logger.error("The error #{reason} occured while trying to broadcast #{node_name}")
     end
-    Process.sleep(@default_timeout)
-    broadcast_cast(node_name)
+  end
+
+  @doc """
+  @brief        Function that will broadcast the node_name on the broadcast port
+                will loop in infinity
+  """
+  def broadcast_cast_loop(node_name, socket, port \\ @broadcast_port)
+  do
+      :gen_udp.send(socket, @broadcast_address, @broadcast_port, node_name)
+      Process.sleep(@default_timeout)
+      broadcast_cast_loop(node_name,socket)
   end
 
 

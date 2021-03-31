@@ -506,7 +506,7 @@ defmodule Elevator do
     updated_orders = Order.remove_floor_orders(orders, dir, floor)
     orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
 
-    Storage.save(updated_orders)
+    Storage.write(updated_orders)
     Lights.set_order_lights(updated_orders)
 
     dir_opt = calculate_optimal_direction(updated_orders, dir, floor)

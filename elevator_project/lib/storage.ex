@@ -1,6 +1,8 @@
-import Matriks
+#import Matriks
 
 defmodule Storage do
+
+    require Order
 
     @moduledoc """
     Rudamentary file storage module. Allows sent data to be written to file, or read from it.
@@ -43,6 +45,17 @@ defmodule Storage do
 
         end
 
+    end
+
+    def write(data)
+    do
+        # Placeholder
+    end
+
+    def read()
+    do
+        # Placeholder
+        struct(Order)
     end
 
 @doc """

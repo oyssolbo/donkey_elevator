@@ -1,7 +1,6 @@
 defmodule Elevator do
   @moduledoc """
   Elevator-module
-
   Requirements:
     - Driver
     - Network
@@ -10,11 +9,9 @@ defmodule Elevator do
     - Lights
     - Timer
     - Storage
-
   TODO:
     More testing
     Writing code for combining with Master and Panel
-
   """
 
 ##### Module definitions #####
@@ -53,7 +50,6 @@ defmodule Elevator do
 
   @doc """
   Function to initialize the elevator, and tries to get the elevator into a defined state.
-
   The function
     - establishes connection to GenStateMachine-server
     - stores the current data on the server
@@ -134,7 +130,6 @@ defmodule Elevator do
 # received_order #
   @doc """
   Function to handle if a new order is received
-
   This event should be handled if the elevator is in idle, moving or door-state and NOT when
   the elevator is initializing or restarting. Could pherhaps be best to send both internal and
   external orders over UDP then... It does simplify the elevator, but adds larger requirements
@@ -167,7 +162,6 @@ defmodule Elevator do
 # udp_timer #
   @doc """
   Function to handle when the elevator's status must be sent to the master
-
   No transition
   """
   def handle_event(
@@ -189,7 +183,6 @@ defmodule Elevator do
 # at_floor #
   @doc """
   Function to handle when the elevator has received a floor in init-state
-
   Transitions into the state 'idle_state'
   """
   def handle_event(
@@ -217,7 +210,6 @@ defmodule Elevator do
 # timeout #
   @doc """
   Function to handle if we are stuck at init for too long
-
   Transitions into the state 'restart_state'
   """
   def handle_event(
@@ -279,7 +271,6 @@ defmodule Elevator do
 # at floor #
   @doc """
   Function to handle when the elevator is at the desired floor in moving state
-
   Transitions into door_state
   """
   def handle_event(
@@ -320,7 +311,6 @@ defmodule Elevator do
   Functions to handle if we have reached the top- or bottom-floor without an
   order there. These functions should not be triggered if we have an order at
   the floor, as that event should be handled above.
-
   Currently the elevator is set to idle, but one could argue that the elevator
   instead should be set to restart.
   """
@@ -349,7 +339,6 @@ defmodule Elevator do
 # timeout #
   @doc """
   Function to handle if the elevator hasn't reached a floor
-
   Transitions into restart
   """
   def handle_event(
@@ -422,7 +411,6 @@ defmodule Elevator do
 
   @doc """
   Function that check if we are at a floor
-
   If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server
   """
   def check_at_floor(floor)
@@ -434,7 +422,6 @@ defmodule Elevator do
 
   @doc """
   Function that check if we are not a floor
-
   If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server
   """
   def check_at_floor(floor)
@@ -447,7 +434,6 @@ defmodule Elevator do
   @doc """
   Function to check if the floor 'floor' is not equivalent to the 'last_floor' in
   the struct elevator_data.
-
   If the floors are different, the timer is reset and 'last_floor' is updated
   """
   defp check_at_new_floor(
@@ -519,9 +505,7 @@ defmodule Elevator do
   @doc """
   Function to find the next optimal order. The function uses the current floor and direction
   to return the next optimal direction for the elevator to serve the given orders.
-
   If orders == [] or floor == :nil, :nil is returned
-
   orders  Orders to be scanned
   dir     Current direction to check for orders
   Floor   Current floor to check for order
@@ -561,7 +545,6 @@ defmodule Elevator do
 
   @doc """
   Function to calculate the optimal floor the elevator should travel to next
-
   One may be worried that the function is stuck here in an endless recursion-loop since it changes
   direction if it haven't found anything. As long as there exist an order inside the elevator-space,
   the function will find it. It may be a possible bug if an order is outside of the elevator-space, but
@@ -634,41 +617,4 @@ defmodule Elevator do
     Driver.set_motor_direction(:stop)
     Process.exit(self(), :shutdown)
   end
-
-
-  ###### Network interfacing #####
-  #Sketch of network interfacing
-  #Should probalby be moved to a different module and needs further development
-
-
-  @doc """
-  Hard coded funciton (for now) to update the masters
-  on the elevators states
-  """
-
-  def send_data_to_all_nodes(sender_id, receiver_id,data, iteration \\ 0)
-  do
-    message_id = 0;
-    #calculation of message_id
-    #Need øysteins' magic code here
-    #This should be sent very often, and therefore no acks are needed
-    network_list = SystemNode.nodes_in_network()
-    {node, network_list} = List.pop_at(network_list, iteration)
-    if node != :nil do
-      send({receiver_id, node}, {sender_id, {message_id, data}})
-      send_data_to_all_nodes(sender_id, receiver_id, data, iteration + 1)
-    end
-  end
-
-  def receive_thread()
-  do
-    receive do
-      {:master, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
-
-    #after
-    #  10_000 -> IO.puts("Connection timeout")
-
-    end
-  end
-
 end

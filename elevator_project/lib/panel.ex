@@ -1,7 +1,7 @@
 # Should one import, or should one try to use require inside the Module? What is the difference here?
 
 #import Driver
-import Matriks
+#import Matriks
 
 defmodule Panel do
     @state_map  %{:on => true, :off => false}

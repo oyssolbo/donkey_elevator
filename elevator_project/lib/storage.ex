@@ -45,6 +45,18 @@ defmodule Storage do
 
     end
 
+    def write(data, fileName \\ "save_data.txt") do
+        # TODO: Format order struct into string
+        dataMap = Map.from_struct(data)
+        textData = Poison.encode!(dataMap)#Map
+        result = File.write(fileName, textData)
+    end
+
+    def read(fileName \\ "save_data.txt") do
+        result = File.read!(fileName)   #Beware! read! embeds errors into results, without error messages
+        ordr = struct(Order, Poison.decode!(result))
+    end
+
 @doc """
 Notes:
 File.write accepts only(?) _a_ string as argument, so process all data before passing.

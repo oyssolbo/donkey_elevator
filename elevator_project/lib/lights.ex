@@ -8,8 +8,8 @@ defmodule Lights do
     - Driver
   """
 
-  @min_floor  Application.fetch_env!(:elevator_project, :min_floor)
-  @max_floor  Application.fetch_env!(:elevator_project, :num_floors) + @min_floor - 1
+  @min_floor  Application.fetch_env!(:elevator_project, :project_min_floor)
+  @max_floor  Application.fetch_env!(:elevator_project, :project_num_floors) + @min_floor - 1
 
 
   @doc """
@@ -20,7 +20,7 @@ defmodule Lights do
     Driver.set_floor_indicator(floor)
   end
 
-  
+
   @doc """
   Set the doorlight to the state 'state'
   """

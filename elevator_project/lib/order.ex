@@ -310,7 +310,6 @@ defmodule Order do
 
   Returns the new list
   """
-
     def gib_rnd_order() do
         rnd_id = Time.utc_now()
         rnd_type = Enum.random([:hall_up, :hall_down, :cab])

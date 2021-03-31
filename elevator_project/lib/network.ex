@@ -95,11 +95,12 @@ defmodule Network do
   do
     message_id = Timer.get_utc_time()
     network_list = SystemNode.nodes_in_network()
-    {node, network_list} = List.pop_at(network_list, iteration)
+    node = Enum.at(network_list, iteration)
     if node != :nil do
       send({receiver_id, node}, {sender_id, {message_id, data}})
       send_data_to_all_nodes(sender_id, receiver_id, data, iteration + 1)
     end
+    {:ok, network_list}
   end
 
   @doc """
@@ -118,7 +119,7 @@ defmodule Network do
   def receive_thread(sender_id, handler)
   do
     receive do
-      {:master, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
+      {sender_id, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
       {:panel, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
 
     #after

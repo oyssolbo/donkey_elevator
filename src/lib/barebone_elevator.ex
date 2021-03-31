@@ -4,22 +4,21 @@ defmodule BareElevator do
   first and fourth floor
   """
 
-  use GenServer
+  use GenStateMachine
   require Driver
 
-  @min_floor 1
-  @max_floor 4
+  @min_floor 0
+  @max_floor 3
   @node_name :barebone_elevator
-  @enforce_keys [:state, :floor, :dir]
+  @enforce_keys [:target_floor, :dir]
 
-  defstruct [:state, :floor, :dir]
+  defstruct [:target_floor, :dir]
 
   # Start link to the GenServer
   def start_link(init_arg \\ []) do
     server_opts = [name: @node_name]
-    GenServer.start_link(__MODULE__, init_arg, server_opts)
+    GenStateMachine.start_link(__MODULE__, init_arg, server_opts)
   end
-
 
   # Init-function that runs the elevator down
   def init(init_arg \\ []) do
@@ -28,13 +27,16 @@ defmodule BareElevator do
 
     # Set correct elevator-state
     elevator_data = %BareElevator{
-      state: :init,
-      floor: :nil,
+      target_floor: :nil,
       dir: :down
     }
 
-    {:ok, elevator_data}
+    # Spawning processs to continously check floor
+    spawn(fn-> read_current_floor() end)
+
+    {:ok, :init_state, elevator_data}
   end
+
 
   # Terminating-function
   def terminate(_reason, _state) do
@@ -42,31 +44,104 @@ defmodule BareElevator do
   end
 
 
-  # Function that checks if we are at a floor. Messages the FSM which floor we are at
-  def at_floor(floor) when floor |> is_integer do
-    GenServer.cast(@node_name, {:at_floor, floor})
+  # Function that checks if we are at a floor
+  defp read_current_floor() do
+    Driver.get_floor_sensor_state() |> check_at_floor()
+    read_current_floor()
   end
 
 
-  # Function for detecting if we are at the top or bottom-floor
-  # Changes direction if that is the case
-  def handle_info(:at_floor, %BareElevator{floor: floor = @min_floor} = elevator_data) do
-    # Change direction and state upwards
-    data = move_elevator(:up, floor, elevator_data)
-    {:noreply, data}
+  # Function that checks if we are at a given floor. Create an asynch request if true
+  defp check_at_floor(floor) when floor |> is_integer do
+    GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
 
-  def handle_info(:at_floor, %BareElevator{floor: floor = @max_floor} = elevator_data) do
-    # Change direction and state upwards
-    data = move_elevator(:down, floor, elevator_data)
-    {:noreply, data}
+
+  # Function to handle if we have reached a desired floor
+  def handle_event(:cast, {:at_floor, floor}, :moving,
+        %BareElevator{target_floor: target_floor = floor} = elevator_data) do
+
+    # If we have reached the desired floor then stop
+    actions = [Driver.set_engine_direction(:stop)]
+    {:next_state, :idle, actions}
   end
 
-  defp move_elevator(dir, floor, elevator_data) when floor |> is_integer and dir |> is_atom do
-    "At floor #{floor}. Moving " <> to_string(dir) |> IO.puts
-    Driver.set_motor_direction(:dir)
-    Map.put(elevator_data, :dir, dir)
-    elevator_data
+
+  # Functions to handle if we have reached either the top or the bottom-floor
+  def handle_event(:cast, {:at_floor, floor = @min_floor}, :moving,
+        %BareElevator{dir: :down} = elevator_data) do
+
+    # Set state to idle and stop engine
+    {:next_state, :idle, reached_floor_limit()}
+  end
+
+
+  def handle_event(:cast, {:at_floor, floor = @max_floor}, :moving,
+  %BareElevator{dir: :up} = elevator_data) do
+
+    # Set state to idle and stop engine
+    {:next_state, :idle, reached_floor_limit()}
+  end
+
+
+  # Function to handle if max or min-floor reached
+  defp reached_floor_limit() do
+    Driver.set_engine_direction(:stop)
+  end
+
+
+  # Function to be called when we have reached the target floor
+  def reached_target_floor() do
+    # Must update the order here somehow
+    Driver.set_engine_direction(:stop)
   end
 
 end
+
+
+##### Timer #####
+
+
+  @doc """
+  Starts the door-timer, which signals that the elevator should
+  close the door
+  """
+  # defp start_door_timer(elevator_data)
+  # do
+  #   timer = Map.get(elevator_data, :timer)
+  #   Process.cancel_timer(timer)
+  #   timer = Process.send_after(self(), :door_timer, @door_time)
+  #   Map.put(elevator_data, :timer, timer)
+  # end
+
+
+  @doc """
+  Function that starts a timer to check if we are moving
+  """
+  # defp start_moving_timer(elevator_data)
+  # do
+  #   timer = Map.get(elevator_data, :timer)
+  #   Process.cancel_timer(timer)
+  #   timer = Process.send_after(self(), :moving_timer, @moving_time)
+  #   Map.put(elevator_data, :timer, timer)
+  # end
+
+
+  @doc """
+  Function that starts a timer to check if init takes too long
+  """
+  # defp start_init_timer(elevator_data)
+  # do
+  #   timer = Map.get(elevator_data, :timer)
+  #   Process.cancel_timer(timer)
+  #   new_timer = Process.send_after(self(), :init_timer, @init_time)
+  #   Map.put(elevator_data, :timer, new_timer)
+  # end
+
+  @doc """
+  Function to start a timer to send updates over UDP to the master
+  """
+  # defp start_udp_timer()
+  # do
+  #   Process.send_after(self(), :udp_timer, @update_time)
+  # end

@@ -1,0 +1,11 @@
+{application,elevator_project,
+             [{applications,[kernel,stdlib,elixir,gen_state_machine]},
+              {description,"elevator_project"},
+              {modules,['Elixir.Client','Elixir.Driver','Elixir.Elevator',
+                        'Elixir.ElevatorTest','Elixir.Lights',
+                        'Elixir.ListOperations','Elixir.Master',
+                        'Elixir.MasterTest','Elixir.Network','Elixir.Order',
+                        'Elixir.Panel','Elixir.Storage','Elixir.SystemNode',
+                        'Elixir.Timer','Elixir.UDP','Elixir.UDP_discover']},
+              {registered,[]},
+              {vsn,"0.1.0"}]}.

@@ -9,8 +9,6 @@ defmodule Elevator do
     - Panel
     - Lights
     - Timer
-
-  Could be used:
     - Storage
 
   TODO:
@@ -31,7 +29,6 @@ defmodule Elevator do
   require Panel
   require Lights
   require Timer
-
   require Storage
 
   @min_floor            Application.fetch_env!(:elevator_project, :project_min_floor)
@@ -160,6 +157,7 @@ defmodule Elevator do
     # Checking if order already exists - if not, add to list and calculate next direction
     updated_order_list = Order.add_order(new_order, prev_orders)
     new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
+    Storage.write(updated_order_list)
 
     Lights.set_order_lights(updated_order_list)
 
@@ -205,7 +203,12 @@ defmodule Elevator do
     # Since we are safe at a floor, the elevator's state is secure
     Driver.set_motor_direction(:stop)
     Process.cancel_timer(timer)
-    new_elevator_data = check_at_new_floor(elevator_data, floor)
+
+    # Reading previously saved orders, and starting timer
+    prev_orders = Storage.read()
+    new_elevator_data =
+      Map.put(elevator_data, :orders, prev_orders) |>
+      check_at_new_floor(floor)
     Timer.interrupt_after(self(), :udp_timer, @status_update_time)
 
     {:next_state, :idle_state, new_elevator_data}
@@ -403,7 +406,7 @@ defmodule Elevator do
   between overflow or not. If the value 'i' results in a negative number, we just keep
   incrementing.
 
-  A while-loop is implemented, since recursion eats up the heap
+  A semi-while-loop is implemented, since it was observed that recursion eats the heap
 
   Invokes the function check_at_floor() with the data
   """
@@ -422,7 +425,8 @@ defmodule Elevator do
 
   If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server
   """
-  def check_at_floor(floor) when floor |> is_integer
+  def check_at_floor(floor)
+  when floor |> is_integer
   do
     Lights.set_floorlight(floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})
@@ -433,7 +437,8 @@ defmodule Elevator do
 
   If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server
   """
-  def check_at_floor(floor) when floor |> is_atom
+  def check_at_floor(floor)
+  when floor |> is_atom
   do
     floor
   end
@@ -476,7 +481,10 @@ defmodule Elevator do
 
 
   @doc """
-  Function to handle if we have reached the desired floor
+  Handles what to do when a floor containing an order with type in [:cab, dir] is reached
+
+  The function serves the order(s), updates the order-list and saves the result to Lights
+  and Storage
 
   orders Current active orders
   dir Current elevator-direction
@@ -494,10 +502,11 @@ defmodule Elevator do
     open_door()
     timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
 
-    # Remove old order and calculate new target_order
+    # Remove old orders and calculate new target_order
     updated_orders = Order.remove_floor_orders(orders, dir, floor)
     orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
 
+    Storage.save(updated_orders)
     Lights.set_order_lights(updated_orders)
 
     dir_opt = calculate_optimal_direction(updated_orders, dir, floor)

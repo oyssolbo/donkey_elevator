@@ -69,7 +69,7 @@ defmodule Elevator do
       orders:       [],
       last_floor:   :nil,
       dir:          :down,
-      timer:        Timer.get_utc_time(),
+      timer:        make_ref(),
       elevator_id:  Network.get_ip()
     }
 
@@ -116,6 +116,7 @@ defmodule Elevator do
   def delegate_order(order)
   do
     #GenStateMachine.call(@node_name, {:received_order, order})
+    IO.inspect(order)
     GenStateMachine.cast(@node_name, {:received_order, order})
   end
 
@@ -142,20 +143,19 @@ defmodule Elevator do
   """
   def handle_event(
         :cast,
-        {:received_order, new_order},
+        {:received_order, new_order_list},
         state,
         %Elevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
   do
-    IO.inspect(@init_time)
-
-    #Logger.info("Elevator received order from #{from}")
     Logger.info("Elevator received order")
 
     # First check if the order is valid - throws an error if not
-    Order.check_valid_order(new_order)
+    Order.check_valid_order(new_order_list)
+    IO.inspect(new_order_list)
+    IO.inspect(prev_orders)
 
     # Checking if order already exists - if not, add to list and calculate next direction
-    updated_order_list = Order.add_order(new_order, prev_orders)
+    updated_order_list = Order.add_orders(new_order_list, prev_orders)
     new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
     Storage.write(updated_order_list)
 
@@ -205,7 +205,15 @@ defmodule Elevator do
     Process.cancel_timer(timer)
 
     # Reading previously saved orders, and starting timer
-    prev_orders = Storage.read()
+    stored_orders = Storage.read()
+    prev_orders =
+      case Order.check_valid_order(stored_orders) do
+        :ok->
+          stored_orders
+        :error->
+          []
+      end
+
     new_elevator_data =
       Map.put(elevator_data, :orders, prev_orders) |>
       check_at_new_floor(floor)
@@ -526,7 +534,7 @@ defmodule Elevator do
   dir     Current direction to check for orders
   Floor   Current floor to check for order
   """
-  defp calculate_optimal_direction(
+  def calculate_optimal_direction(
         [],
         _dir,
         _floor)
@@ -534,7 +542,7 @@ defmodule Elevator do
     :nil
   end
 
-  defp calculate_optimal_direction(
+  def calculate_optimal_direction(
     _orders,
     _dir,
     :nil = _floor)
@@ -542,7 +550,7 @@ defmodule Elevator do
     :nil
   end
 
-  defp calculate_optimal_direction(
+  def calculate_optimal_direction(
         orders,
         dir,
         floor)
@@ -568,7 +576,7 @@ defmodule Elevator do
   that is directly linked to why is it here in the first place. That bug is then related to
   calculate_optimal_direction(), as it should not invoke the function without valid orders
   """
-  defp calculate_optimal_floor(
+  def calculate_optimal_floor(
         orders,
         dir,
         floor)

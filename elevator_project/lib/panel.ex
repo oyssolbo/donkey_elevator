@@ -30,19 +30,29 @@ defmodule Panel do
     end
 
     defp order_checker(old_orders, floor_table) when is_list(old_orders) do
-        orders = []
+
         # Update order list by reading all HW order buttons
-        if old_orders == [] do
-            orders = check_4_orders(floor_table)
-        else
-            orders = old_orders++check_4_orders(floor_table)
+        newOrders = check_4_orders(floor_table)
+        orders = old_orders++newOrders
+        #orders = old_orders++check_4_orders
+
+        #---TEST CODE - REMOVE BEFORE LAUNCH---#
+        if newOrders != [] do
+            IO.inspect("Recieved new order, #{inspect newOrder}",label: "orderChecker")
+            Process.sleep(1000)
         end
 
         # Check for request from sender. If there is, send order list and recurse with reset list
         receive do
             {:gibOrdersPls, sender_addr} ->
                 send(sender_addr, {:order_checker, orders})
+
+                #---TEST CODE - REMOVE BEFORE LAUNCH---#
+                IO.inspect("Recieved send request. Sent orders #{inspect orders}" ,label: "orderChecker")
+                Process.sleep(1000)
+                #--------------------------------------#
                 order_checker([], floor_table)
+                
             after
                 0 -> :ok
         end
@@ -55,6 +65,7 @@ defmodule Panel do
 
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
+            # ... send orders to all masters on network, and send cab orders to local elevator
             Network.send_data_to_all_nodes(:panel, :master, outgoing_orders)
             Network.send_data_inside_node(:panel, :master, Order.extract_cab_orders(outgoing_orders))
             #send({:elevator, node}, {:cab_orders, :panel, self(), extract_cab_orders(orders)})
@@ -71,7 +82,7 @@ defmodule Panel do
                         {:order_checker, updated_orders} ->
                             order_sender(checker_addr, floor_table, send_ID+1, updated_orders)
                             after
-                                2000 -> # Send some kind of error, "no response from order_checker"
+                                2000 -> IO.inspect("OrderSender timed out waiting for orders from orderChecker", label: "Error")# Send some kind of error, "no response from order_checker"
                     end
                 # If no ack is received after 1.5 sec: Recurse and repeat
                 after
@@ -84,9 +95,23 @@ defmodule Panel do
             receive do
                 {:order_checker, updated_orders} ->
                     order_sender(checker_addr, floor_table, send_ID, updated_orders)
+                    after
+                        2000 -> IO.inspect("OrderSender timed out waiting for orders from orderChecker", label: "Error")# Send some kind of error, "no response from order_checker"
+                        order_sender(checker_addr, floor_table, send_ID, outgoing_orders)
             end
         end
 
+    end
+
+    defp dummy_hardware_order_checker(floor, type) do
+        ordr = []
+        num = :rand.uniform(10)
+        if num > 4 do
+            ordr = Order.gibOrdersPls()
+            ordr.order_floor = floor
+            ordr.order_type = type
+        end
+        ordr
     end
 
     defp hardware_order_checker(floor, type) do
@@ -99,7 +124,8 @@ defmodule Panel do
     end
 
     defp check_order(orderType, table \\ Enum.to_list(0..@num_floors-1)) do
-        sendor_states = Enum.map(table, fn x -> hardware_order_checker(x, orderType) end)
+    # !!! Dummy function inserted
+        sendor_states = Enum.map(table, fn x -> dummy_hardware_order_checker(x, orderType) end)
         orders = Enum.filter(sendor_states, fn x -> x == [] end)
     end
 

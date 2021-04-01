@@ -76,7 +76,7 @@ defmodule Master do
       master_message_id:        0,
       activation_time:          :nil,
       connected_elevator_list:  [],
-      master_id:                Atom.to_string(@node_name) <> Network.get_ip()
+      master_id:                0 # Atom.to_string(@node_name) <> Network.get_ip()
     }
 
     # Starting process for error-handling
@@ -123,16 +123,16 @@ defmodule Master do
         elevator_id,
         counter \\ 0)
   do
-    pid = Process.whereis(elevator_id)
+    # pid = Process.whereis(elevator_id)
     # Process.send(pid, order)
   end
 
   @doc """
   Function for other modules to send order to the master
   """
-  def get_orders()
+  def give_master_orders(order)
   do
-    # WIP
+    GenStateMachine.cast(@node_name, {:received_order, order})
   end
 
 
@@ -151,6 +151,10 @@ defmodule Master do
         :backup_state,
         master_data)
   do
+    Logger.info("Backup has connection to active. Activating")
+
+    Timer.interrupt_after(self(), :update_timer, @update_active_time)
+
     activated_master_data =
       Timer.set_utc_time(master_data, :activation_time) |>
       Map.put(:master_message_id, 0)
@@ -265,6 +269,9 @@ defmodule Master do
         master_data)
   when order_list |> is_list()
   do
+    Logger.info("Active master received orders")
+    IO.inspect(order_list)
+
     # Check if valid, and delegate
     Order.check_valid_order(order_list)
 
@@ -415,7 +422,7 @@ defmodule Master do
   it should not be a problem. It will not be as efficient, as one elevator may become
   overloaded with work, but that is a consequence we are prepared to face
   """
-  defp combine_master_data_struct(
+  def combine_master_data_struct(
         intern_master_data,
         extern_master_data)
   do
@@ -455,13 +462,13 @@ defmodule Master do
 
   Returns a list of the new-undelegated orders
   """
-  defp unassign_all_orders([order | rest_orders])
+  def unassign_all_orders([order | rest_orders])
   do
     updated_order = Order.set_delegated_elevator(order, :nil)
     [updated_order | unassign_all_orders(rest_orders)]
   end
 
-  defp unassign_all_orders([])
+  def unassign_all_orders([])
   do
     []
   end
@@ -478,14 +485,14 @@ defmodule Master do
 
   Returns a list of orders with the correct assigned elevator
   """
-  defp delegate_orders(
+  def delegate_orders(
         orders,
         [])
   do
     Order.set_delegated_elevator(orders, :nil)
   end
 
-  defp delegate_orders(
+  def delegate_orders(
         [order | rest_orders],
         connected_elevators)
   do
@@ -501,7 +508,7 @@ defmodule Master do
     [delegated_order | delegate_orders(rest_orders, connected_elevators)]
   end
 
-  defp delegate_orders(
+  def delegate_orders(
         [],
         connected_elevators)
   do
@@ -535,7 +542,7 @@ defmodule Master do
   elevators and not enough floors to be relevant. For a larger building, a better
   function must be developed
   """
-  def find_optimal_elevator(
+  defp find_optimal_elevator(
         order,
         [check_elevator | rest_elevator],
         optimal_elevator)
@@ -558,7 +565,7 @@ defmodule Master do
     end
   end
 
-  def find_optimal_elevator(
+  defp find_optimal_elevator(
         _order,
         [],
         optimal_elevator)
@@ -590,7 +597,8 @@ defmodule Master do
     if elevator_in_dir do
       abs(order_floor - elevator_data_floor)
     else
-      1000 * abs(order_floor - elevator_data_floor)
+      # Adding 1 such that elevator on floor but in wrong direction not prioritized
+      1000 * (1 + abs(order_floor - elevator_data_floor))
     end
   end
 

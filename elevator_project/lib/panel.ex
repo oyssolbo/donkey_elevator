@@ -38,7 +38,7 @@ defmodule Panel do
 
         #---TEST CODE - REMOVE BEFORE LAUNCH---#
         if newOrders != [] do
-            IO.inspect("Recieved new order, #{inspect newOrder}",label: "orderChecker")
+            IO.inspect("Recieved new order, #{inspect newOrders}",label: "orderChecker")
             Process.sleep(1000)
         end
 
@@ -107,9 +107,7 @@ defmodule Panel do
         ordr = []
         num = :rand.uniform(10)
         if num > 4 do
-            ordr = Order.gibOrdersPls()
-            ordr.order_floor = floor
-            ordr.order_type = type
+            ordr = Order.gibOrdersPls(floor,type)
         end
         ordr
     end

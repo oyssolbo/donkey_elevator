@@ -317,6 +317,11 @@ defmodule Order do
         rnd_order = struct(Order, [order_id: rnd_id, order_type: rnd_type, order_floor: rnd_floor])
     end
 
+    def gib_rnd_order(floor, type) do
+        rnd_id = Time.utc_now()
+        rnd_order = struct(Order, [order_id: rnd_id, order_type: type, order_floor: floor])
+    end
+
     @doc """
     Function that returns a list of the cab orders in a list of orders. Returns empty list if none are present
     """

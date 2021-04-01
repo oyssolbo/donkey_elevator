@@ -39,7 +39,7 @@ defmodule Panel do
         #---TEST CODE - REMOVE BEFORE LAUNCH---#
         if new_orders != [] do
             IO.inspect("Recieved new order, #{inspect new_orders}",label: "orderChecker")
-            Process.sleep(1000)
+            Process.sleep(2000)
         end
 
         # Check for request from sender. If there is, send order list and recurse with reset list
@@ -49,10 +49,12 @@ defmodule Panel do
 
                 #---TEST CODE - REMOVE BEFORE LAUNCH---#
                 IO.inspect("Recieved send request. Sent orders #{inspect orders}" ,label: "orderChecker")
-                Process.sleep(1000)
+                Process.sleep(2000)
                 #--------------------------------------#
                 order_checker([], floor_table)
                 
+            {:special_delivery, special_orders} ->
+                order_checker(orders++special_orders, floor_table)
             after
                 0 -> :ok
         end
@@ -62,6 +64,8 @@ defmodule Panel do
     end
 
     defp order_sender(checker_addr, floor_table, send_ID, outgoing_orders) when is_list(outgoing_orders) do
+        ackTimeout = 2000
+        checkerTimeout = 5000
 
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
@@ -82,11 +86,11 @@ defmodule Panel do
                         {:order_checker, updated_orders} ->
                             order_sender(checker_addr, floor_table, send_ID+1, updated_orders)
                             after
-                                2000 -> IO.inspect("OrderSender timed out waiting for orders from orderChecker", label: "Error")# Send some kind of error, "no response from order_checker"
+                                checkerTimeout -> IO.inspect("OrderSender timed out waiting for orders from orderChecker", label: "Error")# Send some kind of error, "no response from order_checker"
                     end
                 # If no ack is received after 1.5 sec: Recurse and repeat
                 after
-                    1500 -> IO.inspect("OrderSender timed out waiting for ack", label: "Error")
+                    ackTimeout -> IO.inspect("OrderSender timed out waiting for ack on Send_ID #{send_ID}", label: "Error")
                     order_sender(checker_addr, floor_table, send_ID, outgoing_orders)
             end
 
@@ -97,7 +101,7 @@ defmodule Panel do
                 {:order_checker, updated_orders} ->
                     order_sender(checker_addr, floor_table, send_ID, updated_orders)
                     after
-                        2000 -> IO.inspect("OrderSender timed out waiting for orders from orderChecker", label: "Error")# Send some kind of error, "no response from order_checker"
+                        checkerTimeout -> IO.inspect("OrderSender timed out waiting for orders from orderChecker", label: "Error")# Send some kind of error, "no response from order_checker"
                         order_sender(checker_addr, floor_table, send_ID, outgoing_orders)
             end
         end

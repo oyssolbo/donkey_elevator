@@ -442,8 +442,12 @@ defmodule Master do
         intern_master_data,
         extern_master_data)
   do
+    Logger.info("Entered combine data")
     intern_orders = Map.get(intern_master_data, :active_order_list)
     extern_orders = Map.get(extern_master_data, :active_order_list)
+
+    #IO.inspect(intern_orders)
+    #IO.inspect(extern_orders)
 
     intern_connected_elevators = Map.get(intern_master_data, :connected_elevator_list)
     extern_connected_elevators = Map.get(extern_master_data, :connected_elevator_list)

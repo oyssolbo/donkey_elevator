@@ -80,7 +80,7 @@ defmodule Master do
     }
 
     # Starting process for error-handling
-    master_data = Timer.start_timer(self(), data, :master_timer, :active_master_timeout, @timeout_active)
+    master_data = Timer.start_timer(self(), data, :master_timer, :active_master_timeout, @timeout_active_master_time)
 
     Logger.info("Master initialized")
 
@@ -276,7 +276,7 @@ defmodule Master do
 
     updated_order_list =
       Map.get(master_data, :active_order_list) |>
-      Order.add_order(delegated_orders)
+      Order.add_orders(delegated_orders)
 
     new_master_data = Map.put(master_data, :active_order_list, updated_order_list)
 
@@ -331,7 +331,7 @@ defmodule Master do
     elevator_client =
       case Client.find_client(elevator_id, old_elevator_client_list) do
         [] ->
-          struct(Client, [client_id: elevator_id, data: %{dir: dir, last_floor: last_floor}])
+          struct(Client, [client_id: elevator_id, client_data: %{dir: dir, last_floor: last_floor}])
         old_client ->
           old_client
       end
@@ -353,7 +353,7 @@ defmodule Master do
     delegated_orders = delegate_orders(undelegated_orders, updated_elevator_list)
 
     # Since we have connection to at least one elevator, we can assume that all orders are delegated
-    new_order_list = Order.add_order(delegated_orders, other_orders)
+    new_order_list = Order.add_orders(delegated_orders, other_orders)
     new_master_data = Map.put(master_data, :active_orders, new_order_list)
 
     {:next_state, :active_state, new_master_data}
@@ -380,7 +380,7 @@ defmodule Master do
     elevator_list = Map.get(master_data, :connected_elevator_list)
     updated_elevator_list =
       Client.find_client(elevator_id, elevator_list) |>
-      Client.remove_client(elevator_list)
+      Client.remove_clients(elevator_list)
 
     # Find a list of affected orders and unaffected orders
     order_list = Map.get(master_data, :active_order_list)
@@ -391,7 +391,7 @@ defmodule Master do
     delegated_orders = delegate_orders(affected_orders, updated_elevator_list)
 
     # Combining the two sets of orders, and adding to master_data
-    new_order_list = Order.add_order(delegated_orders, unaffected_orders)
+    new_order_list = Order.add_orders(delegated_orders, unaffected_orders)
     new_master_data = Map.put(master_data, :active_order_list, new_order_list)
 
     {:next_state, :active_state, new_master_data}
@@ -432,7 +432,7 @@ defmodule Master do
     intern_undelegated_orders = unassign_all_orders(intern_orders)
     extern_undelegated_orders = unassign_all_orders(extern_orders)
 
-    new_order_list = Order.add_order(intern_undelegated_orders, extern_undelegated_orders)
+    new_order_list = Order.add_orders(intern_undelegated_orders, extern_undelegated_orders)
 
     # Cancel all timers, and remove info about the elevators from the list
     intern_elevators_canceled_timers = Client.cancel_all_client_timers(intern_connected_elevators)
@@ -523,7 +523,7 @@ defmodule Master do
     old_nil_delegated_orders = Order.get_orders_with_value(old_orders, :delegated_elevator, :nil)
     new_nil_delegated_orders = Order.get_orders_with_value(new_order_list, :delegated_elevator, :nil)
 
-    Order.add_order(old_nil_delegated_orders, new_nil_delegated_orders)
+    Order.add_orders(old_nil_delegated_orders, new_nil_delegated_orders)
   end
 
 
@@ -535,12 +535,12 @@ defmodule Master do
   elevators and not enough floors to be relevant. For a larger building, a better
   function must be developed
   """
-  defp find_optimal_elevator( # BUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUG
+  def find_optimal_elevator(
         order,
         [check_elevator | rest_elevator],
         optimal_elevator)
   do
-    optimal_data = Map.get(optimal_elevator, :data)
+    optimal_data = Map.get(optimal_elevator, :client_data)
 
     if optimal_data == :nil do
       find_optimal_elevator(order, rest_elevator, check_elevator)
@@ -558,7 +558,7 @@ defmodule Master do
     end
   end
 
-  defp find_optimal_elevator(
+  def find_optimal_elevator(
         _order,
         [],
         optimal_elevator)
@@ -578,7 +578,7 @@ defmodule Master do
         order,
         elevator)
   do
-    elevator_data = Map.get(elevator, :data)
+    elevator_data = Map.get(elevator, :client_data)
     elevator_data_dir = Map.get(elevator_data, :dir)
     elevator_data_floor = Map.get(elevator_data, :last_floor)
 

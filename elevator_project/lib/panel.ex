@@ -77,7 +77,7 @@ defmodule Panel do
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
             # ... send orders to all masters on network, and send cab orders to local elevator
-            Network.send_data_to_all_nodes(:panel, :master, outgoing_orders)
+            Network.send_data_to_all_nodes(:panel, :master, outgoing_orders, send_ID)
             Network.send_data_inside_node(:panel, :master, Order.extract_cab_orders(outgoing_orders))
             #send({:elevator, node}, {:cab_orders, :panel, self(), extract_cab_orders(orders)})
 

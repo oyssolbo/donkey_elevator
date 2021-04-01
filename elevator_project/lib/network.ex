@@ -79,7 +79,7 @@ defmodule Network do
   @doc """
   Init the node nettork on the machine
   """
-  def node_network_init()
+  def init_node_network()
   do
     node_name_s = Kernel.inspect(:rand.uniform(10000)) <> "@" <> UDP_discover.get_ip()
     node_name_a = String.to_atom(node_name_s)
@@ -89,7 +89,7 @@ defmodule Network do
   end
 
   @doc """
-  Send data to all known nodes on the network to the process receiver_id
+  Send data to all known nodes on the network to the process receiver_id, iteration should be left blank
   """
   def send_data_to_all_nodes(sender_id, receiver_id,data, iteration \\ 0)
   do

@@ -338,8 +338,14 @@ defmodule Order do
         Enum.all?(list, fn
             %Order{} -> true
             _ -> false
-    end)
-  end
+        end)
+    end
+
+    def merge_lists(list1, list2) when is_list(list1) and is_list(list2) do
+      lst = list1++list2
+      lst = Enum.uniq(lst)
+    end
+
   # defp set_order_field(
   #       [order | rest_orders],
   #       field,

@@ -15,19 +15,99 @@ defmodule MasterTest do
     - Communication between an elevator and a master (send status etc.)
   """
 
-  def test_find_optimal_elevator()
+  def test_master_backup_to_active()
   do
-    order_opts = [order_id: Timer.get_utc_time(), order_type: :cab, order_floor: 2]
-    order = struct(Order, order_opts)
+    Master.start_link()
+    Process.sleep(2500)
+  end
 
-    elevator_id = Timer.get_utc_time()
+  def test_give_active_orders()
+  do
+    test_master_backup_to_active()
 
-    elevator_data = %{dir: :down, last_floor: 3, elevator_id: elevator_id}
-    elevator_client = struct(Client, [client_data: elevator_data])
+    order_opts1 = [order_id: Timer.get_utc_time(), order_type: :down, order_floor: 2]
+    order1 = struct(Order, order_opts1)
 
-    id = Master.find_optimal_elevator(order, elevator_client, struct(Client))
+    order_opts2 = [order_id: Timer.get_utc_time(), order_type: :up, order_floor: 3]
+    order2 = struct(Order, order_opts2)
+
+    Master.give_master_orders([order1, order2])
   end
 
 
+  def test_find_optimal_elevator()
+  do
+    # Test passed
 
+    order_opts = [order_id: Timer.get_utc_time(), order_type: :down, order_floor: 2]
+    order = struct(Order, order_opts)
+
+    elevator_id1 = Timer.get_utc_time()
+
+    elevator_data1 = %{dir: :down, last_floor: 3, elevator_id: elevator_id1}
+    elevator_client1 = struct(Client, [client_data: elevator_data1])
+
+
+    elevator_id2 = Timer.get_utc_time()
+
+    elevator_data2 = %{dir: :up, last_floor: 2, elevator_id: elevator_id2}
+    elevator_client2 = struct(Client, [client_data: elevator_data2])
+
+    id = Master.find_optimal_elevator(order, [elevator_client1, elevator_client2], struct(Client))
+
+    IO.puts("Optimal id should be")
+    IO.inspect(elevator_id1)
+
+    IO.puts("Found id, is")
+    IO.inspect(id)
+  end
+
+
+  def test_empty_optimal_elevator()
+  do
+    # Test passed
+
+    order_opts = [order_id: Timer.get_utc_time(), order_type: :down, order_floor: 2]
+    order = struct(Order, order_opts)
+
+    id = Master.find_optimal_elevator(order, [], struct(Client))
+  end
+
+  def test_combine_master_structs()
+  do
+
+  end
+
+  def test_unassign_all_orders()
+  do
+
+  end
+
+
+  def test_delegate_orders()
+  do
+    # Passed
+
+    elevator_id1 = Timer.get_utc_time()
+    elevator_data1 = %{dir: :down, last_floor: 3}
+    elevator_client1 = struct(Client, [client_data: elevator_data1, client_id: elevator_id1])
+
+    elevator_id2 = Timer.get_utc_time()
+    elevator_data2 = %{dir: :up, last_floor: 2}
+    elevator_client2 = struct(Client, [client_data: elevator_data2, client_id: elevator_id2])
+
+    order_opts1 = [order_id: Timer.get_utc_time(), order_type: :down, order_floor: 2]
+    order1 = struct(Order, order_opts1)
+
+    order_opts2 = [order_id: Timer.get_utc_time(), order_type: :up, order_floor: 3]
+    order2 = struct(Order, order_opts2)
+
+    IO.puts("First should be delivered to")
+    IO.inspect(elevator_id1)
+
+    IO.puts("Second should be delivered to")
+    IO.inspect(elevator_id2)
+
+    delegated_orders = Master.delegate_orders([order1, order2], [elevator_client1, elevator_client2])
+  end
 end

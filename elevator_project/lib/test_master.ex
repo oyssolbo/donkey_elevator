@@ -17,12 +17,16 @@ defmodule MasterTest do
 
   def test_master_backup_to_active()
   do
+    # Test passed
+
     Master.start_link()
     Process.sleep(2500)
   end
 
   def test_give_active_orders()
   do
+    # Test passed
+
     test_master_backup_to_active()
 
     order_opts1 = [order_id: Timer.get_utc_time(), order_type: :down, order_floor: 2]
@@ -73,20 +77,47 @@ defmodule MasterTest do
     id = Master.find_optimal_elevator(order, [], struct(Client))
   end
 
-  def test_combine_master_structs()
+  def test_combine()
   do
+    order_opts1 = [order_id: Timer.get_utc_time(), order_type: :down, order_floor: 2]
+    order1 = struct(Order, order_opts1)
+
+    order_opts2 = [order_id: Timer.get_utc_time(), order_type: :up, order_floor: 3]
+    order2 = struct(Order, order_opts2)
+
+    order_opts3 = [order_id: Timer.get_utc_time(), order_type: :up, order_floor: 3, delegated_elevator: Timer.get_utc_time()]
+    order3 = struct(Order, order_opts3)
+
+    master_orders1 = [order1, order2]
+    master_struct1 = struct(Master, [active_order_list: master_orders1, master_message_id: 69])
+
+    master_orders2 = [order3]
+    master_struct2 = struct(Master, [active_order_list: master_orders2, master_message_id: 420])
+
+    Master.combine_master_data_struct(master_struct1, master_struct2)
 
   end
 
-  def test_unassign_all_orders()
+  def test_get_undelegated_orders()
   do
+    # Test passed
 
+    order_opts1 = [order_id: Timer.get_utc_time(), order_type: :down, order_floor: 2]
+    order1 = struct(Order, order_opts1)
+
+    order_opts2 = [order_id: Timer.get_utc_time(), order_type: :up, order_floor: 3]
+    order2 = struct(Order, order_opts2)
+
+    order_opts3 = [order_id: Timer.get_utc_time(), order_type: :up, order_floor: 3, delegated_elevator: Timer.get_utc_time()]
+    order3 = struct(Order, order_opts3)
+
+    Master.get_undelegated_orders(struct(Master), [order1, order2, order3])
   end
 
 
   def test_delegate_orders()
   do
-    # Passed
+    # Test passed
 
     elevator_id1 = Timer.get_utc_time()
     elevator_data1 = %{dir: :down, last_floor: 3}

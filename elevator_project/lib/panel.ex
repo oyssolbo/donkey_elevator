@@ -121,8 +121,7 @@ defmodule Panel do
     end
 
     def check_order(orderType, table \\ Enum.to_list(0..@num_floors-1)) do
-    # !!! Dummy function inserted
-        sendor_states = Enum.map(table, fn x -> dummy_hardware_order_checker(x, orderType) end)
+        sendor_states = Enum.map(table, fn x -> hardware_order_checker(x, orderType) end)
         orders = Enum.reject(sendor_states, fn x -> x == [] end)
     end
 

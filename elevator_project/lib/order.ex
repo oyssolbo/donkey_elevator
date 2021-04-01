@@ -105,6 +105,8 @@ defmodule Order do
         order_list)
   when order |> is_struct()
   do
+    IO.puts("Inside add_orders - with struct")
+    IO.inspect(order)
     order_id = Map.get(order, :order_id)
 
     original_order = get_orders_with_value(order_list, :order_id, order_id)
@@ -124,13 +126,21 @@ defmodule Order do
 
   @doc """
   Function to add a list of orders to another list of orders.
-
   """
   def add_orders(
         [order | rest_orders],
         order_list)
   do
-    [add_orders(order, order_list) | add_orders(rest_orders, order_list)]
+    IO.puts("Inside add order - with list")
+    cond do
+      order |> is_struct() ->
+        IO.puts("Struct")
+      order |> is_list() ->
+        IO.puts("OOOPS")
+    end
+    new_order_list = add_orders(order, order_list)
+    add_orders(rest_orders, new_order_list)
+    # [add_orders(order, order_list) | add_orders(rest_orders, order_list)]
   end
 
   def add_orders(

@@ -45,12 +45,12 @@ defmodule Master do
   ]
 
   defstruct [
-    :active_order_list,
-    :master_timer,
-    :master_message_id,
-    :activation_time,
-    :connected_elevator_list,
-    :master_id
+    active_order_list:        [],
+    master_timer:             :nil,
+    master_message_id:        0,
+    activation_time:          :nil,
+    connected_elevator_list:  [],
+    master_id:                :nil
   ]
 
 ###################################### External functions ######################################
@@ -191,6 +191,22 @@ defmodule Master do
           intern_master_data
       end
     {:next_state, :backup_state, new_master_data}
+  end
+
+
+  @doc """
+  Function to handle if the GenStateMachine-server receives an order while in passive mode.
+  Since the master should not respond to orders while in backup-state, we leave the work
+  to the active master. If the active master is unable to respond, the sender will repeat
+  the order, until the backup has activated itself
+  """
+  def handle_event(
+        :cast,
+        {:received_order, _order_list},
+        :backup_state,
+        master_data)
+  do
+    {:next_state, :backup_state, master_data}
   end
 
 
@@ -521,7 +537,7 @@ defmodule Master do
   :delegated_elevator set to :nil). It can take in a new list of orders, and
   adds these orders to the list of undelegated orders
   """
-  defp get_undelegated_orders(
+  def get_undelegated_orders(
         master_data,
         new_order_list \\ [])
   do

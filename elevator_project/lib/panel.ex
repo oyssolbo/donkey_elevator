@@ -55,7 +55,7 @@ defmodule Panel do
                 send(sender_addr, {:order_checker, orders})
 
                 #---TEST CODE - REMOVE BEFORE LAUNCH---#
-                IO.inspect("Recieved send request. Sent orders #{inspect orders}" ,label: "orderChecker")
+                IO.inspect("Received send request. Sent orders #{inspect orders}" ,label: "orderChecker")
                 Process.sleep(2000)
                 #--------------------------------------#
                 order_checker([], floor_table)

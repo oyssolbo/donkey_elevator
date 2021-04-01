@@ -16,7 +16,6 @@ defmodule Panel do
     @num_floors Application.fetch_env!(:elevator_project, :project_num_floors)
     # floor_table: Array of the floors; makes it easier to iterate through
 
-    # TODO: Replace mid1, mid2, eid with send_local_node func. For master send; send_data_to_all_nodes.
     def init(floor_table \\ Enum.to_list(0..@num_floors-1)) do
 
         checker_ID = spawn(fn -> order_checker([], floor_table) end)
@@ -27,6 +26,14 @@ defmodule Panel do
         Process.register(sender_ID, :panel)
 
         {checker_ID, sender_ID}
+    end
+
+    def init(sender_ID, floor_table) do
+
+        checker_ID = spawn(fn -> order_checker([], floor_table) end)
+        Process.register(checker_ID, :order_checker)
+
+        checker_ID
     end
 
     defp order_checker(old_orders, floor_table) when is_list(old_orders) do
@@ -87,6 +94,7 @@ defmodule Panel do
                             order_sender(checker_addr, floor_table, send_ID+1, updated_orders)
                             after
                                 checkerTimeout -> IO.inspect("OrderSender timed out waiting for orders from orderChecker", label: "Error")# Send some kind of error, "no response from order_checker"
+                                init(self(), floor_table) # Assume order_checker has died. Reinitialize it
                     end
                 # If no ack is received after 1.5 sec: Recurse and repeat
                 after
@@ -102,6 +110,7 @@ defmodule Panel do
                     order_sender(checker_addr, floor_table, send_ID, updated_orders)
                     after
                         checkerTimeout -> IO.inspect("OrderSender timed out waiting for orders from orderChecker", label: "Error")# Send some kind of error, "no response from order_checker"
+                        init(self(), floor_table) # Assume order_checker has died. Reinitialize it
                         order_sender(checker_addr, floor_table, send_ID, outgoing_orders)
             end
         end

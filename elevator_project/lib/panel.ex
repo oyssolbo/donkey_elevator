@@ -83,7 +83,7 @@ defmodule Panel do
 
             # ... and wait for an ack
             receive do
-                {:ack, from, sentID} ->
+                {:ack, sentID} ->
                     # When ack is recieved for current send_ID, send request to checker for latest order matrix
                     if sentID == send_ID do
                         send(checker_addr, {:gibOrdersPls, self()})

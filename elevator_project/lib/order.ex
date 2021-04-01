@@ -315,6 +315,18 @@ defmodule Order do
 
 
   @doc """
+  Function that sets the field of a single order
+  """
+  defp set_order_field(
+        order,
+        field,
+        value)
+  when order |> is_struct()
+  do
+    Map.put(order, field, value)
+  end
+
+  @doc """
   Sets the field 'field' in an order to an assigned 'value'
 
   Recurses over the entire list, such that all orders in the list get the
@@ -327,7 +339,7 @@ defmodule Order do
         field,
         value)
   do
-    [Map.put(order, field, value) | set_order_field(rest_orders, field, value)]
+    [set_order_field(order, field, value) | set_order_field(rest_orders, field, value)]
   end
 
   defp set_order_field(

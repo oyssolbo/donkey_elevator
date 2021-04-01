@@ -1,10 +1,8 @@
 defmodule Order do
   @moduledoc """
-  Module that implements 'Orders' and includes a function to zip multiple orders into a
-  list. This makes it easier to send
+  Module that implements the struct 'Order' with different functions for operating
+  on them
   """
-
-  require ListOperations
 
   @min_floor Application.fetch_env!(:elevator_project, :project_min_floor)
   @max_floor Application.fetch_env!(:elevator_project, :project_num_floors) + @min_floor - 1
@@ -30,7 +28,7 @@ defmodule Order do
   updated_orders List of orders where the old ones are deleted
   """
   def remove_floor_orders(
-          orders,
+          [_first_order | _rest_orders] = orders,
           dir,
           floor)
   do
@@ -39,11 +37,8 @@ defmodule Order do
     order_in_dir = get_orders_with_value(orders_at_floor, :order_type, dir)
     order_in_cab = get_orders_with_value(orders_at_floor, :order_type, :cab)
 
-    #temp_orders = remove_order_list_from_list(order_in_dir, orders)
-    #remove_order_list_from_list(order_in_cab, temp_orders)
-
-    temp_orders = ListOperations.remove_list_from_list(order_in_dir, orders)
-    ListOperations.remove_list_from_list(order_in_cab, temp_orders)
+    temp_orders = remove_orders(order_in_dir, orders)
+    remove_orders(order_in_cab, temp_orders)
 
   #       [%Order{order_type: order_type, order_floor: order_floor} = first_order | rest_orders],
   #       dir,
@@ -58,14 +53,29 @@ defmodule Order do
   #   end
   end
 
-  def remove_floor_orders(
-        [],
-        _dir,
-        _floor)
-  do
-    []
-  end
 
+  @doc """
+  Function that removes a single order from a list of orders
+
+  The function searches through the entire list, such that if a duplicated
+  order has occured, both are then removed
+  """
+  def remove_orders(
+        order,
+        order_list)
+  when order |> is_struct()
+  do
+    original_length = length(order_list)
+    new_list = List.delete(order_list, order)
+    new_length = length(new_list)
+
+    case new_length < original_length do
+      :true->
+        remove_orders(order, new_list)
+      :false->
+        new_list
+    end
+  end
 
   @doc """
   Function to remove a list of orders from another list of orders
@@ -73,72 +83,99 @@ defmodule Order do
   It is assumed that there is only one copy of each order in the list
   """
   def remove_orders(
-        orders,
+        [order | rest_orders],
         order_list)
-  when orders |> is_list()
   do
-    # new_list = List.delete(list, order)
-    # remove_order_list_from_list(rest_orders, new_list)
-
-    ListOperations.remove_list_from_list(orders, order_list)
-
+    new_list = remove_orders(order, order_list)
+    remove_orders(rest_orders, new_list)
   end
 
   def remove_orders(
+        [],
+        order_list)
+  do
+    order_list
+  end
+
+  @doc """
+  Function to add a single order to a list of orders
+  """
+  def add_orders(
         order,
         order_list)
   when order |> is_struct()
   do
-    ListOperations.remove_element_from_list(order, order_list)
+    order_id = Map.get(order, :order_id)
+
+    original_order = get_orders_with_value(order_list, :order_id, order_id)
+    cond do
+      order_list == []->
+        [order]
+
+      original_order != []->
+        # An order with 'order_id' exists in order_list
+        order_list
+
+      original_order == []->
+        [order_list | order]
+    end
   end
 
 
   @doc """
-  Function to add a list of orders to another list of orders
+  Function to add a list of orders to another list of orders.
+
   """
-  def add_order(
-        orders,
+  def add_orders(
+        [order | rest_orders],
         order_list)
-  when orders |> is_list()
   do
-    ListOperations.add_list_to_list(orders, order_list)
+    [add_orders(order, order_list) | add_orders(rest_orders, order_list)]
   end
 
-  def add_order(
-        order,
+  def add_orders(
+        [],
         order_list)
-  when order |> is_struct()
   do
-    ListOperations.add_single_element_to_list(order, order_list)
+    order_list
   end
-
-
-  @doc """
-  Function to add a single order to a list 'list'
-  """
-  # def add_orders_to_list(
-  #       new_order,
-  #       list)
-  # do
-  #   cond do
-  #     list == []->
-  #       [new_order]
-  #     new_order in list->
-  #       list
-  #     new_order not in list->
-  #       [list | new_order]
-  #   end
-  # end
 
 
 ## Valid orders ##
   @doc """
-  Function to check if an order is valid
+  Function to check if an order is valid. Invalid orders should not occur!
+
+  If this function causes a crash, it is likely that an order is set to
+  default (:nil)
 
   For the order to be valid, we require that:
     - order_floor is between min and max
     - order_type is either :cab, :up, :down
   """
+  def check_valid_order(order)
+  when order |> is_struct()
+  do
+    floor = Map.get(order, :order_floor)
+    type = Map.get(order, :order_type)
+    cond do
+      floor < @min_floor->
+        IO.puts("Invalid floor. Less than min-floor and at floor")
+        IO.inspect(floor)
+        :error
+      floor > @max_floor->
+        IO.puts("Invalid floor. Greater than max-floor and at floor")
+        IO.inspect(floor)
+        :error
+      type not in [:cab, :up, :down]->
+        IO.puts("Invalid type. Order has the type")
+        IO.inspect(type)
+        :error
+      :true->
+        :ok
+    end
+  end
+
+
   def check_valid_order([order | rest_orders])
   do
     case check_valid_order(order) do
@@ -153,27 +190,6 @@ defmodule Order do
   def check_valid_order([])
   do
     :ok
-  end
-
-
-  def check_valid_order(order)
-  when order |> is_struct()
-  do
-    floor = Map.get(order, :order_floor)
-    type = Map.get(order, :order_type)
-    cond do
-      floor < @min_floor->
-        IO.puts("Invalid floor")
-        :error
-      floor > @max_floor->
-        IO.puts("Invalid floor")
-        :error
-      type not in [:cab, :up, :down]->
-        IO.puts("Invalid type")
-        :error
-      :true->
-        :ok
-    end
   end
 
 
@@ -227,9 +243,9 @@ defmodule Order do
   {:false, []}              No orders satisfies the requirements
   """
   def check_orders_at_floor(
-    orders,
-    floor,
-    dir)
+        orders,
+        floor,
+        dir)
   do
     satisfying_orders = get_orders_at_floor(orders, floor, dir)
 
@@ -252,19 +268,16 @@ defmodule Order do
   Returns a list of orders with the desired value in the field
   """
   def get_orders_with_value(
-        orders,
-        #[order | rest_orders],
+        [order | rest_orders],
         field,
         value)
   do
-    ListOperations.find_element_with_value(orders, field, value)
-
-    # order_value = Map.get(order, field, value)
-    # if order_value == value do
-    #   [order | get_orders_with_value(rest_orders, field, value)]
-    # else
-    #   get_orders_with_value(rest_orders, field, value)
-    # end
+    order_value = Map.get(order, field)
+    if order_value == value do
+      [order | get_orders_with_value(rest_orders, field, value)]
+    else
+      get_orders_with_value(rest_orders, field, value)
+    end
   end
 
   def get_orders_with_value(
@@ -285,8 +298,7 @@ defmodule Order do
         orders,
         elevator_id)
   do
-    #set_order_field(orders, :delegated_elevator, elevator_id)
-    ListOperations.set_element_field(orders, :delegated_elevator, elevator_id)
+    set_order_field(orders, :delegated_elevator, elevator_id)
   end
 
 
@@ -298,7 +310,7 @@ defmodule Order do
         orders,
         elevator_id)
   do
-    ListOperations.find_element_with_value(orders, :delegated_elevator, elevator_id)
+    get_orders_with_value(orders, :delegated_elevator, elevator_id)
   end
 
 
@@ -310,23 +322,20 @@ defmodule Order do
 
   Returns the new list
   """
-  # defp set_order_field(
-  #       [order | rest_orders],
-  #       field,
-  #       value)
-  # do
-  #   [
-  #     Map.put(order, field, value) |
-  #     set_order_field(rest_orders, field, value)
-  #   ]
-  # end
+  defp set_order_field(
+        [order | rest_orders],
+        field,
+        value)
+  do
+    [Map.put(order, field, value) | set_order_field(rest_orders, field, value)]
+  end
 
-  # defp set_order_field(
-  #       [],
-  #       field,
-  #       value)
-  # do
-  #   []
-  # end
+  defp set_order_field(
+        [],
+        field,
+        value)
+  do
+    []
+  end
 
 end

@@ -32,13 +32,13 @@ defmodule Panel do
     defp order_checker(old_orders, floor_table) when is_list(old_orders) do
 
         # Update order list by reading all HW order buttons
-        newOrders = check_4_orders(floor_table)
-        orders = old_orders++newOrders
+        new_orders = check_4_orders(floor_table)
+        orders = old_orders++new_orders
         #orders = old_orders++check_4_orders
 
         #---TEST CODE - REMOVE BEFORE LAUNCH---#
-        if newOrders != [] do
-            IO.inspect("Recieved new order, #{inspect newOrders}",label: "orderChecker")
+        if new_orders != [] do
+            IO.inspect("Recieved new order, #{inspect new_orders}",label: "orderChecker")
             Process.sleep(1000)
         end
 
@@ -103,16 +103,15 @@ defmodule Panel do
 
     end
 
-    defp dummy_hardware_order_checker(floor, type) do
-        ordr = []
+    def dummy_hardware_order_checker(floor, type) do
         num = :rand.uniform(10)
+        ordr = []
         if num > 4 do
-            ordr = Order.gibOrdersPls(floor,type)
+            ordr = Order.gib_rnd_order(floor,type)
         end
-        ordr
     end
 
-    defp hardware_order_checker(floor, type) do
+    def hardware_order_checker(floor, type) do
         if Driver.get_order_button_state(floor, type) == :on do
             # TODO: Replace Time.utc_now() with wrapper func from Timer module
             order = struct(Order, [order_id: Time.utc_now(), order_type: type, order_floor: floor])
@@ -121,13 +120,13 @@ defmodule Panel do
         end
     end
 
-    defp check_order(orderType, table \\ Enum.to_list(0..@num_floors-1)) do
+    def check_order(orderType, table \\ Enum.to_list(0..@num_floors-1)) do
     # !!! Dummy function inserted
         sendor_states = Enum.map(table, fn x -> dummy_hardware_order_checker(x, orderType) end)
-        orders = Enum.filter(sendor_states, fn x -> x == [] end)
+        orders = Enum.reject(sendor_states, fn x -> x == [] end)
     end
 
-    defp check_4_orders(table \\ Enum.to_list(0..@num_floors-1)) do
+    def check_4_orders(table \\ Enum.to_list(0..@num_floors-1)) do
         orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
     end
 

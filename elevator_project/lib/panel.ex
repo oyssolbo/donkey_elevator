@@ -86,7 +86,8 @@ defmodule Panel do
                     end
                 # If no ack is received after 1.5 sec: Recurse and repeat
                 after
-                    1500 -> order_sender(checker_addr, floor_table, send_ID, outgoing_orders)
+                    1500 -> IO.inspect("OrderSender timed out waiting for ack", label: "Error")
+                    order_sender(checker_addr, floor_table, send_ID, outgoing_orders)
             end
 
         else

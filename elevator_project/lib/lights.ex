@@ -49,7 +49,7 @@ defmodule Lights do
 
   Clears all hall_down, hall_up, cab at each floor
   """
-  defp clear_all_lights(floor \\ @min_floor)
+  def clear_all_lights(floor \\ @min_floor)
   when floor <= @max_floor
   do
     Driver.set_order_button_light(:hall_down, floor, :off)
@@ -60,7 +60,7 @@ defmodule Lights do
     :ok
   end
 
-  defp clear_all_lights(_floor)
+  def clear_all_lights(_floor)
   do
     :ok
   end
@@ -70,19 +70,33 @@ defmodule Lights do
   Function to iterate through a list of orders, and set the corresponding
   light on
   """
-  defp set_all_order_lights([%Order{order_type: type, order_floor: floor} = _order | rest_orders])
-  do
-    if type == :down do
-      Driver.set_order_button_light(:hall_down, floor, :on)
+  defp set_all_order_lights(ordrs) when is_list(ordrs) and ordrs != [] do
+    [first_ordr | rst_ordrs] = ordrs
+    if Order.is_order_list(ordrs) do
+      case Map.get(first_ordr, :order_type) do
+        :hall_up ->
+          Driver.set_order_button_light(:hall_up, Map.get(first_ordr, :order_floor), :on)
+        :hall_down ->
+          Driver.set_order_button_light(:hall_down, Map.get(first_ordr, :order_floor), :on)
+        :cab ->
+          Driver.set_order_button_light(:cab, Map.get(first_ordr, :order_floor), :on)
+      end
     end
-    if type == :up do
-      Driver.set_order_button_light(:hall_up, floor, :on)
-    end
-    if type == :cab do
-      Driver.set_order_button_light(:cab, floor, :on)
-    end
-    set_all_order_lights(rest_orders)
+    set_all_order_lights(rst_ordrs)
   end
+  # defp set_all_order_lights([%Order{order_type: type, order_floor: floor} = _order | rest_orders])
+  # do
+  #   if type == :down do
+  #     Driver.set_order_button_light(:hall_down, floor, :on)
+  #   end
+  #   if type == :up do
+  #     Driver.set_order_button_light(:hall_up, floor, :on)
+  #   end
+  #   if type == :cab do
+  #     Driver.set_order_button_light(:cab, floor, :on)
+  #   end
+  #   set_all_order_lights(rest_orders)
+  # end
 
   defp set_all_order_lights([])
   do

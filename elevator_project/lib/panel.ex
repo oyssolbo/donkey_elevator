@@ -25,6 +25,11 @@ defmodule Panel do
         Process.register(checker_ID, :order_checker)
         Process.register(sender_ID, :panel)
 
+        #---TEST CODE---#
+        dummy = spawn(fn -> dummy_master() end)
+        Process.register(dummy, :master)
+        #---------------#
+
         {checker_ID, sender_ID}
     end
 
@@ -38,6 +43,8 @@ defmodule Panel do
 
     defp order_checker(old_orders, floor_table) when is_list(old_orders) do
 
+        checkerSleep = 3000
+
         # Update order list by reading all HW order buttons
         new_orders = check_4_orders(floor_table)
         orders = old_orders++new_orders
@@ -45,8 +52,8 @@ defmodule Panel do
 
         #---TEST CODE - REMOVE BEFORE LAUNCH---#
         if new_orders != [] do
-            IO.inspect("Recieved new order, #{inspect new_orders}",label: "orderChecker")
-            Process.sleep(2000)
+            IO.inspect("Recieved new order, #{inspect length(new_orders)}",label: "orderChecker")
+            Process.sleep(checkerSleep)
         end
 
         # Check for request from sender. If there is, send order list and recurse with reset list
@@ -55,8 +62,8 @@ defmodule Panel do
                 send(sender_addr, {:order_checker, orders})
 
                 #---TEST CODE - REMOVE BEFORE LAUNCH---#
-                IO.inspect("Received send request. Sent orders #{inspect orders}" ,label: "orderChecker")
-                Process.sleep(2000)
+                IO.inspect("Received send request. Sent orders #{inspect length(orders)}" ,label: "orderChecker")
+                Process.sleep(checkerSleep)
                 #--------------------------------------#
                 order_checker([], floor_table)
                 
@@ -71,13 +78,13 @@ defmodule Panel do
     end
 
     defp order_sender(checker_addr, floor_table, send_ID, outgoing_orders) when is_list(outgoing_orders) do
-        ackTimeout = 2000
-        checkerTimeout = 5000
+        ackTimeout = 5000
+        checkerTimeout = 8000
 
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
             # ... send orders to all masters on network, and send cab orders to local elevator
-            Network.send_data_to_all_nodes(:panel, :master, outgoing_orders, send_ID)
+            Network.send_data_to_all_nodes(:panel, :master, {outgoing_orders, send_ID})
             Network.send_data_inside_node(:panel, :master, Order.extract_cab_orders(outgoing_orders))
             #send({:elevator, node}, {:cab_orders, :panel, self(), extract_cab_orders(orders)})
 
@@ -87,6 +94,7 @@ defmodule Panel do
                     # When ack is recieved for current send_ID, send request to checker for latest order matrix
                     if sentID == send_ID do
                         send(checker_addr, {:gibOrdersPls, self()})
+                        IO.inspect("Received ack on #{sentID}", label: "orderSender")
                     end
                     receive do
                         # When latest order matrix is received, recurse with new orders and iterated send_ID
@@ -126,7 +134,7 @@ defmodule Panel do
     end
 
     def hardware_order_checker(floor, type) do
-        if Driver.get_order_button_state(floor, type) == :on do
+        if Driver.get_order_button_state(floor, type) == 1 do
             # TODO: Replace Time.utc_now() with wrapper func from Timer module
             order = struct(Order, [order_id: Time.utc_now(), order_type: type, order_floor: floor])
         else
@@ -141,6 +149,18 @@ defmodule Panel do
 
     def check_4_orders(table \\ Enum.to_list(0..@num_floors-1)) do
         orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
+    end
+
+    def dummy_master() do
+        Process.sleep(1000)
+        receive do
+            {sender_id, {message_id, {orders, sendID}}} ->
+                send(sender_id, {:ack, sendID})
+                Lights.set_order_lights(orders)
+                after
+                    0 -> :ok
+        end
+        dummy_master()
     end
 
 end

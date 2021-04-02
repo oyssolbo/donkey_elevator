@@ -4,18 +4,32 @@ Syntax
 """
 
 defmodule Panel do
+    @moduledoc """
+    Module for detecting button inputs on the elevator panel, and passing the information on to relevant modules.
+
+    Dependancies:
+    - Driver
+    - Network
+    - UDP
+    - Order
+    """
     require Driver
     require UDP
     require Network
     require Order
 
-    #@button_map %{:hall_up => 0, :hall_down => 1, :cab => 2}
-    #@state_map  %{:on => 1, :off => 0}
-    #@direction_map %{:up => 1, :down => 255, :stop => 0}
-
     @num_floors Application.fetch_env!(:elevator_project, :project_num_floors)
     # floor_table: Array of the floors; makes it easier to iterate through
 
+    @doc """
+    Initializes the panel module by spawning the 'order checker' and 'order sender' processes,
+    and registering them at the local node as :order_checker and :panel respectively.
+
+    Returns a tuple with their PIDs.
+
+    init(sender_ID, floor_table) will only initialize the checker process and is used by the sender
+    in the case that the checker stops responding.
+    """
     def init(floor_table \\ Enum.to_list(0..@num_floors-1)) do
 
         checker_ID = spawn(fn -> order_checker([], floor_table) end)

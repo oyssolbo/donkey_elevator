@@ -313,12 +313,20 @@ defmodule Panel do
     # WORKHORSE FUNCTIONS
 
     def hardware_order_checker(floor, type) do
-        if Driver.get_order_button_state(floor, type) == 1 do
-            # TODO: Replace Time.utc_now() with wrapper func from Timer module
-            order = struct(Order, [order_id: Time.utc_now(), order_type: type, order_floor: floor])
-        else
-            order = []
+        try do
+            if Driver.get_order_button_state(floor, type) == 1 do
+                # TODO: Replace Time.utc_now() with wrapper func from Timer module
+                order = struct(Order, [order_id: Time.utc_now(), order_type: type, order_floor: floor])
+            else
+                order = []
+            end            
+
+        catch
+            :exit, reason -> 
+                IO.inspect("EXIT: #{inspect reason}\n Check if panel is connected to elevator HW.", label: "HW Order Checker")
+                order = []
         end
+        
     end
 
     def check_order(orderType, table \\ Enum.to_list(0..@num_floors-1)) do

@@ -118,7 +118,7 @@ defmodule Network do
   do
     message_id = make_ref()
 
-    send({receiver_id, Node.self()}, {get_node_id(), sender_id, message_id, data})
+    send({receiver_id, Node.self()}, {sender_id, Node.self(), message_id, data})
   end
 
  @doc """
@@ -127,7 +127,7 @@ defmodule Network do
   def send_data_spesific_node(sender_id, receiver_id, receiver_node, data)
     do
       message_id = make_ref()
-      send({receiver_id, receiver_node}, {get_node_id(), sender_id, message_id, data})
+      send({receiver_id, receiver_node}, {sender_id ,Node.self(), message_id, data})
     end
 
    @doc """
@@ -136,7 +136,7 @@ defmodule Network do
   def receive_thread(sender_id, handler)
   do
     receive do
-      {sender_id, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
+      {sender_process_id, sender_node, message_id, data}} -> IO.puts("Got the following data from master #{data}")
       {:panel, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
 
     #after

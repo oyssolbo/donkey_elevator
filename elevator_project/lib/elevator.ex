@@ -627,12 +627,12 @@ defmodule Elevator do
   def receive_thread()
   do
     receive do
-      {:master, {message_id, data}} ->
+      {:master, _node, message_id, data} ->
         IO.puts("Got the following data from master #{data}")
         Network.send_data_to_all_nodes(:elevator, :master, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:received_order, data}) # will this work?
 
-      {:panel, {message_id, data}} ->
+      {:panel, _node, message_id, data} ->
         IO.puts("Got the following data from panel #{data}")
         Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:received_order, data}) # will this work?

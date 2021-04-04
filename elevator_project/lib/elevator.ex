@@ -155,7 +155,7 @@ defmodule Elevator do
     IO.inspect(prev_orders)
 
     # Checking if order already exists - if not, add to list and calculate next direction
-    updated_order_list = Order.add_orders(new_order_list, prev_orders)
+    updated_order_list = Order.merge_order_lists(new_order_list, prev_orders)
     new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
     Storage.write(updated_order_list)
 

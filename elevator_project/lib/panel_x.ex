@@ -50,23 +50,23 @@ defmodule Panel_X do
     end
 
     def init_checker(floor_table) do
-        must_die = Process.whereis(:order_checker)
-        if must_die != nil do
-            Process.exit(must_die, :kill)
-        end
+        #must_die = Process.whereis(:order_checker)
+        #if must_die != nil do
+        #    Process.exit(must_die, :kill)
+        #end
         checker_ID = spawn(fn -> order_checker([], floor_table) end)
-        Process.register(checker_ID, :order_checker)
+        #Process.register(checker_ID, :order_checker)
 
         checker_ID
     end
 
     def init_sender(floor_table) do
-        must_die = Process.whereis(:panel)
-        if must_die != nil do
-            Process.exit(must_die, :kill)
-        end
+        # must_die = Process.whereis(:panel)
+        # if must_die != nil do
+        #     Process.exit(must_die, :kill)
+        # end
         sender_ID = spawn(fn -> order_sender(floor_table, 0, []) end)
-        Process.register(sender_ID, :panel)
+        #Process.register(sender_ID, :panel)
 
         sender_ID        
     end
@@ -75,7 +75,7 @@ defmodule Panel_X do
     # MODULE PROCESSES
 
     def order_checker(old_orders, floor_table) when is_list(old_orders) do
-        Network.send_data_inside_node(:order_checker, :checker_sprvsr, :ping)
+        Network.send_data_inside_node(:order_checker, :panel, :ping)
 
         checkerSleep = 200
 
@@ -113,7 +113,7 @@ defmodule Panel_X do
     end
 
     def order_sender(floor_table, send_ID, outgoing_orders) when is_list(outgoing_orders) do
-        Network.send_data_inside_node(:panel, :sender_sprvsr, :ping)
+        Network.send_data_inside_node(:panel, :order_checker, :ping)
         ackTimeout = 800
         checkerTimeout = 1000
 
@@ -128,7 +128,7 @@ defmodule Panel_X do
             receive do
                 {:ack, sentID} ->
                     # When ack is recieved for current send_ID, send request to checker for latest order matrix
-                    if sentID == send_ID do
+                    if sentID >= send_ID do
                         #send(checker_addr, {:gibOrdersPls, self()})
                         Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
                         IO.inspect("Received ack on SendID #{sentID}", label: "orderSender")   # TEST CODE

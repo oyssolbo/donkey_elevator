@@ -79,11 +79,15 @@ defmodule MasterTest do
 
   def test_combine()
   do
+    # Test passed
+
     order_opts1 = [order_id: Timer.get_utc_time(), order_type: :down, order_floor: 2]
     order1 = struct(Order, order_opts1)
+    Process.sleep(10)
 
     order_opts2 = [order_id: Timer.get_utc_time(), order_type: :up, order_floor: 3]
     order2 = struct(Order, order_opts2)
+    Process.sleep(10)
 
     order_opts3 = [order_id: Timer.get_utc_time(), order_type: :up, order_floor: 3, delegated_elevator: Timer.get_utc_time()]
     order3 = struct(Order, order_opts3)
@@ -104,14 +108,17 @@ defmodule MasterTest do
 
     order_opts1 = [order_id: Timer.get_utc_time(), order_type: :down, order_floor: 2]
     order1 = struct(Order, order_opts1)
+    Process.sleep(10)
 
     order_opts2 = [order_id: Timer.get_utc_time(), order_type: :up, order_floor: 3]
     order2 = struct(Order, order_opts2)
+    Process.sleep(10)
 
     order_opts3 = [order_id: Timer.get_utc_time(), order_type: :up, order_floor: 3, delegated_elevator: Timer.get_utc_time()]
     order3 = struct(Order, order_opts3)
+    Process.sleep(10)
 
-    Master.get_undelegated_orders(struct(Master), [order1, order2, order3])
+    Master.get_undelegated_orders(struct(Master, [active_order_list: order1]), [order1, order2, order3])
   end
 
 
@@ -141,4 +148,21 @@ defmodule MasterTest do
 
     delegated_orders = Master.delegate_orders([order1, order2], [elevator_client1, elevator_client2])
   end
+
+  def test_remove_floor_orders()
+  do
+    order_opts1 = [order_id: Timer.get_utc_time(), order_type: :down, order_floor: 2]
+    order1 = struct(Order, order_opts1)
+    Process.sleep(10)
+
+    order_opts2 = [order_id: Timer.get_utc_time(), order_type: :up, order_floor: 3]
+    order2 = struct(Order, order_opts2)
+    Process.sleep(10)
+
+    order_opts3 = [order_id: Timer.get_utc_time(), order_type: :up, order_floor: 3, delegated_elevator: Timer.get_utc_time()]
+    order3 = struct(Order, order_opts3)
+
+    Order.remove_floor_orders()
+  end
+
 end

@@ -6,6 +6,10 @@ defmodule ElevatorProject.Application do
 
   use Application
 
+  @doc """
+  Function for spawning the entire elevator project. Spawns the major supervisor,
+  which spawns the supervisors for Elevator, Master, ...
+  """
   def start(_type, _args) do
     children = [
       {ElevatorProject.Supervisor, []}

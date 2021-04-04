@@ -119,9 +119,9 @@ defmodule Master do
   Will continue to try until it receives an ack or a timeout is triggered
   """
   defp send_order_to_elevator(
-        order,
-        elevator_id,
-        counter \\ 0)
+        _order,
+        _elevator_id,
+        _counter \\ 0)
   do
     # pid = Process.whereis(elevator_id)
     # Process.send(pid, order)
@@ -165,7 +165,8 @@ defmodule Master do
   @doc """
   Function to handle if data has been sent from the active-master to the passive master
 
-  The heartsbeats / messages are only considered valid if
+  The heartsbeats / messages are only considered valid if the message-id exceeds the internal /
+  previous message-id
   """
   def handle_event(
         :cast,
@@ -182,10 +183,14 @@ defmodule Master do
           active_order_list = Map.get(extern_master_data, :active_order_list)
           connected_elevator_list = Map.get(extern_master_data, :connected_elevator_list)
 
-          updated_timer_master_data = Timer.start_timer(self(), intern_master_data, :master_timer, :active_master_timeout, @timeout_active_master_time)
-          updated_order_master_data = Map.put(updated_timer_master_data, :active_order_list, active_order_list)
-          updated_connection_master_data = Map.put(updated_order_master_data, :connected_elevator_list, connected_elevator_list)
-          Map.put(updated_connection_master_data, :master_message_id, extern_message_id)
+          # updated_timer_master_data = Timer.start_timer(self(), intern_master_data, :master_timer, :active_master_timeout, @timeout_active_master_time)
+          # updated_order_master_data = Map.put(updated_timer_master_data, :active_order_list, active_order_list)
+          # updated_connection_master_data = Map.put(updated_order_master_data, :connected_elevator_list, connected_elevator_list)
+          # Map.put(updated_connection_master_data, :master_message_id, extern_message_id)
+          Timer.start_timer(self(), intern_master_data, :master_timer, :active_master_timeout, @timeout_active_master_time) |>
+            Map.put(:active_order_list, active_order_list) |>
+            Map.put(:connected_elevator_list, connected_elevator_list) |>
+            Map.put(:master_message_id, extern_message_id)
 
         intern_message_id >= extern_message_id ->
           intern_master_data
@@ -216,7 +221,7 @@ defmodule Master do
   """
   def handle_event(
         :info,
-        {:timeout_elevator, elevator_id},
+        {:timeout_elevator, _elevator_id},
         :backup_state,
         master_data)
   do
@@ -291,7 +296,7 @@ defmodule Master do
     # Check if valid, and delegate
     Order.check_valid_order(order_list)
 
-    temp_order_list = Order.set_delegated_elevator(order_list, :nil)
+    temp_order_list = Order.modify_order_field(order_list, :delegated_elevator, :nil)
     undelegated_orders = get_undelegated_orders(master_data, temp_order_list)
 
     connected_elevator_list = Map.get(master_data, :connected_elevator_list)
@@ -299,7 +304,7 @@ defmodule Master do
 
     updated_order_list =
       Map.get(master_data, :active_order_list) |>
-      Order.merge_order_lists(delegated_orders)
+      Order.add_orders(delegated_orders)
 
     new_master_data = Map.put(master_data, :active_order_list, updated_order_list)
 
@@ -307,7 +312,12 @@ defmodule Master do
   end
 
 
-  # Handle if two masters are active simultaneously
+  @doc """
+  Function that updates the backup-master about the current active orders
+
+  This update functions as a heartbeat, such that the backup can take over if something
+  occurs with the active master
+  """
   def handle_event(
         :info,
         {:update_active_master, extern_master_data},
@@ -345,14 +355,14 @@ defmodule Master do
   """
   def handle_event(
         :cast,
-        {:status_update, {elevator_id, message_id, dir, last_floor}},
+        {:status_update, {elevator_id, dir, last_floor}},
         :active_state,
         master_data)
   do
     # Add to list of connected elevators and reset timer
     old_elevator_client_list = Map.get(master_data, :connected_elevator_list)
     elevator_client =
-      case Client.find_client(elevator_id, old_elevator_client_list) do
+      case Client.extract_client(elevator_id, old_elevator_client_list) do
         [] ->
           struct(Client, [client_id: elevator_id, client_data: %{dir: dir, last_floor: last_floor}])
         old_client ->
@@ -363,7 +373,7 @@ defmodule Master do
     # Likely a bug here. We will not add the updated client to the client-list if it already exists...
     updated_elevator_list =
       Timer.start_timer(self(), elevator_client, :last_message_time, :elevator_timeout, @timeout_elevator_time) |>
-      Client.add_client(old_elevator_client_list)
+      Client.add_clients(old_elevator_client_list)
 
     # Delegate any undelegated orders
     order_list = Map.get(master_data, :active_order_list)
@@ -377,7 +387,7 @@ defmodule Master do
     delegated_orders = delegate_orders(undelegated_orders, updated_elevator_list)
 
     # Since we have connection to at least one elevator, we can assume that all orders are delegated
-    new_order_list = Order.merge_order_lists(delegated_orders, other_orders)
+    new_order_list = Order.add_orders(delegated_orders, other_orders)
     new_master_data = Map.put(master_data, :active_orders, new_order_list)
 
     {:next_state, :active_state, new_master_data}
@@ -390,13 +400,13 @@ defmodule Master do
   """
   def handle_event(
         :info,
-        {:elevator_served_order, {elevator_id, served_order_id}},
+        {:elevator_served_order, {_elevator_id, served_order_id}},
         :active_state,
         master_data)
   do
     # Get the order with the correct id
     order_list = Map.get(master_data, :active_order_list)
-    served_order = Order.get_order_with_value(order_list, :order_id, served_order_id)
+    served_order = Order.extract_order(served_order_id, order_list)
 
     # Remove the order from the order-list
     new_order_list = Order.remove_orders(served_order, order_list)
@@ -426,19 +436,19 @@ defmodule Master do
     # Find and remove the connection
     elevator_list = Map.get(master_data, :connected_elevator_list)
     updated_elevator_list =
-      Client.find_client(elevator_id, elevator_list) |>
+      Client.extract_client(elevator_id, elevator_list) |>
       Client.remove_clients(elevator_list)
 
     # Find a list of affected orders and unaffected orders
     order_list = Map.get(master_data, :active_order_list)
-    affected_orders = get_assigned_elevator_orders(order_list, elevator_id)
+    affected_orders = Order.extract_delegated_elevator_orders(elevator_id, order_list)
     unaffected_orders = Order.remove_orders(affected_orders, order_list)
 
     # Distribute these orders to the other elevators
     delegated_orders = delegate_orders(affected_orders, updated_elevator_list)
 
     # Combining the two sets of orders, and adding to master_data
-    new_order_list = Order.merge_order_lists(delegated_orders, unaffected_orders)
+    new_order_list = Order.add_orders(delegated_orders, unaffected_orders)
     new_master_data = Map.put(master_data, :active_order_list, new_order_list)
 
     {:next_state, :active_state, new_master_data}
@@ -483,11 +493,11 @@ defmodule Master do
     intern_undelegated_orders = unassign_all_orders(intern_orders)
     extern_undelegated_orders = unassign_all_orders(extern_orders)
 
-    new_order_list = Order.merge_order_lists(intern_undelegated_orders, extern_undelegated_orders)
+    new_order_list = Order.add_orders(intern_undelegated_orders, extern_undelegated_orders)
 
     # Cancel all timers, and remove info about the elevators from the list
-    intern_elevators_canceled_timers = Client.cancel_all_client_timers(intern_connected_elevators)
-    extern_elevators_canceled_timers = Client.cancel_all_client_timers(extern_connected_elevators)
+    Client.cancel_all_client_timers(intern_connected_elevators)
+    Client.cancel_all_client_timers(extern_connected_elevators)
 
     new_elevator_connection_list = []
 
@@ -508,7 +518,7 @@ defmodule Master do
   """
   def unassign_all_orders([order | rest_orders])
   do
-    updated_order = Order.set_delegated_elevator(order, :nil)
+    updated_order = Order.modify_order_field(order, :delegated_elevator, :nil)
     [updated_order | unassign_all_orders(rest_orders)]
   end
 
@@ -529,14 +539,14 @@ defmodule Master do
 
   Returns a list of orders with the correct assigned elevator
   """
-  def delegate_orders(
+  defp delegate_orders(
         orders,
         [])
   do
-    Order.set_delegated_elevator(orders, :nil)
+    Order.modify_order_field(orders, :delegated_elevator, :nil)
   end
 
-  def delegate_orders(
+  defp delegate_orders(
         [order | rest_orders],
         connected_elevators)
   do
@@ -546,15 +556,15 @@ defmodule Master do
       Map.get(:client_id)
 
     # Delegate the order to the optimal elevator
-    delegated_order = Order.set_delegated_elevator(order, optimal_elevator_id)
+    delegated_order = Order.modify_order_field(order, :delegated_elevator, optimal_elevator_id)
     spawn(fn-> send_order_to_elevator(delegated_order, optimal_elevator_id) end)
 
     [delegated_order | delegate_orders(rest_orders, connected_elevators)]
   end
 
-  def delegate_orders(
+  defp delegate_orders(
         [],
-        connected_elevators)
+        _connected_elevators)
   do
     []
   end
@@ -565,16 +575,16 @@ defmodule Master do
   :delegated_elevator set to :nil). It can take in a new list of orders, and
   adds these orders to the list of undelegated orders
   """
-  def get_undelegated_orders(
+  defp get_undelegated_orders(
         master_data,
         new_order_list \\ [])
   do
-    old_orders = Map.get(master_data, :active_order_list, [])
+    old_order_list = Map.get(master_data, :active_order_list, [])
 
-    old_nil_delegated_orders = Order.get_orders_with_value(old_orders, :delegated_elevator, :nil)
-    new_nil_delegated_orders = Order.get_orders_with_value(new_order_list, :delegated_elevator, :nil)
+    old_nil_delegated_orders = Order.extract_delegated_elevator_orders(:nil, old_order_list)
+    new_nil_delegated_orders = Order.extract_delegated_elevator_orders(:nil, new_order_list)
 
-    Order.merge_order_lists(old_nil_delegated_orders, new_nil_delegated_orders)
+    Order.add_orders(old_nil_delegated_orders, new_nil_delegated_orders)
   end
 
 
@@ -674,16 +684,4 @@ defmodule Master do
         :false
     end
   end
-
-
-  @doc """
-  Function to get the orders previously assigned to a spesific elevator
-  """
-  defp get_assigned_elevator_orders(
-        order_list,
-        elevator_id)
-  do
-    Order.get_delegated_elevator(order_list, elevator_id)
-  end
-
 end

@@ -105,10 +105,10 @@ defmodule Order do
   fulfilling the requirements, the function returns an empty list
   """
   def extract_orders(
-        order_list,
         floor,
-        dir)
-  when is_list(order_list)
+        dir,
+        order_list)
+  when is_list(order_list) and is_integer(floor) and dir in [:down, :up, :cab]
   do
     Enum.filter(order_list, fn x ->
       x.order_floor == floor and
@@ -120,10 +120,10 @@ defmodule Order do
   @doc """
   Function that extracts all orders that have the type dir
   """
-  def extract_type_orders(
+  def extract_orders(
         dir,
         order_list)
-  when order_list |> is_list()
+  when order_list |> is_list() and dir in [:up, :down]
   do
     if is_order_list(order_list) do
       Enum.filter(order_list, fn x -> x.order_dir == dir end)
@@ -138,7 +138,7 @@ defmodule Order do
   Function that extracts a list of orders that is delegated to an elevator 'elevator_id'
   from another list of orders. Returns an empty list if no orders found
   """
-  def extract_delegated_elevator_orders(
+  def extract_orders(
         elevator_id,
         order_list)
   when order_list |> is_list()

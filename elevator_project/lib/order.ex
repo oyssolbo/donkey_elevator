@@ -118,7 +118,9 @@ defmodule Order do
 
 
   @doc """
-  Function that extracts all orders that have the type dir
+  Function that extracts all orders that have the type 'type'
+
+  Example; extracts all orders with type ':cab' from a list of orders
   """
   def extract_orders(
         type,

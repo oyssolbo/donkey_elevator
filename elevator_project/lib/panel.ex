@@ -35,7 +35,7 @@ defmodule Panel do
     def init(floor_table \\ Enum.to_list(0..@num_floors-1)) do
 
         checker_ID = spawn(fn -> order_checker([], floor_table) end)
-        sender_ID = spawn(fn -> order_sender(checker_ID, floor_table, 0, []) end)
+        sender_ID = spawn(fn -> order_sender(floor_table, 0, []) end)
 
         # Register the processes in the local node
         Process.register(checker_ID, :order_checker)
@@ -52,7 +52,7 @@ defmodule Panel do
         {checker_ID, sender_ID}
     end
 
-    defp init_checker(floor_table) do
+    def init_checker(floor_table) do
         must_die = Process.whereis(:order_checker)
         if must_die != nil do
             Process.exit(must_die, :kill)
@@ -63,36 +63,57 @@ defmodule Panel do
         checker_ID
     end
 
-    defp init_sender(floor_table) do
-        checker_ID = Process.whereis(:order_checker)
-        if checker_ID == nil do
-            raise "Panel error: Order_sender-initializer could not find a checker_ID"
-        else
-            sender_ID = spawn(fn -> order_sender(checker_ID, floor_table, 0, []) end)
-            Process.register(sender_ID, :panel)
-
-            sender_ID
+    def init_sender(floor_table) do
+        must_die = Process.whereis(:panel)
+        if must_die != nil do
+            Process.exit(must_die, :kill)
         end
+        sender_ID = spawn(fn -> order_sender(floor_table, 0, []) end)
+        Process.register(sender_ID, :panel)
+
+        sender_ID        
+    end
+
+    defp checker_sprvsr_init(floor_table) do
+        fraudster = Process.whereis(:checker_sprvsr)
+        if fraudster != nil do
+            Process.exit(fraudster, :kill)
+        end
+
+        its_id = spawn(fn -> checker_sprvsr(floor_table) end)
+        Process.register(its_id, :checker_sprvsr)
+        its_id
+    end
+
+    defp sender_sprvsr_init(floor_table) do
+        fraudster = Process.whereis(:sender_sprvsr)
+        if fraudster != nil do
+            Process.exit(fraudster, :kill)
+        end
+
+        its_id = spawn(fn -> sender_sprvsr(floor_table) end)
+        Process.register(its_id, :sender_sprvsr)
+        its_id
     end
 
     # SUPERVISORS
-    defp checker_sprvsr(floor_table, missed_child_pings \\ 0, missed_buddy_pings \\ 0) do
-        timeout = 1000
+    def checker_sprvsr(floor_table, missed_child_pings \\ 1, missed_buddy_pings \\ 0) do
+        timeout = 1500
 
         # Send a ping to the other supervisor to let it know you exist
         Network.send_data_inside_node(:checker_sprvsr, :sender_sprvsr, :ping)
 
         # Check how many pings have been missed. If above 5, run init on the relevant process
         cond do
-            missed_child_pings > 5 ->
+            missed_child_pings > 4 ->
                 IO.inspect("Timed out on #{inspect missed_child_pings} pings from child. Initialized new checker.", label: "Checker Supervisor")
                 init_checker(floor_table)
                 checker_sprvsr(floor_table, 0, missed_buddy_pings)
-            missed_buddy_pings > 5 ->
+            missed_buddy_pings > 4 ->
                 IO.inspect("Timed out on #{inspect missed_buddy_pings} pings from buddy. Initialized new supervisor.", label: "Checker Supervisor")
                 sender_sprvsr_init(floor_table)  
                 checker_sprvsr(floor_table, missed_child_pings, 0)
-            missed_child_pings < 6 and missed_buddy_pings < 6 ->
+            missed_child_pings < 5 and missed_buddy_pings < 5 ->
                 :ok              
         end
 
@@ -138,7 +159,7 @@ defmodule Panel do
 
     defp sender_sprvsr(floor_table, missed_child_pings \\ 0, missed_buddy_pings \\ 0) do
 
-        timeout = 1000
+        timeout = 1500
         #IO.puts("Senderloop start; mcp = #{inspect missed_child_pings}, mbp = #{inspect missed_buddy_pings}")
 
         # Send a ping to the other supervisor to let it know you exist
@@ -146,15 +167,15 @@ defmodule Panel do
 
         # Check how many pings have been missed. If above 5, run init on the relevant process
         cond do
-            missed_child_pings > 5 ->
+            missed_child_pings > 4 ->
                 IO.inspect("Timed out on #{inspect missed_child_pings} pings from child. Initialized new sender.", label: "Sender Supervisor")
                 init_sender(floor_table)
                 sender_sprvsr(floor_table, 0, missed_buddy_pings)
-            missed_buddy_pings > 5 ->
+            missed_buddy_pings > 4 ->
                 IO.inspect("Timed out on #{inspect missed_buddy_pings} pings from buddy. Initialized new supervisor.", label: "Sender Supervisor")
                 checker_sprvsr_init(floor_table)  
                 sender_sprvsr(floor_table, missed_child_pings, 0)
-            missed_child_pings < 6 and missed_buddy_pings < 6 ->
+            missed_child_pings < 5 and missed_buddy_pings < 5 ->
                 :ok               
         end
 
@@ -181,7 +202,6 @@ defmodule Panel do
         end  
 
         # Recurse with updated missed pings
-
         receive do
             {:mcp, mcp} ->
                 receive do
@@ -199,34 +219,13 @@ defmodule Panel do
         sender_sprvsr(floor_table)
     end
 
-    defp checker_sprvsr_init(floor_table) do
-        fraudster = Process.whereis(:checker_sprvsr)
-        if fraudster != nil do
-            Process.exit(fraudster, :kill)
-        end
-
-        its_id = spawn(fn -> checker_sprvsr(floor_table) end)
-        Process.register(its_id, :checker_sprvsr)
-        its_id
-    end
-
-    defp sender_sprvsr_init(floor_table) do
-        fraudster = Process.whereis(:sender_sprvsr)
-        if fraudster != nil do
-            Process.exit(fraudster, :kill)
-        end
-
-        its_id = spawn(fn -> sender_sprvsr(floor_table) end)
-        Process.register(its_id, :sender_sprvsr)
-        its_id
-    end
-
+    
     # MODULE PROCESSES
 
     defp order_checker(old_orders, floor_table) when is_list(old_orders) do
         Network.send_data_inside_node(:order_checker, :checker_sprvsr, :ping)
 
-        checkerSleep = 300 # PART OF TEST CODE - REMOVE BEFORE LAUNCH
+        checkerSleep = 200
 
         # Update order list by reading all HW order buttons
         new_orders = check_4_orders(floor_table)
@@ -241,16 +240,17 @@ defmodule Panel do
 
         # Check for request from sender. If there is, send order list and recurse with reset list
         receive do
-            {:gibOrdersPls, sender_addr} ->
-                send(sender_addr, {:order_checker, orders})
+            {:panel, {_message_ID, :gibOrdersPls}} ->
+                #send(sender_addr, {:order_checker, orders})
+                Network.send_data_inside_node(:order_checker, :panel, orders)
 
                 #---TEST CODE - REMOVE BEFORE LAUNCH---#
                 #IO.inspect("Received send request. Sent #{inspect length(orders)} orders" ,label: "orderChecker")
-                Process.sleep(checkerSleep)
+                #Process.sleep(checkerSleep)
                 #--------------------------------------#
                 order_checker([], floor_table)
                 
-            {:special_delivery, special_orders} ->
+            {_sender, {_messageID, {:special_delivery, special_orders}}} ->
                 order_checker(orders++special_orders, floor_table)
             after
                 0 -> :ok
@@ -260,10 +260,10 @@ defmodule Panel do
         order_checker(orders, floor_table)
     end
 
-    defp order_sender(checker_addr, floor_table, send_ID, outgoing_orders) when is_list(outgoing_orders) do
+    defp order_sender(floor_table, send_ID, outgoing_orders) when is_list(outgoing_orders) do
         Network.send_data_inside_node(:panel, :sender_sprvsr, :ping)
-        ackTimeout = 500
-        checkerTimeout = 800
+        ackTimeout = 800
+        checkerTimeout = 1000
 
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
@@ -277,32 +277,34 @@ defmodule Panel do
                 {:ack, sentID} ->
                     # When ack is recieved for current send_ID, send request to checker for latest order matrix
                     if sentID == send_ID do
-                        send(checker_addr, {:gibOrdersPls, self()})
+                        #send(checker_addr, {:gibOrdersPls, self()})
+                        Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
                         IO.inspect("Received ack on SendID #{sentID}", label: "orderSender")   # TEST CODE
                     end
                     receive do
                         # When latest order matrix is received, recurse with new orders and iterated send_ID
-                        {:order_checker, updated_orders} ->
-                            order_sender(checker_addr, floor_table, send_ID+1, updated_orders)
+                        {:order_checker, {_messageID, updated_orders}} ->
+                            order_sender(floor_table, send_ID+1, updated_orders)
                             after
-                                checkerTimeout -> IO.inspect("OrderSender timed out waiting for orders from orderChecker[1]", label: "Error")# Send some kind of error, "no response from order_checker" # TEST CODE
-                                order_sender(checker_addr, floor_table, send_ID, outgoing_orders)
+                                checkerTimeout -> #IO.inspect("OrderSender timed out waiting for orders from orderChecker[1]", label: "Error")# Send some kind of error, "no response from order_checker" # TEST CODE
+                                order_sender(floor_table, send_ID, outgoing_orders)
                     end
                 # If no ack is received after 'ackTimeout' number of milliseconds: Recurse and repeat
                 after
                     ackTimeout -> IO.inspect("OrderSender timed out waiting for ack on Send_ID #{send_ID}", label: "Error")
-                    order_sender(checker_addr, floor_table, send_ID, outgoing_orders)
+                    order_sender(floor_table, send_ID, outgoing_orders)
             end
 
         else
             # If order matrix is empty, send request to checker for latest orders. Recurse with those (but same sender ID)
-            send(checker_addr, {:gibOrdersPls, self()})
+            #send(checker_addr, {:gibOrdersPls, self()})
+            Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
             receive do
-                {:order_checker, updated_orders} ->
-                    order_sender(checker_addr, floor_table, send_ID, updated_orders)
+                {:order_checker, {_messageID, updated_orders}} ->
+                    order_sender(floor_table, send_ID, updated_orders)
                     after
-                        checkerTimeout -> IO.inspect("OrderSender timed out waiting for orders from orderChecker [2]", label: "Error")# Send some kind of error, "no response from order_checker"
-                        order_sender(checker_addr, floor_table, send_ID, outgoing_orders)
+                        checkerTimeout -> #IO.inspect("OrderSender timed out waiting for orders from orderChecker [2]", label: "Error")# Send some kind of error, "no response from order_checker"
+                        order_sender(floor_table, send_ID, outgoing_orders)
             end
         end
 
@@ -337,6 +339,35 @@ defmodule Panel do
     end
 
     ### TEST CODE ###
+    def initialize(func, x, name) do
+        if Process.whereis(name) == nil do
+            dafunc = spawn(fn x -> func.(x) end)
+            Process.register(dafunc, name)
+        else
+            IO.inspect("Function already exists", label: "Function initializer")
+        end
+
+    end
+
+
+    def annihilate() do
+        checkerID = Process.whereis(:order_checker)
+        senderID = Process.whereis(:panel)
+        checkersprvsrID = Process.whereis(:checker_sprvsr)
+        sendersprvsrID = Process.whereis(:sender_sprvsr)
+        if checkerID != nil do
+            Process.exit(checkerID, :kill)
+        end
+        if senderID != nil do
+            Process.exit(senderID, :kill)
+        end
+        if checkersprvsrID != nil do
+            Process.exit(checkersprvsrID, :kill)
+        end
+        if sendersprvsrID != nil do
+            Process.exit(sendersprvsrID, :kill)
+        end
+    end
 
     def dummy_hardware_order_checker(floor, type) do
         num = :rand.uniform(10)

@@ -23,7 +23,7 @@ defmodule Elevator do
   require Driver
   require Network
   require Order
-  require Panel
+  #require Panel
   require Lights
   require Timer
   require Storage

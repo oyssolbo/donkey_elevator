@@ -1,4 +1,4 @@
-# defmodule Master do
+ #defmodule Master do
 #   @moduledoc """
 #   Module implementing the master-module
 
@@ -247,4 +247,41 @@
 #     :ok
 #   end
 
-# end
+  ##### Networking #####
+
+  ## send data to elevator or panel ##
+  #send_data_spesific_node(:master, :elevator, receiver_node, data)
+  #send_data_spesific_node(:master, :panel, receiver_node, data)
+
+  ## send data to other master ##
+  #send_data_to_all_nodes(:master, :master,data)
+
+  # def receive_thread()
+  #do
+  #  receive do
+  #    {:master, from_node, message_id, data} ->
+  #      IO.puts("Got the following data from other master #{data}")
+  #      #response ?
+  #      GenStateMachine.cast(@node_name, {"insert event here", data})
+
+  #    {:panel, from_node, message_id, data} ->
+  #      IO.puts("Got the following data from panel #{data}")
+  #      GenStateMachine.cast(@node_name, {:received_order, data})
+  #      #send_data_spesific_node(:master, :panel, from_node, {message_id, :ack})
+
+
+  #  after
+  #    10_000 -> IO.puts("Connection timeout, -> active master")
+
+  #  end
+  #  receive_thread()
+  #end
+
+  #def init_receive()
+  #do
+  #  pid = spawn(fn -> receive_thread() end)
+  #  Process.register(pid, :master)
+  #end
+
+
+#end

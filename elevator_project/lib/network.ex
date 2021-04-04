@@ -90,8 +90,9 @@ defmodule Network do
     UDP_discover.broadcast_listen() #listen for other nodes forever
     UDP_discover.broadcast_cast(node_name_s) #cast node names forever
 
-    id_table = :ets.new(:buckets_registry, [:set, :protected, :named_table])
-    :ets.insert(:buckets_registry, {Node.self(), make_ref()}) #Note, make_ref() can be swapped with ip if we know ip's will be unique
+    #Not needed at the moment
+    #id_table = :ets.new(:buckets_registry, [:set, :protected, :named_table])
+    #:ets.insert(:buckets_registry, {Node.self(), make_ref()}) #Note, make_ref() can be swapped with ip if we know ip's will be unique
   end
 
   @doc """
@@ -105,7 +106,7 @@ defmodule Network do
     receiver_node = Enum.at(network_list, iteration)
 
     if receiver_node != :nil do
-      send({receiver_id, receiver_node}, {get_node_id(), sender_id, message_id, data})
+      send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})
       send_data_to_all_nodes(sender_id, receiver_id, data, iteration + 1)
     end
     {:ok, network_list}
@@ -136,8 +137,8 @@ defmodule Network do
   def receive_thread(sender_id, handler)
   do
     receive do
-      {sender_process_id, sender_node, message_id, data}} -> IO.puts("Got the following data from master #{data}")
-      {:panel, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
+      {sender_process_id, sender_node, message_id, data} -> IO.puts("Got the following data from master #{data}")
+      {:panel, message_id, data} -> IO.puts("Got the following data from master #{data}")
 
     #after
     #  10_000 -> IO.puts("Connection timeout")
@@ -148,6 +149,7 @@ defmodule Network do
 
  @doc """
   Returns the node id that is created in init_node_network
+  kepts in case need arises
   """
   def get_node_id()
   do

@@ -162,7 +162,7 @@ defmodule MasterTest do
     order_opts3 = [order_id: Timer.get_utc_time(), order_type: :up, order_floor: 3, delegated_elevator: Timer.get_utc_time()]
     order3 = struct(Order, order_opts3)
 
-    Order.remove_floor_orders()
+    Order.remove_orders([order1], [order1, order2, order3])
   end
 
 end

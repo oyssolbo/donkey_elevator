@@ -7,7 +7,7 @@ defmodule Elevator.Supervisor do
   """
 
   use Supervisor
-
+  
 
   @doc """
   Starts a link from the supervisor to the module

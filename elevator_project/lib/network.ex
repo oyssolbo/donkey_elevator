@@ -112,6 +112,13 @@ defmodule Network do
     send({receiver_id, Node.self()}, {sender_id, {message_id, data}})
   end
 
+  def send_data_spesific_node(sender_id, receiver_id, receiver_node, data){
+    do
+      message_id = Timer.get_utc_time()
+      send({receiver_id, receiver_node, {sender_id, {message_id, data}})
+    end
+  }
+
 
    @doc """
   Prof of concept function to demonstrate receive_functionallity

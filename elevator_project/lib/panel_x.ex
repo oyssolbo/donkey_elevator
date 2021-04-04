@@ -34,48 +34,53 @@ defmodule Panel_X do
     """
     def init(floor_table \\ Enum.to_list(0..@num_floors-1)) do
 
-        checker_ID = spawn(fn -> order_checker([], floor_table) end)
-        sender_ID = spawn(fn -> order_sender(floor_table, 0, []) end)
-
-        # Register the processes in the local node
-        Process.register(checker_ID, :order_checker)
-        Process.register(sender_ID, :panel)
-
-        #---TEST CODE---#
-        dummy = spawn(fn -> dummy_master() end)
-        Process.register(dummy, :master)
-        #---------------#
+        checker_ID = init_checker(floor_table)
+        sender_ID = init_sender(floor_table)
+        init_dummy_master()
 
         {checker_ID, sender_ID}
     end
 
     def init_checker(floor_table) do
-        #must_die = Process.whereis(:order_checker)
-        #if must_die != nil do
-        #    Process.exit(must_die, :kill)
-        #end
+        must_die = Process.whereis(:order_checker)
+        if must_die != nil do
+           Process.exit(must_die, :kill)
+        end
+        Process.sleep(100)
         checker_ID = spawn(fn -> order_checker([], floor_table) end)
-        #Process.register(checker_ID, :order_checker)
+        Process.register(checker_ID, :order_checker)
 
         checker_ID
     end
 
     def init_sender(floor_table) do
-        # must_die = Process.whereis(:panel)
-        # if must_die != nil do
-        #     Process.exit(must_die, :kill)
-        # end
+        must_die = Process.whereis(:panel)
+        if must_die != nil do
+            Process.exit(must_die, :kill)
+        end
+        Process.sleep(100)
         sender_ID = spawn(fn -> order_sender(floor_table, 0, []) end)
-        #Process.register(sender_ID, :panel)
+        Process.register(sender_ID, :panel)
 
         sender_ID        
     end
 
+    def init_dummy_master() do
+        must_die = Process.whereis(:master)
+        if must_die != nil do
+            Process.exit(must_die, :kill)
+        end
+        Process.sleep(500)
+        dummy = spawn(fn -> dummy_master() end)
+        Process.register(dummy, :master)
+
+        dummy        
+    end
 
     # MODULE PROCESSES
 
     def order_checker(old_orders, floor_table) when is_list(old_orders) do
-        Network.send_data_inside_node(:order_checker, :panel, :ping)
+        #Network.send_data_inside_node(:order_checker, :panel, :ping)
 
         checkerSleep = 200
 
@@ -113,7 +118,7 @@ defmodule Panel_X do
     end
 
     def order_sender(floor_table, send_ID, outgoing_orders) when is_list(outgoing_orders) do
-        Network.send_data_inside_node(:panel, :order_checker, :ping)
+        #Network.send_data_inside_node(:panel, :order_checker, :ping)
         ackTimeout = 800
         checkerTimeout = 1000
 
@@ -126,7 +131,7 @@ defmodule Panel_X do
 
             # ... and wait for an ack
             receive do
-                {:ack, sentID} ->
+                {:master, {_message_ID, {:ack, sentID}}} ->
                     # When ack is recieved for current send_ID, send request to checker for latest order matrix
                     if sentID >= send_ID do
                         #send(checker_addr, {:gibOrdersPls, self()})
@@ -138,7 +143,7 @@ defmodule Panel_X do
                         {:order_checker, {_messageID, updated_orders}} ->
                             order_sender(floor_table, send_ID+1, updated_orders)
                             after
-                                checkerTimeout -> #IO.inspect("OrderSender timed out waiting for orders from orderChecker[1]", label: "Error")# Send some kind of error, "no response from order_checker" # TEST CODE
+                                checkerTimeout -> IO.inspect("OrderSender timed out waiting for orders from orderChecker[1]", label: "Error")# Send some kind of error, "no response from order_checker" # TEST CODE
                                 order_sender(floor_table, send_ID, outgoing_orders)
                     end
                 # If no ack is received after 'ackTimeout' number of milliseconds: Recurse and repeat
@@ -155,7 +160,7 @@ defmodule Panel_X do
                 {:order_checker, {_messageID, updated_orders}} ->
                     order_sender(floor_table, send_ID, updated_orders)
                     after
-                        checkerTimeout -> #IO.inspect("OrderSender timed out waiting for orders from orderChecker [2]", label: "Error")# Send some kind of error, "no response from order_checker"
+                        checkerTimeout -> IO.inspect("OrderSender timed out waiting for orders from orderChecker [2]", label: "Error")# Send some kind of error, "no response from order_checker"
                         order_sender(floor_table, send_ID, outgoing_orders)
             end
         end
@@ -175,7 +180,7 @@ defmodule Panel_X do
 
         catch
             :exit, reason -> 
-                IO.inspect("EXIT: #{inspect reason}\n Check if panel is connected to elevator HW.", label: "HW Order Checker")
+                #IO.inspect("EXIT: #{inspect reason}\n Check if panel is connected to elevator HW.", label: "HW Order Checker")
                 order = []
         end
         
@@ -206,8 +211,8 @@ defmodule Panel_X do
     def dummy_master() do
         Process.sleep(1000)
         receive do
-            {sender_id, {_message_id, {orders, sendID}}} ->
-                send(sender_id, {:ack, sendID})
+            {_sender_id, {_message_id, {orders, sendID}}} ->
+                Network.send_data_inside_node(:master, :panel, {:ack, sendID})
                 Lights.set_order_lights(orders)
                 after
                     0 -> :ok

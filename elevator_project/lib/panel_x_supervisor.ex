@@ -10,12 +10,16 @@ defmodule Panel_X.Supervisor do
     def init(init_args) do
         children = [
             %{
-                id: order_checker
-                start: {Panel, init_checker, [init_args]}
+                id: "order_checker",
+                start: {Panel_X, :init_checker, [init_args]}
             },
             %{
-                id: panel
-                start: {Panel, init_sender, [init_args]}
+                id: "panel",
+                start: {Panel_X, :init_sender, [init_args]}
+            },
+            %{
+                id: "dummy_master",
+                start: {Panel_X, :init_dummy_master, []}
             }
         ]
 

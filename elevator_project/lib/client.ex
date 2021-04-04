@@ -11,9 +11,9 @@ defmodule Client do
   require Logger
 
   defstruct [
-    client_id:          :nil,                 # IP-address to differentiate
+    client_id:          :nil, # IP-address to differentiate
     client_data:        :nil,
-    last_message_time:  Timer.get_utc_time(), # Last time a message was received. Useful for throwing a timeout
+    last_message_time:  :nil, # Last time a message was received. Useful for throwing a timeout
     last_message_id:    0
   ]
 
@@ -26,12 +26,19 @@ defmodule Client do
         client_list)
   when is_list(client_list)
   do
-    case extract_client(new_client.client_id, client_list) do
+    old_client = extract_client(new_client.client_id, client_list)
+
+    case client_list do
       []->
-        [client_list | new_client]
-      client->
-        temp_client_list = remove_clients(client, client_list)
-        add_clients(new_client, temp_client_list)
+        [new_client]
+      _->
+        case old_client do
+          []->
+            client_list ++ [new_client]
+          _->
+            temp_client_list = remove_clients(old_client, client_list)
+            temp_client_list ++ [new_client]
+        end
     end
   end
 
@@ -88,7 +95,10 @@ defmodule Client do
   when is_list(clients) and is_list(client_list)
   do
     if is_client_list(client_list) and is_client_list(clients) do
-      Enum.each(clients, fn client -> remove_clients(client, client_list) end)
+      Enum.map(clients, fn client -> remove_clients(client, client_list) end)
+    else
+      Logger.info("Not a client-list")
+      []
     end
   end
 
@@ -150,7 +160,7 @@ defmodule Client do
   when clients |> is_list()
   do
     if is_client_list(clients) do
-      Enum.each(clients, fn client -> Map.put(client, field, value) end)
+      Enum.map(clients, fn client -> Map.put(client, field, value) end)
     else
       Logger.info("Not a client-list")
       clients
@@ -165,7 +175,7 @@ defmodule Client do
   when is_list(clients)
   do
     if is_client_list(clients) do
-      Enum.each(clients, fn client -> Timer.stop_timer(client, :last_message_time) end)
+      Enum.map(clients, fn client -> Timer.stop_timer(client, :last_message_time) end)
     else
       Logger.info("Not a client-list")
       clients

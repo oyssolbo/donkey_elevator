@@ -238,7 +238,7 @@ defmodule Order do
   when orders |> is_list()
   do
     if is_order_list(orders) do
-      Enum.each(orders, fn order -> Map.put(order, field, value) end)
+      Enum.map(orders, fn order -> Map.put(order, field, value) end)
     else
       Logger.info("Not an order-list")
       orders

@@ -11,8 +11,9 @@ defmodule Client do
 
   defstruct [
     client_id:          :nil,                 # IP-address to differentiate
+    client_data:        :nil,
     last_message_time:  Timer.get_utc_time(), # Last time a message was received. Useful for throwing a timeout
-    client_data:        :nil
+    last_message_id:    0
   ]
 
 

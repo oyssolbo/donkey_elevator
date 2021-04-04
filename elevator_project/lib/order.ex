@@ -108,7 +108,7 @@ defmodule Order do
         floor,
         dir,
         order_list)
-  when is_list(order_list) and is_integer(floor) and dir in [:down, :up, :cab]
+  when is_list(order_list) and is_integer(floor) and dir in [:down, :up]
   do
     Enum.filter(order_list, fn x ->
       x.order_floor == floor and
@@ -121,12 +121,12 @@ defmodule Order do
   Function that extracts all orders that have the type dir
   """
   def extract_orders(
-        dir,
+        type,
         order_list)
-  when order_list |> is_list() and dir in [:up, :down]
+  when order_list |> is_list() and type in [:up, :down, :cab]
   do
     if is_order_list(order_list) do
-      Enum.filter(order_list, fn x -> x.order_dir == dir end)
+      Enum.filter(order_list, fn x -> x.order_dir == type end)
     else
       Logger.info("Not an order-list")
       []

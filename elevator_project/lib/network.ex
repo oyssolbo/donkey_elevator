@@ -91,7 +91,7 @@ defmodule Network do
     UDP_discover.broadcast_cast(node_name_s) #cast node names forever
 
     id_table = :ets.new(:buckets_registry, [:set, :protected, :named_table])
-    :ets.insert(:buckets_registry, {Node.self(), make_ref()})
+    :ets.insert(:buckets_registry, {Node.self(), make_ref()}) #Note, make_ref() can be swapped with ip if we know ip's will be unique
   end
 
   @doc """

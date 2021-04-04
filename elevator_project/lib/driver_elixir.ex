@@ -129,14 +129,5 @@ defmodule Driver do
     end
     {:reply, button_state, socket}
   end
-  ##### Testing #####
-
-  def order_test do
-    if Driver.get_order_button_state(0, :cab) == 1 do
-      IO.puts("received order")
-    end
-    order_test
-  end
-
 
 end

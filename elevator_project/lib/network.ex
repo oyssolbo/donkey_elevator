@@ -121,6 +121,9 @@ defmodule Network do
     send({receiver_id, Node.self()}, {get_node_id(), sender_id, message_id, data})
   end
 
+ @doc """
+  Send data to the spesific process "receiver_id" on the spesific node "receiver_node"
+  """
   def send_data_spesific_node(sender_id, receiver_id, receiver_node, data)
     do
       message_id = make_ref()
@@ -142,6 +145,10 @@ defmodule Network do
     end
   end
 
+
+ @doc """
+  Returns the node id that is created in init_node_network
+  """
   def get_node_id()
   do
     node_id_list = :ets.lookup(:buckets_registry, Node.self())

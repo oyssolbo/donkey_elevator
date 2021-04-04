@@ -145,20 +145,18 @@ defmodule Elevator do
         :cast,
         {:received_order, new_order_list},
         state,
-        %Elevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
+        %Elevator{orders: prev_orders} = elevator_data)
   do
     Logger.info("Elevator received order")
 
     # First check if the order is valid - throws an error if not
     Order.check_valid_order(new_order_list)
-    IO.inspect(new_order_list)
-    IO.inspect(prev_orders)
 
     # Checking if order already exists - if not, add to list and calculate next direction
-    updated_order_list = Order.merge_order_lists(new_order_list, prev_orders)
+    updated_order_list = Order.add_orders(new_order_list, prev_orders)
     new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
-    Storage.write(updated_order_list)
 
+    Storage.write(updated_order_list)
     Lights.set_order_lights(updated_order_list)
 
     {:next_state, state, new_elevator_data}
@@ -208,9 +206,9 @@ defmodule Elevator do
     stored_orders = Storage.read()
     prev_orders =
       case Order.check_valid_order(stored_orders) do
-        :ok->
+        :true->
           stored_orders
-        :error->
+        :false->
           []
       end
 
@@ -258,9 +256,6 @@ defmodule Elevator do
     last_dir = Map.get(elevator_data, :dir)
     orders = Map.get(elevator_data, :orders)
 
-    IO.inspect(orders)
-
-    # We only get :nil (when we should have orders)
     new_dir = calculate_optimal_direction(orders, last_dir, last_floor)
 
     {new_state, new_data} =
@@ -500,7 +495,7 @@ defmodule Elevator do
   timer Current active timer for elevator (moving)
   """
   defp reached_order_floor(
-        %Elevator{orders: orders, dir: dir} = elevator_data,
+        %Elevator{orders: order_list, dir: dir} = elevator_data,
         floor)
   do
     Driver.set_motor_direction(:stop)
@@ -511,7 +506,9 @@ defmodule Elevator do
     timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
 
     # Remove old orders and calculate new target_order
-    updated_orders = Order.remove_floor_orders(orders, dir, floor)
+    updated_orders =
+      Order.extract_orders(order_list, floor, dir) |>
+      Order.remove_orders(order_list)
     orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
 
     Storage.write(updated_orders)

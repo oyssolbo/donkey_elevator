@@ -441,7 +441,7 @@ defmodule Master do
 
     # Find a list of affected orders and unaffected orders
     order_list = Map.get(master_data, :active_order_list)
-    affected_orders = Order.extract_delegated_elevator_orders(elevator_id, order_list)
+    affected_orders = Order.extract_orders(elevator_id, order_list)
     unaffected_orders = Order.remove_orders(affected_orders, order_list)
 
     # Distribute these orders to the other elevators

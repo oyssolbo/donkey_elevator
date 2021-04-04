@@ -507,7 +507,7 @@ defmodule Elevator do
 
     # Remove old orders and calculate new target_order
     updated_orders =
-      Order.extract_orders(order_list, floor, dir) |>
+      Order.extract_orders(floor, dir, order_list) |>
       Order.remove_orders(order_list)
     orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
 
@@ -658,7 +658,7 @@ defmodule Elevator do
     #Need øysteins' magic code here
     #This should be sent very often, and therefore no acks are needed
     network_list = SystemNode.nodes_in_network()
-    {node, network_list} = List.pop_at(network_list, iteration)
+    {node, _new_network_list} = List.pop_at(network_list, iteration)
     if node != :nil do
       send({receiver_id, node}, {sender_id, {message_id, data}})
       send_data_to_all_nodes(sender_id, receiver_id, data, iteration + 1)
@@ -668,7 +668,7 @@ defmodule Elevator do
   def receive_thread()
   do
     receive do
-      {:master, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
+      {:master, {_message_id, data}} -> IO.puts("Got the following data from master #{data}")
 
     #after
     #  10_000 -> IO.puts("Connection timeout")

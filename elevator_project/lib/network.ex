@@ -128,7 +128,7 @@ defmodule Network do
   def send_data_spesific_node(sender_id, receiver_id, receiver_node, data)
     do
       message_id = make_ref()
-      send({receiver_id, receiver_node}, {sender_id ,Node.self(), message_id, data})
+      send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})
     end
 
    @doc """
@@ -137,11 +137,11 @@ defmodule Network do
   def receive_thread(sender_id, handler)
   do
     receive do
-      {sender_process_id, sender_node, message_id, data} -> IO.puts("Got the following data from master #{data}")
-      {:panel, message_id, data} -> IO.puts("Got the following data from master #{data}")
+      {sender_process_id, sender_node, message_id, data} -> IO.puts("Got the following data from #{sender_process_id} #{data}")
+      {:panel, message_id, data} -> IO.puts("Got the following data from #{sender_process_id} #{data}")
 
-    #after
-    #  10_000 -> IO.puts("Connection timeout")
+    after
+      10_000 -> IO.puts("Connection timeout")
 
     end
   end

@@ -2,7 +2,6 @@
 Syntax
     @Order{order_ID, order_type, order_floor}
 """
-
 defmodule Panel do
     require Driver
     require UDP
@@ -56,7 +55,7 @@ defmodule Panel do
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
             Network.send_data_to_all_nodes(:panel, :master, outgoing_orders)
-            Network.send_data_inside_node(:panel, :master, Order.extract_cab_orders(outgoing_orders))
+            Network.send_data_inside_node(:panel, :master, Order.extract_orders(:cab, outgoing_orders))
             #send({:elevator, node}, {:cab_orders, :panel, self(), extract_cab_orders(orders)})
 
             # ... and wait for an ack

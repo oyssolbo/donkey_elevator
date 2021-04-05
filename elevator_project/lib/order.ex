@@ -1,71 +1,68 @@
 defmodule Order do
   @moduledoc """
-  Module that implements 'Orders' and includes a function to zip multiple orders into a
-  list. This makes it easier to send
+  Module that implements the struct 'Order' with different functions for operating
+  on them
   """
 
-  require ListOperations
+  require Logger
 
   @min_floor Application.fetch_env!(:elevator_project, :project_min_floor)
   @max_floor Application.fetch_env!(:elevator_project, :project_num_floors) + @min_floor - 1
 
 
   defstruct [
-    order_id: :nil,
-    order_type: :nil,
-    order_floor: :nil,
+    order_id:           :nil,
+    order_type:         :nil,
+    order_floor:        :nil,
     delegated_elevator: :nil
   ]
 
-## Add/remove orders from list ##
+## Add order(s) ##
   @doc """
-  Function to remove all orders from the list with the current floor and direction
-
-  first_order First order in the order-list
-  rest_orders Rest of the orders in the order-list
-  dir Direction of elevator
-  floor Current floor the elevator is in
-
-  Returns
-  updated_orders List of orders where the old ones are deleted
+  Function to add order(s) to a list of orders
   """
-  def remove_floor_orders(
-          orders,
-          dir,
-          floor)
+  def add_orders(
+        %Order{} = order,
+        order_list)
+  when is_list(order_list)
   do
-    orders_at_floor = get_orders_with_value(orders, :order_floor, floor)
-
-    order_in_dir = get_orders_with_value(orders_at_floor, :order_type, dir)
-    order_in_cab = get_orders_with_value(orders_at_floor, :order_type, :cab)
-
-    #temp_orders = remove_order_list_from_list(order_in_dir, orders)
-    #remove_order_list_from_list(order_in_cab, temp_orders)
-
-    temp_orders = ListOperations.remove_list_from_list(order_in_dir, orders)
-    ListOperations.remove_list_from_list(order_in_cab, temp_orders)
-
-  #       [%Order{order_type: order_type, order_floor: order_floor} = first_order | rest_orders],
-  #       dir,
-  #       floor)
-  # do
-  #   if order_type not in [dir, :cab] or order_floor != floor do
-  #     [first_order | remove_floor_orders(rest_orders, dir, floor)]
-  #   else
-  #     List.delete(list, first_order) |>
-  #       remove_floor_orders(dir, floor)
-  #     # remove_floor_orders(rest_orders, dir, floor)
-  #   end
+    [order]++order_list |>
+      Enum.uniq()
   end
 
-  def remove_floor_orders(
-        [],
-        _dir,
-        _floor)
+  def add_orders(
+        new_orders,
+        order_list)
+  when is_list(order_list) and is_list(new_orders)
   do
-    []
+    new_orders++order_list |>
+      Enum.uniq()
   end
 
+
+## Remove order(s) ##
+  @doc """
+  Function that removes a single or a list of orders from another list of orders
+
+  The function searches through the entire list, such that if a duplicated
+  order has occured, all duplicates are removed
+  """
+  def remove_orders(
+        %Order{} = order,
+        order_list)
+  when is_list(order_list)
+  do
+    original_length = length(order_list)
+    new_list = List.delete(order_list, order)
+    new_length = length(new_list)
+
+    case new_length < original_length do
+      :true->
+        remove_orders(order, new_list)
+      :false->
+        new_list
+    end
+  end
 
   @doc """
   Function to remove a list of orders from another list of orders
@@ -75,283 +72,200 @@ defmodule Order do
   def remove_orders(
         orders,
         order_list)
-  when orders |> is_list()
+  when is_list(orders) and is_list(order_list)
   do
-    # new_list = List.delete(list, order)
-    # remove_order_list_from_list(rest_orders, new_list)
-
-    ListOperations.remove_list_from_list(orders, order_list)
-
-  end
-
-  def remove_orders(
-        order,
-        order_list)
-  when order |> is_struct()
-  do
-    ListOperations.remove_element_from_list(order, order_list)
+    if is_order_list(order_list) and is_order_list(orders) do
+      Enum.each(orders, fn order -> remove_orders(order, order_list) end)
+    else
+      Logger.info("Not an order-list")
+      []
+    end
   end
 
 
+## Extract orders(s) ##
   @doc """
-  Function to add a list of orders to another list of orders
+  Function that extract a single order with id 'order_id' from a list of orders. Returns
+  an empty list if not found, or if the list did not contain only orders
   """
-  def add_order(
-        orders,
+  def extract_order(
+        order_id,
         order_list)
-  when orders |> is_list()
+  when order_list |> is_list()
   do
-    ListOperations.add_list_to_list(orders, order_list)
-  end
-
-  def add_order(
-        order,
-        order_list)
-  when order |> is_struct()
-  do
-    ListOperations.add_single_element_to_list(order, order_list)
+    if is_order_list(order_list) do
+      Enum.filter(order_list, fn x -> x.order_id == order_id end)
+    else
+      Logger.info("Not an order-list")
+      []
+    end
   end
 
 
   @doc """
-  Function to add a single order to a list 'list'
+  Function to get all orders at floor 'floor' in a list of orders
+  that satisfies the required [:dir, :cab]. If there are no orders
+  fulfilling the requirements, the function returns an empty list
   """
-  # def add_orders_to_list(
-  #       new_order,
-  #       list)
-  # do
-  #   cond do
-  #     list == []->
-  #       [new_order]
-  #     new_order in list->
-  #       list
-  #     new_order not in list->
-  #       [list | new_order]
-  #   end
-  # end
+  def extract_orders(
+        floor,
+        dir,
+        order_list)
+  when is_list(order_list) and is_integer(floor) and dir in [:down, :up]
+  do
+    Enum.filter(order_list, fn x ->
+      x.order_floor == floor and
+      x.order_type in [dir, :cab]
+    end)
+  end
 
 
-## Valid orders ##
   @doc """
-  Function to check if an order is valid
+  Function that extracts all orders that have the type 'type'
+
+  Example; extracts all orders with type ':cab' from a list of orders
+  """
+  def extract_orders(
+        type,
+        order_list)
+  when order_list |> is_list() and type in [:up, :down, :cab]
+  do
+    if is_order_list(order_list) do
+      Enum.filter(order_list, fn x -> x.order_type == type end)
+    else
+      Logger.info("Not an order-list")
+      []
+    end
+  end
+
+
+  @doc """
+  Function that extracts a list of orders that is delegated to an elevator 'elevator_id'
+  from another list of orders. Returns an empty list if no orders found
+  """
+  def extract_orders(
+        elevator_id,
+        order_list)
+  when order_list |> is_list()
+  do
+    if is_order_list(order_list) do
+      Enum.filter(order_list, fn x -> x.delegated_elevator == elevator_id end)
+    else
+      Logger.info("Not an order-list")
+      []
+    end
+  end
+
+## Check order(s) ##
+  @doc """
+  Function to check if an order is valid. Invalid orders should not occur!
+
+  If this function causes a crash, it is likely that an order is set to
+  default (:nil)
 
   For the order to be valid, we require that:
     - order_floor is between min and max
     - order_type is either :cab, :up, :down
   """
-  def check_valid_order([order | rest_orders])
+  def check_valid_order(%Order{order_floor: floor, order_type: type} = _order)
   do
-    case check_valid_order(order) do
-      :ok->
-        check_valid_order(rest_orders)
-      :error->
-        IO.puts("Invalid order found!")
-        :error
-    end
-  end
-
-  def check_valid_order([])
-  do
-    :ok
-  end
-
-
-  def check_valid_order(order)
-  when order |> is_struct()
-  do
-    floor = Map.get(order, :order_floor)
-    type = Map.get(order, :order_type)
     cond do
       floor < @min_floor->
-        IO.puts("Invalid floor")
-        :error
+        Logger.info("Invalid floor. Less than min-floor")
+        :false
       floor > @max_floor->
-        IO.puts("Invalid floor")
-        :error
+        Logger.info("Invalid floor. Greater than max-floor")
+        :false
       type not in [:cab, :up, :down]->
-        IO.puts("Invalid type")
-        :error
+        Logger.info("Invalid type")
+        :false
       :true->
-        :ok
+        :true
     end
   end
 
 
-## Orders at floor ##
-  @doc """
-  Function to get all orders at floor 'floor' in a list of orders
-  that satisfies the required [:dir, :cab]
-
-  [order | rest_orders] List of orders to check
-  floor                 Floor to check on
-  dir                   Direction (:up, :down) to check for
-
-  Returns               If
-  list_of_orders        There are orders satisfying the requirements
-  []                    No orders satisfies the requirements
-  """
-  def get_orders_at_floor(
-        [order | rest_orders],
-        floor,
-        dir)
+  def check_valid_order(orders)
+  when is_list(orders)
   do
-    order_floor = Map.get(order, :order_floor)
-    order_dir = Map.get(order, :order_type)
-
-    if order_dir in [dir, :cab] and order_floor == floor do
-      [order | get_orders_at_floor(rest_orders, floor, dir)]
-    else
-      get_orders_at_floor(rest_orders, floor, dir)
-    end
-  end
-
-  def get_orders_at_floor(
-        [],
-        _floor,
-        _dir)
-  do
-    []
+    Enum.all?(orders, fn order -> check_valid_order(order) end)
   end
 
 
   @doc """
   Function to check if there are orders on floor 'floor' with the
   direction 'dir' or ':cab'
-
-  orders  List of orders to check
-  floor   Floor to check on
-  dir     Direction (:up, :down) to check for
-
-  Returns                   If
-  {:true, list_of_orders}   There are orders satisfying the requirements
-  {:false, []}              No orders satisfies the requirements
   """
   def check_orders_at_floor(
-    orders,
-    floor,
-    dir)
+        orders,
+        floor,
+        dir)
   do
-    satisfying_orders = get_orders_at_floor(orders, floor, dir)
-
-    if satisfying_orders == [] do
-      {:false, []}
-    else
-      {:true, satisfying_orders}
+    case extract_orders(orders, floor, dir) do
+      [] ->
+        {:false, []}
+      orders ->
+        {:true, orders}
     end
   end
 
-
-## Get spesific orders ##
   @doc """
-  Find the orders in a list which have desired value 'value' in field
-  'field'
-
-  Ex.
-    Find all of the orders assigned to elevator 1
-
-  Returns a list of orders with the desired value in the field
+  Function to check whether list contains only orders or not
   """
-  def get_orders_with_value(
-        orders,
-        #[order | rest_orders],
-        field,
-        value)
+  defp is_order_list(list)
+  when is_list(list)
   do
-    ListOperations.find_element_with_value(orders, field, value)
-
-    # order_value = Map.get(order, field, value)
-    # if order_value == value do
-    #   [order | get_orders_with_value(rest_orders, field, value)]
-    # else
-    #   get_orders_with_value(rest_orders, field, value)
-    # end
-  end
-
-  def get_orders_with_value(
-        [],
-        field,
-        value)
-  do
-    []
-  end
-
-
-## Set spesific orders ##
-
-  @doc """
-  Assigns all of the orders to the elevator 'elevator_id'
-  """
-  def set_delegated_elevator(
-        orders,
-        elevator_id)
-  do
-    #set_order_field(orders, :delegated_elevator, elevator_id)
-    ListOperations.set_element_field(orders, :delegated_elevator, elevator_id)
-  end
-
-
-  @doc """
-  Functions that gets all orders which are assigned to an elevator with the id
-  'elevator_id'
-  """
-  def get_delegated_elevator(
-        orders,
-        elevator_id)
-  do
-    ListOperations.find_element_with_value(orders, :delegated_elevator, elevator_id)
-  end
-
-
-  @doc """
-  Sets the field 'field' in an order to an assigned 'value'
-
-  Recurses over the entire list, such that all orders in the list get the
-  desired 'value'
-
-  Returns the new list
-  """
-    def gib_rnd_order() do
-        rnd_id = Time.utc_now()
-        rnd_type = Enum.random([:hall_up, :hall_down, :cab])
-        rnd_floor = Enum.random(0..@max_floor)
-        rnd_order = struct(Order, [order_id: rnd_id, order_type: rnd_type, order_floor: rnd_floor])
-    end
-
-    @doc """
-    Function that returns a list of the cab orders in a list of orders. Returns empty list if none are present
-    """
-    def extract_cab_orders(order_list) when is_list(order_list) do
-        if is_order_list(order_list) do
-            cab_orders = Enum.filter(order_list, fn x -> x.order_type == :cab end)
-        end
-    end
-
-    @doc """
-    Function to check whether list contains only orders or not
-    """
-    def is_order_list(list) when is_list(list) do
-        Enum.all?(list, fn
-            %Order{} -> true
-            _ -> false
+    Enum.all?(list, fn
+      %Order{} -> :true
+      _ -> :false
     end)
   end
-  # defp set_order_field(
-  #       [order | rest_orders],
-  #       field,
-  #       value)
-  # do
-  #   [
-  #     Map.put(order, field, value) |
-  #     set_order_field(rest_orders, field, value)
-  #   ]
-  # end
 
-  # defp set_order_field(
-  #       [],
-  #       field,
-  #       value)
-  # do
-  #   []
-  # end
+## Modify order ##
+  @doc """
+  Function that modifies a field in a single order, or a list of orders. The
+  field 'field' is set to value 'value'
+  """
+  def modify_order_field(
+        %Order{} = order,
+        field,
+        value)
+  do
+    Map.put(order, field, value)
+  end
+
+  def modify_order_field(
+        orders,
+        field,
+        value)
+  when orders |> is_list()
+  do
+    if is_order_list(orders) do
+      Enum.map(orders, fn order -> Map.put(order, field, value) end)
+    else
+      Logger.info("Not an order-list")
+      orders
+    end
+  end
+
+## Create random order ##
+  @doc """
+  Creates random order
+  """
+  def create_rnd_order()
+  do
+    rnd_id = Time.utc_now()
+    rnd_type = Enum.random([:hall_up, :hall_down, :cab])
+    rnd_floor = Enum.random(0..@max_floor)
+    rnd_order = struct(Order, [order_id: rnd_id, order_type: rnd_type, order_floor: rnd_floor])
+  end
+
+  def create_rnd_order(
+        floor,
+        type)
+  do
+    rnd_id = Time.utc_now()
+    rnd_order = struct(Order, [order_id: rnd_id, order_type: type, order_floor: floor])
+  end
 
 end

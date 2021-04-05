@@ -619,42 +619,41 @@ defmodule Elevator do
   defp restart_process()
   do
     # Should pherhaps consider sending a message to master or something ?
+    # Network.send_data_to_all_nodes(:elevator, :master, :restarting})
     Driver.set_motor_direction(:stop)
     Process.exit(self(), :shutdown)
   end
-  ###### Network interfacing #####
-  #Sketch of network interfacing
-  #Should probalby be moved to a different module and needs further development
 
+  ##### Networking #####
 
-  @doc """
-  Hard coded funciton (for now) to update the masters
-  on the elevators states
-  """
+  #sending data, should be copy pased into suitable loccation
+  #send_data_to_all_nodes(:elevator, :master, elevator_data)
 
-  def send_data_to_all_nodes(sender_id, receiver_id,data, iteration \\ 0)
-  do
-    message_id = 0;
-    #calculation of message_id
-    #Need øysteins' magic code here
-    #This should be sent very often, and therefore no acks are needed
-    network_list = SystemNode.nodes_in_network()
-    {node, _new_network_list} = List.pop_at(network_list, iteration)
-    if node != :nil do
-      send({receiver_id, node}, {sender_id, {message_id, data}})
-      send_data_to_all_nodes(sender_id, receiver_id, data, iteration + 1)
-    end
-  end
 
   def receive_thread()
   do
     receive do
-      {:master, {_message_id, data}} -> IO.puts("Got the following data from master #{data}")
+      {:master, _node, message_id, data} ->
+        IO.puts("Got the following data from master #{data}")
+        Network.send_data_to_all_nodes(:elevator, :master, {message_id, :ack})
+        GenStateMachine.cast(@node_name, {:received_order, data}) # will this work?
+
+      {:panel, _node, message_id, data} ->
+        IO.puts("Got the following data from panel #{data}")
+        Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
+        GenStateMachine.cast(@node_name, {:received_order, data}) # will this work?
 
     #after
     #  10_000 -> IO.puts("Connection timeout")
 
     end
+
+    receive_thread()
   end
 
+  def init_receive()
+  do
+    pid = spawn(fn -> receive_thread() end)
+    Process.register(pid, :elevator)
+  end
 end

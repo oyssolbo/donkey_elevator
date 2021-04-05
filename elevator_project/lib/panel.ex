@@ -11,8 +11,8 @@ defmodule Panel do
     #@button_map %{:hall_up => 0, :hall_down => 1, :cab => 2}
     #@state_map  %{:on => 1, :off => 0}
     #@direction_map %{:up => 1, :down => 255, :stop => 0}
-    
-    @num_floors Application.fetch_env!(:elevator_project, :num_floors)
+
+    @num_floors Application.fetch_env!(:elevator_project, :project_num_floors)
     # floor_table: Array of the floors; makes it easier to iterate through
 
     # TODO: Replace mid1, mid2, eid with send_local_node func. For master send; send_data_to_all_nodes.
@@ -54,8 +54,8 @@ defmodule Panel do
 
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
-            send_data_to_all_nodes(:panel, :master, outgoing_orders)
-            send_data_inside_node(:panel, :master, extract_cab_orders(outgoing_orders))
+            Network.send_data_to_all_nodes(:panel, :master, outgoing_orders)
+            Network.send_data_inside_node(:panel, :master, Order.extract_orders(:cab, outgoing_orders))
             #send({:elevator, node}, {:cab_orders, :panel, self(), extract_cab_orders(orders)})
 
             # ... and wait for an ack

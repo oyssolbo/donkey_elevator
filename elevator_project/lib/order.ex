@@ -76,6 +76,9 @@ defmodule Order do
   do
     if is_order_list(order_list) and is_order_list(orders) do
       Enum.each(orders, fn order -> remove_orders(order, order_list) end)
+    else
+      Logger.info("Not an order-list")
+      []
     end
   end
 
@@ -128,7 +131,7 @@ defmodule Order do
   when order_list |> is_list() and type in [:up, :down, :cab]
   do
     if is_order_list(order_list) do
-      Enum.filter(order_list, fn x -> x.order_dir == type end)
+      Enum.filter(order_list, fn x -> x.order_type == type end)
     else
       Logger.info("Not an order-list")
       []

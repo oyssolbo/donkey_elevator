@@ -170,6 +170,8 @@ defmodule Client do
 
   @doc """
   Function to cancel the timers in a list of clients
+
+  The function assumes that the parameter 'clients' is a list
   """
   def cancel_all_client_timers(clients)
   when is_list(clients)

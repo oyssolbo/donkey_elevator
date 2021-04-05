@@ -137,8 +137,8 @@ defmodule Network do
   def receive_thread(sender_id, handler)
   do
     receive do
-      {sender_process_id, sender_node, message_id, data} -> IO.puts("Got the following data from #{sender_process_id} #{data}")
-      {:panel, message_id, data} -> IO.puts("Got the following data from #{sender_process_id} #{data}")
+      {:master, sender_node, message_id, data} -> IO.puts("Got the following data from master #{data}")
+      {:panel, message_id, data} -> IO.puts("Got the following data from panel #{data}")
 
     after
       10_000 -> IO.puts("Connection timeout")

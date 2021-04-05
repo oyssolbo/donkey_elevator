@@ -4,7 +4,6 @@ Syntax
 """
 defmodule Panel do
     require Driver
-    require UDP
     require Network
     require Order
 

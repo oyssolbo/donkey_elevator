@@ -23,7 +23,8 @@ defmodule ElevatorProject.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:gen_state_machine, git: "https://github.com/ericentin/gen_state_machine", override: :true}
+      {:gen_state_machine, git: "https://github.com/ericentin/gen_state_machine", override: :true},
+      {:poison, "~> 3.1"}
     ]
   end
 end

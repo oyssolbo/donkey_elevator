@@ -1,11 +1,6 @@
 defmodule Network do
   @moduledoc """
-  Module giving basic functions for using networking
-
-  Entire module inspired by Jostein Løwer
-
-  Credit to: Jostein Løwer, NTNU (2019)
-  Link: https://github.com/jostlowe/kokeplata/blob/master/lib/networkstuff.ex
+  Module for casting and receiving nodenames via UDP broadcast
 
   Dependencies:
   -UDP
@@ -63,7 +58,6 @@ defmodule Network do
   end
 
 
-
   @doc """
   Detects all nodes on the network
 
@@ -87,13 +81,49 @@ defmodule Network do
   """
   def node_network_init()
   do
-    node_name = Kernel.inspect(:rand.uniform(10000))
-    node_name_ip_s = node_name <> "@" <> get_ip()
-    node_name_ip_a = String.to_atom(node_name_ip_s)
-    SystemNode.start_node(node_name_ip_a)
-
+    node_name_s = Kernel.inspect(:rand.uniform(10000)) <> "@" <> UDP_discover.get_ip()
+    node_name_a = String.to_atom(node_name_s)
+    SystemNode.start_node(node_name_a)
     UDP_discover.broadcast_listen() #listen for other nodes forever
-    UDP_discover.broadcast_cast(node_name_ip_s) #cast nodename to all other nodes listening
+    UDP_discover.broadcast_cast(node_name_s) #cast node names forever
+  end
 
+  @doc """
+  Send data to all known nodes on the network to the process receiver_id
+  """
+  def send_data_to_all_nodes(sender_id, receiver_id,data, iteration \\ 0)
+  do
+    message_id = Timer.get_utc_time()
+    network_list = SystemNode.nodes_in_network()
+    {node, network_list} = List.pop_at(network_list, iteration)
+    if node != :nil do
+      send({receiver_id, node}, {sender_id, {message_id, data}})
+      send_data_to_all_nodes(sender_id, receiver_id, data, iteration + 1)
+    end
+  end
+
+  @doc """
+  Send data locally (on the same node) to the process receiver_id
+  """
+  def send_data_inside_node(sender_id, receiver_id, data)
+  do
+    message_id = Timer.get_utc_time()
+    send({receiver_id, Node.self()}, {sender_id, {message_id, data}})
+  end
+
+
+   @doc """
+  Prof of concept function to demonstrate receive_functionallity
+  """
+  def receive_thread(sender_id, handler)
+  do
+    receive do
+      {:master, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
+      {:panel, {message_id, data}} -> IO.puts("Got the following data from master #{data}")
+
+    #after
+    #  10_000 -> IO.puts("Connection timeout")
+
+    end
   end
 end

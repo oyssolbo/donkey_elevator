@@ -12,7 +12,7 @@ defmodule UDP_discover do
   @broadcast_port 9876
   @init_port 6789
   @num_tries 5
-  @default_timeout 5000
+  @default_timeout 15000
 
   @doc """
   @brief        Function that hopefully returns the IP-address of the system
@@ -72,14 +72,28 @@ defmodule UDP_discover do
 
   @doc """
   @brief        Function that will broadcast the node_name on the broadcast port
+                It will spawn it's own process for looping in infinity
   """
-  def broadcast_cast(node_name, port \\ @broadcast_port) do
+  def broadcast_cast(node_name, port \\ @broadcast_port)
+  do
     case broadcast_open_connection() do
       {:ok, socket} ->
-        :gen_udp.send(socket, @broadcast_address, @broadcast_port, node_name)
+        #:gen_udp.send(socket, @broadcast_address, @broadcast_port, node_name)
+        spawn (fn -> broadcast_cast_loop(node_name,socket) end)
       {:error, reason} ->
         Logger.error("The error #{reason} occured while trying to broadcast #{node_name}")
     end
+  end
+
+  @doc """
+  @brief        Function that will broadcast the node_name on the broadcast port
+                will loop in infinity
+  """
+  def broadcast_cast_loop(node_name, socket, port \\ @broadcast_port)
+  do
+      :gen_udp.send(socket, @broadcast_address, @broadcast_port, node_name)
+      Process.sleep(@default_timeout)
+      broadcast_cast_loop(node_name,socket)
   end
 
 
@@ -104,7 +118,7 @@ defmodule UDP_discover do
         {:ok, recv_packet} ->
           data = Kernel.elem(recv_packet, 2)
           Logger.info("Connecting to the node #{data}")
-          Node.ping(String.to_atom(to_string(data))) |> IO.puts()
+          Node.ping(String.to_atom(to_string(data)))
 
         {:error, reason} ->
           Logger.error("Failed to receive due to #{reason}")

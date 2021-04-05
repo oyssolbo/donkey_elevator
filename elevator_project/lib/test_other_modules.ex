@@ -59,6 +59,19 @@ defmodule ClientTest do
     Client.modify_client_field(client_list, :client_id, 69) |> IO.inspect()
   end
 
+  def test_extract_client()
+  do
+    # Test passed
+
+    client1 = struct(Client, [client_data: 1, client_id: 1])
+    client2 = struct(Client, [client_data: 2, client_id: 2])
+    client3 = struct(Client, [client_data: 3, client_id: 3])
+
+    client_list = [client1, client2, client3]
+
+    Client.extract_client(1, client_list) |> IO.inspect()
+  end
+
 end
 
 
@@ -67,5 +80,38 @@ defmodule OrderTest do
   require Timer
   require Order
   require Logger
+
+  def test_add_order()
+  do
+    # Test passed
+
+    order1 = Order.create_rnd_order()
+    order2 = Order.create_rnd_order()
+    order3 = Order.create_rnd_order()
+
+    Logger.info("First test")
+    Order.add_orders([order1, order2, order3], []) |> IO.inspect()
+
+    Logger.info("Second test")
+    Order.add_orders([order1, order2, order2], [order3, order1]) |> IO.inspect()
+  end
+
+  def test_extract_order()
+  do
+    # Test passed
+
+    order1 = Order.create_rnd_order(0, :up)
+    order2 = Order.create_rnd_order(1, :down)
+    order3 = Order.create_rnd_order(1, :cab)
+
+    Logger.info("First test")
+    Order.extract_order(order1.order_id, [order1, order2, order3]) |> IO.inspect()
+
+    Logger.info("Second test")
+    Order.extract_orders(3, :down, [order1, order2, order3]) |> IO.inspect()
+
+    Logger.info("Third test")
+    Order.extract_orders(:cab, [order1, order2, order3]) |> IO.inspect()
+  end
 
 end

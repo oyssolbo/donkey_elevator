@@ -3,7 +3,7 @@ Syntax
     @Order{order_ID, order_type, order_floor}
 """
 
-defmodule Panel_X do
+defmodule Panel_X2 do
     @moduledoc """
     Module for detecting button inputs on the elevator panel, and passing the information on to relevant modules.
 
@@ -36,6 +36,11 @@ defmodule Panel_X do
 
         checker_ID = init_checker(floor_table)
         sender_ID = init_sender(floor_table)
+
+        Process.sleep(500)
+        sender_sprvsr_init(floor_table)
+        checker_sprvsr_init(floor_table)
+
         init_dummy_master()
 
         {checker_ID, sender_ID}
@@ -50,21 +55,7 @@ defmodule Panel_X do
         checker_ID = spawn(fn -> order_checker([], floor_table) end)
         Process.register(checker_ID, :order_checker)
 
-        init_sender_guardian(floor_table)
-
         checker_ID
-    end
-
-    defp init_checker_guardian(floor_table) do
-        must_die = Process.whereis(:checker_guardian)
-        if must_die != nil do
-            Process.exit(must_die, :kill)
-        end
-        Process.sleep(150)
-        chk_guard_ID = spawn(fn -> checker_guardian(floor_table) end)
-        Process.register(chk_guard_ID, :checker_guardian)
-
-        chk_guard_ID  
     end
 
     def init_sender(floor_table) do
@@ -76,21 +67,7 @@ defmodule Panel_X do
         sender_ID = spawn(fn -> order_sender(floor_table, 0, []) end)
         Process.register(sender_ID, :panel)
 
-        init_checker_guardian(floor_table)
-
         sender_ID        
-    end
-
-    defp init_sender_guardian(floor_table) do
-        must_die = Process.whereis(:sender_guardian)
-        if must_die != nil do
-            Process.exit(must_die, :kill)
-        end
-        Process.sleep(150)
-        snd_guard_ID = spawn(fn -> sender_guardian(floor_table) end)
-        Process.register(snd_guard_ID, :sender_guardian)
-
-        snd_guard_ID 
     end
 
     def init_dummy_master() do
@@ -108,7 +85,6 @@ defmodule Panel_X do
     # MODULE PROCESSES
 
     def order_checker(old_orders, floor_table) when is_list(old_orders) do
-        Network.send_data_inside_node(:order_checker, :checker_guardian, {:ping, Time.to_iso8601(Time.utc_now)})
 
         checkerSleep = 250
 
@@ -145,7 +121,6 @@ defmodule Panel_X do
     end
 
     def order_sender(floor_table, send_ID, outgoing_orders) when is_list(outgoing_orders) do
-        Network.send_data_inside_node(:panel, :sender_guardian, {:ping, Time.to_iso8601(Time.utc_now)})
         ackTimeout = 800
         checkerTimeout = 1000
 
@@ -195,67 +170,70 @@ defmodule Panel_X do
 
     end
 
-    defp checker_guardian(floor_table, missed_pings \\ 0, prev_ping \\ "0") do
-        Process.sleep(100)
-        buddy_ID = Process.whereis(:panel)
-        if buddy_ID != nil do
-            Process.link(buddy_ID)
-        else
-            IO.inspect("Watch out! Checker Guardian couldn't link with sender", label: "Error")
-        end
+    # SUPERVISORS
 
-        if missed_pings > 3 do
+    def checker_sprvsr(floor_table) do
+        Process.sleep(300)
 
-            IO.inspect("Checker missed out on #{inspect missed_pings} pings and is reinitialized", label: "Checker Guardian")
+        buddy = Process.whereis(:order_checker)
+        collegue = Process.whereis(:sender_sprvsr)
+
+        if buddy == nil do
+            IO.inspect("No order checker found - initialized one", label: "Checker Supervisor")
             init_checker(floor_table)
-
-        else
-            receive do
-                {:order_checker, {_message_ID, {:ping, stamp}}} ->
-                    if stamp>prev_ping do
-                        checker_guardian(floor_table, 0 , stamp)
-                    else
-                        IO.inspect("Checker missed out on ping", label: "Checker Guardian")
-                        checker_guardian(floor_table, missed_pings + 1, prev_ping)
-                    end
-            after
-                200 -> 
-                    IO.inspect("Checker missed out on ping", label: "Checker Guardian")
-                    checker_guardian(floor_table, missed_pings + 1, prev_ping)
-            end
-        end      
-    end
-
-    defp sender_guardian(floor_table, missed_pings \\ 0, prev_ping \\ "0") do
-        Process.sleep(100)
-        buddy_ID = Process.whereis(:order_checker)
-        if buddy_ID != nil do
-            Process.link(buddy_ID)
-        else
-            IO.inspect("Watch out! Sender Guardian couldn't link with sender", label: "Error")
         end
 
-        if missed_pings > 3 do
+        if collegue == nil do
+            IO.inspect("No sender supervisor found - initialized one", label: "Checker Supervisor")
+            sender_sprvsr_init(floor_table)
+        end
 
-            IO.inspect("Sender missed out on #{inspect missed_pings} pings and is reinitialized", label: "Sender Guardian")
+        checker_sprvsr(floor_table)
+    end
+
+    def checker_sprvsr_init(floor_table) do
+        must_die = Process.whereis(:checker_sprvsr)
+        if must_die != nil do
+            Process.exit(must_die, :kill)
+        end
+        Process.sleep(200)
+        chk_sprvsr = spawn(fn -> checker_sprvsr(floor_table) end)
+        Process.register(chk_sprvsr, :checker_sprvsr)
+
+        chk_sprvsr 
+    end
+
+    def sender_sprvsr(floor_table) do
+        Process.sleep(300)
+        buddy = Process.whereis(:order_checker)
+        collegue = Process.whereis(:checker_sprvsr)
+
+        if buddy == nil do
+            IO.inspect("No order sender found - initialized one", label: "Sender Supervisor")
             init_sender(floor_table)
-
-        else
-            receive do
-                {:panel, {_message_ID, {:ping, stamp}}} ->
-                    if stamp>prev_ping do
-                        sender_guardian(floor_table, 0 , stamp)
-                    else
-                        IO.inspect("Sender missed out on ping", label: "Sender Guardian")
-                        sender_guardian(floor_table, missed_pings + 1, prev_ping)
-                    end
-            after
-                1400 -> 
-                    IO.inspect("Sender missed out on ping", label: "Sender Guardian")
-                    sender_guardian(floor_table, missed_pings + 1, prev_ping)
-            end
         end
+
+        if collegue == nil do
+            IO.inspect("No checker supervisor found - initialized one", label: "Sender Supervisor")
+            checker_sprvsr_init(floor_table)
+        end
+
+        sender_sprvsr(floor_table)
     end
+
+    def sender_sprvsr_init(floor_table) do
+        must_die = Process.whereis(:sender_sprvsr)
+        if must_die != nil do
+            Process.exit(must_die, :kill)
+        end
+        Process.sleep(200)
+        snd_sprvsr = spawn(fn -> sender_sprvsr(floor_table) end)
+        Process.register(snd_sprvsr, :sender_sprvsr)
+
+        snd_sprvsr 
+    end
+
+
 
     # WORKHORSE FUNCTIONS
 

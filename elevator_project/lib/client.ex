@@ -90,6 +90,14 @@ defmodule Client do
   It is assumed that there is only one copy of each order in the list
   """
   def remove_clients(
+        [],
+        client_list)
+  when is_list(client_list)
+  do
+    client_list
+  end
+
+  def remove_clients(
         clients,
         client_list)
   when is_list(clients) and is_list(client_list)

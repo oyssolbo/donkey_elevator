@@ -293,20 +293,24 @@ defmodule Master do
     Logger.info("Active master received orders")
     IO.inspect(order_list)
 
-    # Check if valid, and delegate
-    Order.check_valid_order(order_list)
+    new_master_data =
+      case Order.check_valid_order(order_list) do
+        :true->
+          temp_order_list = Order.modify_order_field(order_list, :delegated_elevator, :nil)
+          undelegated_orders = get_undelegated_orders(master_data, temp_order_list)
 
-    temp_order_list = Order.modify_order_field(order_list, :delegated_elevator, :nil)
-    undelegated_orders = get_undelegated_orders(master_data, temp_order_list)
+          connected_elevator_list = Map.get(master_data, :connected_elevator_list)
+          delegated_orders = delegate_orders(undelegated_orders, connected_elevator_list)
 
-    connected_elevator_list = Map.get(master_data, :connected_elevator_list)
-    delegated_orders = delegate_orders(undelegated_orders, connected_elevator_list)
+          updated_order_list =
+            Map.get(master_data, :active_order_list) |>
+            Order.add_orders(delegated_orders)
 
-    updated_order_list =
-      Map.get(master_data, :active_order_list) |>
-      Order.add_orders(delegated_orders)
+          Map.put(master_data, :active_order_list, updated_order_list)
 
-    new_master_data = Map.put(master_data, :active_order_list, updated_order_list)
+        :false->
+          master_data
+      end
 
     {:next_state, :active_state, new_master_data}
   end
@@ -366,11 +370,9 @@ defmodule Master do
         [] ->
           struct(Client, [client_id: elevator_id, client_data: %{dir: dir, last_floor: last_floor}])
         old_client ->
-          old_client
+          Map.put(old_client, :client_data, %{dir: dir, last_floor: last_floor})
       end
 
-
-    # Likely a bug here. We will not add the updated client to the client-list if it already exists...
     updated_elevator_list =
       Timer.start_timer(self(), elevator_client, :last_message_time, :elevator_timeout, @timeout_elevator_time) |>
       Client.add_clients(old_elevator_client_list)
@@ -416,6 +418,26 @@ defmodule Master do
   end
 
 
+  @doc """
+  Function to handle if an order has been served
+
+  The function finds the order, deletes it - if it exists and then resumes
+  """
+  def handle_event(
+        :info,
+        {:order_served, order_id},
+        :active_state,
+        master_data)
+  do
+    order_list = Map.get(master_data, :active_order_list)
+    updated_order_list =
+      Order.extract_order(order_id, order_list) |>
+      Order.remove_orders(order_list)
+
+    new_master_data = Map.put(master_data, :active_order_list, updated_order_list)
+    {:next_state, :active_state, new_master_data}
+  end
+
 
   @doc """
   Function to handle if an elevator gets a timeout / is disconnected
@@ -453,6 +475,7 @@ defmodule Master do
 
     {:next_state, :active_state, new_master_data}
   end
+
 
 
 
@@ -685,4 +708,3 @@ defmodule Master do
     end
   end
 end
-

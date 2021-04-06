@@ -37,6 +37,8 @@ defmodule Elevator do
   @moving_time          Application.fetch_env!(:elevator_project, :elevator_timeout_moving_ms)
   @status_update_time   Application.fetch_env!(:elevator_project, :elevator_update_status_time_ms)
 
+  @restart_time         Application.fetch_env!(:elevator_project, :elevator_restart_time_ms)
+
   @node_name            :elevator
 
   @enforce_keys         [:orders, :last_floor, :dir, :timer, :elevator_id]
@@ -141,6 +143,7 @@ defmodule Elevator do
         {:received_order, new_order_list},
         state,
         %Elevator{orders: prev_orders} = elevator_data)
+  when state in [:init_state, :active_state, :door_state, :moving_state]
   do
     Logger.info("Elevator received order")
 
@@ -162,6 +165,17 @@ defmodule Elevator do
 
     {:next_state, state, new_elevator_data}
   end
+
+  def handle_event(
+        :cast,
+        {:received_order, _new_order_list},
+        :restart_state,
+        elevator_data)
+  do
+    Logger.info("Elevator received order while in restart_state")
+    {:next_state, :restart_state, elevator_data}
+  end
+
 
 # udp_timer #
   @doc """
@@ -521,7 +535,7 @@ defmodule Elevator do
   dir     Current direction to check for orders
   Floor   Current floor to check for order
   """
-  def calculate_optimal_direction(
+  defp calculate_optimal_direction(
         [],
         _dir,
         _floor)
@@ -529,7 +543,7 @@ defmodule Elevator do
     :nil
   end
 
-  def calculate_optimal_direction(
+  defp calculate_optimal_direction(
     _orders,
     _dir,
     :nil = _floor)
@@ -537,7 +551,7 @@ defmodule Elevator do
     :nil
   end
 
-  def calculate_optimal_direction(
+  defp calculate_optimal_direction(
         orders,
         dir,
         floor)
@@ -562,7 +576,7 @@ defmodule Elevator do
   that is directly linked to why is it here in the first place. That bug is then related to
   calculate_optimal_direction(), as it should not invoke the function without valid orders
   """
-  def calculate_optimal_floor(
+  defp calculate_optimal_floor(
         orders,
         dir,
         floor)
@@ -621,16 +635,18 @@ defmodule Elevator do
 
   @doc """
   Function to kill the module in case of an error
+
+  The function puts the process to sleep for @restart_time. This should trigger a
+  timeout in master and redistribute any external orders to other elevators
   """
   defp restart_process()
   do
-    # Should pherhaps consider sending a message to master or something ?
-    # Network.send_data_to_all_nodes(:elevator, :master, :restarting})
     Driver.set_motor_direction(:stop)
+    Process.sleep(@restart_time)
     Process.exit(self(), :shutdown)
   end
 
-  ##### Networking #####
+##### Networking #####
 
   #sending data, should be copy pased into suitable loccation
   #send_data_to_all_nodes(:elevator, :master, elevator_data)

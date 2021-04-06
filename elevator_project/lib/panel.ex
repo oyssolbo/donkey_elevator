@@ -2,10 +2,14 @@
 Syntax
     @Order{order_ID, order_type, order_floor}
 """
+
+
 defmodule Panel do
     require Driver
     require Network
     require Order
+
+    use GenServer
 
     #@button_map %{:hall_up => 0, :hall_down => 1, :cab => 2}
     #@state_map  %{:on => 1, :off => 0}
@@ -25,6 +29,7 @@ defmodule Panel do
         Process.register(sender_ID, :panel)
 
         {checker_ID, sender_ID}
+        {:ok, "hello"}
     end
 
     defp order_checker(old_orders, floor_table) when is_list(old_orders) do
@@ -103,6 +108,22 @@ defmodule Panel do
 
     defp check_4_orders(table \\ Enum.to_list(0..@num_floors-1)) do
         orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
+    end
+
+    def child_spec(opts) do
+        %{
+          id: __MODULE__,
+          start: {__MODULE__, :start_link, [opts]},
+          type: :worker,
+          restart: :permanent,
+          shutdown: 500
+        }
+    end
+
+    def start_link(init_arg \\ [])
+    do
+    server_opts = [name: :panel_module]
+    GenServer.start_link(__MODULE__, init_arg, server_opts)
     end
 
 end

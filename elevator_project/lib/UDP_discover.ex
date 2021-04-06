@@ -28,14 +28,7 @@ defmodule UDP_discover do
   def get_ip(port \\ @init_port) do
     case :gen_udp.open(port, [active: false, broadcast: true]) do
       {:ok, socket} ->
-        #UDP.send_data(socket, @broadcast_address, port, "Test")
         :gen_udp.send(socket, @broadcast_address, port, "test packet")
-        # case UDP.receive_data(socket) do
-        #   {:recv, {ip, _port, _data}} ->
-        #     {:recv, ip}
-        #   {:error, _} ->
-        #     {:error, :could_not_get_ip}
-        # end
 
         ip = case :gen_udp.recv(socket, 100, 1000) do
           {:ok, {ip, _port, _data}} -> ip

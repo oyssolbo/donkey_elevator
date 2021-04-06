@@ -69,7 +69,7 @@ defmodule Elevator do
       last_floor:   :nil,
       dir:          :down,
       timer:        make_ref(),
-      elevator_id:  Network.get_ip()
+      elevator_id:  Node.self()
     }
 
     # Close door and set direction down
@@ -124,7 +124,7 @@ defmodule Elevator do
   """
   def wip()
   do
-    :ok
+    :okhorizon
   end
 
 
@@ -190,11 +190,8 @@ defmodule Elevator do
         %Elevator{dir: dir, last_floor: last_floor} = elevator_data)
   do
     Timer.interrupt_after(self(), :udp_timer, @status_update_time)
+    Network.send_data_all_nodes(:elevator, :master,  {Map.get(elevator_data, :elevator_id), Map.get(elevator_data, :dir), Map.get(elevator_data, :last_floor)})
 
-    active_master_pid = Process.whereis(:active_master)
-    if active_master_pid != :nil do
-      Process.send(active_master_pid, {self(), dir, last_floor}, [])
-    end
     {:next_state, state, elevator_data}
   end
 
@@ -653,7 +650,7 @@ defmodule Elevator do
     receive do
       {:master, _node, message_id, data} ->
         IO.puts("Got the following data from master #{data}")
-        Network.send_data_to_all_nodes(:elevator, :master, {message_id, :ack})
+        Network.send_data_all_nodes(:elevator, :master, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:received_order, data}) # will this work?
 
       {:panel, _node, message_id, data} ->

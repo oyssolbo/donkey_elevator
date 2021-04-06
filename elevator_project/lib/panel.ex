@@ -18,7 +18,7 @@ defmodule Panel do
     @num_floors Application.fetch_env!(:elevator_project, :project_num_floors)
     # floor_table: Array of the floors; makes it easier to iterate through
 
-    # TODO: Replace mid1, mid2, eid with send_local_node func. For master send; send_data_to_all_nodes.
+    # TODO: Replace mid1, mid2, eid with send_local_node func. For master send; send_data_all_nodes.
     def init(floor_table \\ Enum.to_list(0..@num_floors-1)) do
 
         checker_ID = spawn(fn -> order_checker([], floor_table) end)
@@ -110,20 +110,11 @@ defmodule Panel do
         orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
     end
 
-    def child_spec(opts) do
-        %{
-          id: __MODULE__,
-          start: {__MODULE__, :start_link, [opts]},
-          type: :worker,
-          restart: :permanent,
-          shutdown: 500
-        }
-    end
 
     def start_link(init_arg \\ [])
     do
-    server_opts = [name: :panel_module]
-    GenServer.start_link(__MODULE__, init_arg, server_opts)
+        server_opts = [name: :panel_module]
+        GenServer.start_link(__MODULE__, init_arg, server_opts)
     end
 
 end

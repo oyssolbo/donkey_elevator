@@ -15,8 +15,8 @@ defmodule ElevatorProject.MixProject do
   def application do
     [
       applications: [:gen_state_machine],
-      applications: [:logger] ,
-      mod: {ElevatorProject.Application, []}
+      applications: [:logger] #,
+      #mod: {ElevatorProject.Application, []}
     ]
   end
 

@@ -163,6 +163,21 @@ defmodule Master do
 
 
   @doc """
+  Function to handle if the GenStateMachine-server receives a request to spam status to the
+  backup-master while the current state is in backup-state. This could occur if the current
+  process was demoted from active to backup because two active master simultaneously
+  """
+  def handle_event(
+        :info,
+        :master_update_timer,
+        :backup_state,
+        master_data)
+  do
+    {:next_state, :backup_state, master_data}
+  end
+
+
+  @doc """
   Function to handle if data has been sent from the active-master to the passive master
 
   The heartsbeats / messages are only considered valid if the message-id exceeds the internal /
@@ -198,18 +213,30 @@ defmodule Master do
     {:next_state, :backup_state, new_master_data}
   end
 
-
   @doc """
-  Function to handle if the GenStateMachine-server receives an order while in passive mode.
-  Since the master should not respond to orders while in backup-state, we leave the work
-  to the active master. If the active master is unable to respond, the sender will repeat
-  the order, until the backup has activated itself
+  Function to handle when an elevator sends a status-update to the master, while the master
+  is in backup-mode. The backup-master does nothing, as it is assumed that these updates
+  comes often enough for the system to handle if the backup master must be activated again
   """
   def handle_event(
         :cast,
-        {:panel_received_order, _order_list},
+        {:elevator_status_update, {_elevator_id, _dir, _last_floor}},
         :backup_state,
         master_data)
+  do
+    {:next_state, :backup_state, master_data}
+  end
+
+  @doc """
+  Handles if the server receives a message that an elevator has served an order,
+  while the master serves as backup. It is assumed that the active master will
+  handle it, such that the backup-master will be updated from the active
+  """
+  def handle_event(
+      :info,
+      {:elevator_served_order, {_elevator_id, _served_order_id}},
+      :backup_state,
+      master_data)
   do
     {:next_state, :backup_state, master_data}
   end
@@ -230,18 +257,20 @@ defmodule Master do
 
 
   @doc """
-  Function to handle if the GenStateMachine-server receives a request to spam status to the
-  backup-master while the current state is in backup-state. This could occur if the current
-  process was demoted from active to backup because two active master simultaneously
+  Function to handle if the GenStateMachine-server receives an order while in passive mode.
+  Since the master should not respond to orders while in backup-state, we leave the work
+  to the active master. If the active master is unable to respond, the sender will repeat
+  the order, until the backup has activated itself
   """
   def handle_event(
-        :info,
-        :master_update_timer,
+        :cast,
+        {:panel_received_order, _order_list},
         :backup_state,
         master_data)
   do
     {:next_state, :backup_state, master_data}
   end
+
 
 
 ##### active_state #####
@@ -272,45 +301,6 @@ defmodule Master do
     end
 
     new_master_data = Map.put(master_data, :master_message_id, updated_message_id)
-
-    {:next_state, :active_state, new_master_data}
-  end
-
-
-
-  @doc """
-  Function to handle if the GenStateMachine-server receives a list of orders
-
-  Important that the function get a list of orders
-  """
-  def handle_event(
-        :cast,
-        {:panel_received_order, order_list},
-        :active_state,
-        master_data)
-  when order_list |> is_list()
-  do
-    Logger.info("Active master received orders")
-    IO.inspect(order_list)
-
-    new_master_data =
-      case Order.check_valid_order(order_list) do
-        :true->
-          temp_order_list = Order.modify_order_field(order_list, :delegated_elevator, :nil)
-          undelegated_orders = get_undelegated_orders(master_data, temp_order_list)
-
-          connected_elevator_list = Map.get(master_data, :connected_elevator_list)
-          delegated_orders = delegate_orders(undelegated_orders, connected_elevator_list)
-
-          updated_order_list =
-            Map.get(master_data, :active_order_list) |>
-            Order.add_orders(delegated_orders)
-
-          Map.put(master_data, :active_order_list, updated_order_list)
-
-        :false->
-          master_data
-      end
 
     {:next_state, :active_state, new_master_data}
   end
@@ -459,6 +449,44 @@ defmodule Master do
   end
 
 
+  @doc """
+  Function to handle if the GenStateMachine-server receives a list of orders
+
+  Important that the function get a list of orders
+  """
+  def handle_event(
+        :cast,
+        {:panel_received_order, order_list},
+        :active_state,
+        master_data)
+  when order_list |> is_list()
+  do
+    Logger.info("Active master received orders")
+    IO.inspect(order_list)
+
+    new_master_data =
+      case Order.check_valid_order(order_list) do
+        :true->
+          temp_order_list = Order.modify_order_field(order_list, :delegated_elevator, :nil)
+          undelegated_orders = get_undelegated_orders(master_data, temp_order_list)
+
+          connected_elevator_list = Map.get(master_data, :connected_elevator_list)
+          delegated_orders = delegate_orders(undelegated_orders, connected_elevator_list)
+
+          updated_order_list =
+            Map.get(master_data, :active_order_list) |>
+            Order.add_orders(delegated_orders)
+
+          Map.put(master_data, :active_order_list, updated_order_list)
+
+        :false->
+          master_data
+      end
+
+    {:next_state, :active_state, new_master_data}
+  end
+
+
 ###################################### Actions ######################################
 
 
@@ -591,6 +619,7 @@ defmodule Master do
   end
 
 
+## Determine elevator ##
   @doc """
   Function that finds the optimal elevator to serve an order.
 
@@ -686,5 +715,48 @@ defmodule Master do
         # Any other case
         :false
     end
+  end
+
+
+## Networking ##
+
+  ## send data to elevator or panel ##
+  #send_data_spesific_node(:master, :elevator, receiver_node, data)
+  #send_data_spesific_node(:master, :panel, receiver_node, data)
+
+  ## send data to other master ##
+  #send_data_to_all_nodes(:master, :master,data)
+
+  @doc """
+  Receives messages from elevator, panel or other master. The function casts a message
+  to the GenStateMachine-server, such that all events can be handled properly
+  """
+  def receive_thread()
+  do
+    receive do
+      {:master, _from_node, _message_id, {event_name, data}} ->
+        Logger.info("Got message from other master")
+        GenStateMachine.cast(@node_name, {event_name, data})
+
+      {:elevator, _from_node, _message_id, {event_name, data}} ->
+        Logger.info("Got message from elevator")
+        GenStateMachine.cast(@node_name, {event_name, data})
+
+      {:panel, from_node, message_id, order_list} ->
+        Logger.info("Got message from panel")
+        GenStateMachine.cast(@node_name, {:panel_received_order, order_list})
+        Network.send_data_spesific_node(:master, :panel, from_node, {message_id, :ack})
+
+    after
+      10_000 -> Logger.info("Connection timeout for master")
+
+    end
+    receive_thread()
+  end
+
+  def init_receive()
+  do
+    pid = spawn(fn -> receive_thread() end)
+    Process.register(pid, :master_receive)
   end
 end

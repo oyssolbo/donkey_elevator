@@ -80,7 +80,7 @@ defmodule Master do
     }
 
     # Starting process for error-handling
-    master_data = Timer.start_timer(self(), data, :master_timer, :active_master_timeout, @timeout_active_master_time)
+    master_data = Timer.start_timer(self(), data, :master_timer, :master_active_timeout, @timeout_active_master_time)
 
     Logger.info("Master initialized")
 
@@ -132,7 +132,7 @@ defmodule Master do
   """
   def give_master_orders(order)
   do
-    GenStateMachine.cast(@node_name, {:received_order, order})
+    GenStateMachine.cast(@node_name, {:panel_received_order, order})
   end
 
 
@@ -147,13 +147,13 @@ defmodule Master do
   """
   def handle_event(
         :info,
-        :active_master_timeout,
+        :master_active_timeout,
         :backup_state,
         master_data)
   do
     Logger.info("Backup has connection to active. Activating")
 
-    Timer.interrupt_after(self(), :update_timer, @update_active_time)
+    Timer.interrupt_after(self(), :master_update_timer, @update_active_time)
 
     activated_master_data =
       Timer.set_utc_time(master_data, :activation_time) |>
@@ -170,7 +170,7 @@ defmodule Master do
   """
   def handle_event(
         :cast,
-        {:update_active_master, extern_master_data},
+        {:master_update, extern_master_data},
         :backup_state,
         intern_master_data)
   do
@@ -187,7 +187,7 @@ defmodule Master do
           # updated_order_master_data = Map.put(updated_timer_master_data, :active_order_list, active_order_list)
           # updated_connection_master_data = Map.put(updated_order_master_data, :connected_elevator_list, connected_elevator_list)
           # Map.put(updated_connection_master_data, :master_message_id, extern_message_id)
-          Timer.start_timer(self(), intern_master_data, :master_timer, :active_master_timeout, @timeout_active_master_time) |>
+          Timer.start_timer(self(), intern_master_data, :master_timer, :master_active_timeout, @timeout_active_master_time) |>
             Map.put(:active_order_list, active_order_list) |>
             Map.put(:connected_elevator_list, connected_elevator_list) |>
             Map.put(:master_message_id, extern_message_id)
@@ -207,7 +207,7 @@ defmodule Master do
   """
   def handle_event(
         :cast,
-        {:received_order, _order_list},
+        {:panel_received_order, _order_list},
         :backup_state,
         master_data)
   do
@@ -221,7 +221,7 @@ defmodule Master do
   """
   def handle_event(
         :info,
-        {:timeout_elevator, _elevator_id},
+        {:elevator_timeout, _elevator_id},
         :backup_state,
         master_data)
   do
@@ -236,7 +236,7 @@ defmodule Master do
   """
   def handle_event(
         :info,
-        :update_timer,
+        :master_update_timer,
         :backup_state,
         master_data)
   do
@@ -251,11 +251,11 @@ defmodule Master do
   """
   def handle_event(
         :info,
-        :update_timer,
+        :master_update_timer,
         :active_state,
         master_data)
   do
-    Timer.interrupt_after(self(), :update_timer, @update_active_time)
+    Timer.interrupt_after(self(), :master_update_timer, @update_active_time)
 
     # Update this when we know how to send data
     backup_master_pid = Process.whereis(:backup_master)
@@ -285,7 +285,7 @@ defmodule Master do
   """
   def handle_event(
         :cast,
-        {:received_order, order_list},
+        {:panel_received_order, order_list},
         :active_state,
         master_data)
   when order_list |> is_list()
@@ -324,7 +324,7 @@ defmodule Master do
   """
   def handle_event(
         :info,
-        {:update_active_master, extern_master_data},
+        {:master_update_active, extern_master_data},
         :active_state,
         intern_master_data)
   do
@@ -342,11 +342,11 @@ defmodule Master do
           {:active_state, combined_master_data}
         :eq->
           Logger.info("Equal time detected. Transition into backup state")
-          reset_timer_master_data = Timer.start_timer(self(), combined_master_data, :master_timer, :active_master_timeout, @timeout_active_master_time)
+          reset_timer_master_data = Timer.start_timer(self(), combined_master_data, :master_timer, :master_active_timeout, @timeout_active_master_time)
           {:backup_state, reset_timer_master_data}
         :gt->
           Logger.info("Transition into backup state")
-          reset_timer_master_data = Timer.start_timer(self(), combined_master_data, :master_timer, :active_master_timeout, @timeout_active_master_time)
+          reset_timer_master_data = Timer.start_timer(self(), combined_master_data, :master_timer, :master_active_timeout, @timeout_active_master_time)
           {:backup_state, reset_timer_master_data}
       end
 
@@ -359,7 +359,7 @@ defmodule Master do
   """
   def handle_event(
         :cast,
-        {:status_update, {elevator_id, dir, last_floor}},
+        {:elevator_status_update, {elevator_id, dir, last_floor}},
         :active_state,
         master_data)
   do
@@ -368,13 +368,18 @@ defmodule Master do
     elevator_client =
       case Client.extract_client(elevator_id, old_elevator_client_list) do
         [] ->
-          struct(Client, [client_id: elevator_id, client_data: %{dir: dir, last_floor: last_floor}])
+          struct(Client,
+            [
+              client_id: elevator_id,
+              client_data: %{dir: dir, last_floor: last_floor},
+              client_timer: make_ref()
+            ])
         old_client ->
           Map.put(old_client, :client_data, %{dir: dir, last_floor: last_floor})
       end
 
     updated_elevator_list =
-      Timer.start_timer(self(), elevator_client, :last_message_time, :elevator_timeout, @timeout_elevator_time) |>
+      Timer.start_timer(self(), elevator_client, :client_timer, :elevator_timeout, @timeout_elevator_time) |>
       Client.add_clients(old_elevator_client_list)
 
     # Delegate any undelegated orders
@@ -406,32 +411,9 @@ defmodule Master do
         :active_state,
         master_data)
   do
-    # Get the order with the correct id
-    order_list = Map.get(master_data, :active_order_list)
-    served_order = Order.extract_order(served_order_id, order_list)
-
-    # Remove the order from the order-list
-    new_order_list = Order.remove_orders(served_order, order_list)
-    new_master_data = Map.put(master_data, :active_order_list, new_order_list)
-
-    {:next_state, :active_state, new_master_data}
-  end
-
-
-  @doc """
-  Function to handle if an order has been served
-
-  The function finds the order, deletes it - if it exists and then resumes
-  """
-  def handle_event(
-        :info,
-        {:order_served, order_id},
-        :active_state,
-        master_data)
-  do
     order_list = Map.get(master_data, :active_order_list)
     updated_order_list =
-      Order.extract_order(order_id, order_list) |>
+      Order.extract_order(served_order_id, order_list) |>
       Order.remove_orders(order_list)
 
     new_master_data = Map.put(master_data, :active_order_list, updated_order_list)
@@ -543,7 +525,7 @@ defmodule Master do
     [updated_order | unassign_all_orders(rest_orders)]
   end
 
-  def unassign_all_orders([])
+  defp unassign_all_orders([])
   do
     []
   end

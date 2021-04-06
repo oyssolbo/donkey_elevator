@@ -1,3 +1,4 @@
+
 defmodule Elevator do
   @moduledoc """
   Elevator-module
@@ -68,7 +69,7 @@ defmodule Elevator do
       last_floor:   :nil,
       dir:          :down,
       timer:        make_ref(),
-      elevator_id:  UDP_discover.get_ip()
+      elevator_id:  Network.get_ip()
     }
 
     # Close door and set direction down
@@ -114,6 +115,7 @@ defmodule Elevator do
   def delegate_order(order)
   do
     #GenStateMachine.call(@node_name, {:received_order, order})
+    IO.inspect(order)
     GenStateMachine.cast(@node_name, {:received_order, order})
   end
 
@@ -139,14 +141,11 @@ defmodule Elevator do
   """
   def handle_event(
         :cast,
-        {:received_order, new_order},
+        {:received_order, new_order_list},
         state,
         %Elevator{orders: prev_orders} = elevator_data)
   when state in [:init_state, :active_state, :door_state, :moving_state]
   do
-    IO.inspect(@init_time)
-
-    #Logger.info("Elevator received order from #{from}")
     Logger.info("Elevator received order")
 
     new_elevator_data =
@@ -218,7 +217,15 @@ defmodule Elevator do
     Process.cancel_timer(timer)
 
     # Reading previously saved orders, and starting timer
-    prev_orders = Storage.read()
+    stored_orders = Storage.read()
+    prev_orders =
+      case Order.check_valid_order(stored_orders) do
+        :true->
+          stored_orders
+        :false->
+          []
+      end
+
     new_elevator_data =
       Map.put(elevator_data, :orders, prev_orders) |>
       check_at_new_floor(floor)
@@ -262,9 +269,6 @@ defmodule Elevator do
     last_dir = Map.get(elevator_data, :dir)
     orders = Map.get(elevator_data, :orders)
 
-    IO.inspect(orders)
-
-    # We only get :nil (when we should have orders)
     new_dir = calculate_optimal_direction(orders, last_dir, last_floor)
 
     {new_state, new_data} =
@@ -414,9 +418,7 @@ defmodule Elevator do
   Function to read the current floor indefinetly. The function does not take any interdiction
   between overflow or not. If the value 'i' results in a negative number, we just keep
   incrementing.
-
   A semi-while-loop is implemented, since it was observed that recursion eats the heap
-
   Invokes the function check_at_floor() with the data
   """
   defp read_current_floor()
@@ -488,17 +490,15 @@ defmodule Elevator do
 
   @doc """
   Handles what to do when a floor containing an order with type in [:cab, dir] is reached
-
   The function serves the order(s), updates the order-list and saves the result to Lights
   and Storage
-
   orders Current active orders
   dir Current elevator-direction
   floor Current elevator floor
   timer Current active timer for elevator (moving)
   """
   defp reached_order_floor(
-        %Elevator{orders: orders, dir: dir} = elevator_data,
+        %Elevator{orders: order_list, dir: dir} = elevator_data,
         floor)
   do
     Driver.set_motor_direction(:stop)
@@ -509,10 +509,12 @@ defmodule Elevator do
     timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
 
     # Remove old orders and calculate new target_order
-    updated_orders = Order.remove_floor_orders(orders, dir, floor)
+    updated_orders =
+      Order.extract_orders(floor, dir, order_list) |>
+      Order.remove_orders(order_list)
     orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
 
-    Storage.save(updated_orders)
+    Storage.write(updated_orders)
     Lights.set_order_lights(updated_orders)
 
     dir_opt = calculate_optimal_direction(updated_orders, dir, floor)
@@ -630,7 +632,6 @@ defmodule Elevator do
 
   @doc """
   Function to kill the module in case of an error
-
   The function puts the process to sleep for @restart_time. This should trigger a
   timeout in master and redistribute any external orders to other elevators
   """
@@ -645,6 +646,7 @@ defmodule Elevator do
 
   #sending data, should be copy pased into suitable loccation
   #send_data_to_all_nodes(:elevator, :master, elevator_data)
+
 
   def receive_thread()
   do
@@ -663,6 +665,7 @@ defmodule Elevator do
     #  10_000 -> IO.puts("Connection timeout")
 
     end
+
     receive_thread()
   end
 

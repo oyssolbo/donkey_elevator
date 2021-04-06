@@ -694,7 +694,7 @@ defmodule Master do
   ## send data to other master ##
   #send_data_to_all_nodes(:master, :master,data)
 
-  def receive_thread()
+  def receive_data()
   do
     receive do
       {:master, from_node, message_id, data} ->
@@ -712,12 +712,22 @@ defmodule Master do
       10_000 -> IO.puts("Connection timeout, -> active master")
 
     end
-    receive_thread()
+    receive_data()
+  end
+
+  def receive_ack(message_id)
+  do
+    receive do
+      {receiver_id, _from_node, _ack_message_id, {message_id, :ack}} ->
+        {:ok, receiver_id}
+      after Application.fetch_env!(:elevator_project, :ack_timeout_time_ms) ->
+        {:no_ack, :no_id}
+    end
   end
 
   def init_receive()
   do
-    pid = spawn(fn -> receive_thread() end)
+    pid = spawn(fn -> receive_data() end)
     Process.register(pid, :master)
   end
 

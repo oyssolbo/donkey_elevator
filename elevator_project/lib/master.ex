@@ -477,8 +477,6 @@ defmodule Master do
   end
 
 
-
-
 ###################################### Actions ######################################
 
 
@@ -495,7 +493,7 @@ defmodule Master do
   it should not be a problem. It will not be as efficient, as one elevator may become
   overloaded with work, but that is a consequence we are prepared to face
   """
-  def combine_master_data_struct(
+  defp combine_master_data_struct(
         intern_master_data,
         extern_master_data)
   do
@@ -539,7 +537,7 @@ defmodule Master do
 
   Returns a list of the new-undelegated orders
   """
-  def unassign_all_orders([order | rest_orders])
+  defp unassign_all_orders([order | rest_orders])
   do
     updated_order = Order.modify_order_field(order, :delegated_elevator, :nil)
     [updated_order | unassign_all_orders(rest_orders)]
@@ -604,8 +602,8 @@ defmodule Master do
   do
     old_order_list = Map.get(master_data, :active_order_list, [])
 
-    old_nil_delegated_orders = Order.extract_delegated_elevator_orders(:nil, old_order_list)
-    new_nil_delegated_orders = Order.extract_delegated_elevator_orders(:nil, new_order_list)
+    old_nil_delegated_orders = Order.extract_orders(:nil, old_order_list)
+    new_nil_delegated_orders = Order.extract_orders(:nil, new_order_list)
 
     Order.add_orders(old_nil_delegated_orders, new_nil_delegated_orders)
   end

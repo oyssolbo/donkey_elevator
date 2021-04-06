@@ -8,25 +8,7 @@ defmodule Network do
 
   require Logger
 
-
-
-  @doc """
-  Detects all nodes on the network
-
-  RETURNS:                      IF:
-    nodes                         If nodes discovered
-    {:error, :node_not_running}   If no nodes discovered
-  """
-  def detect_nodes()
-  do
-    case [Node.self() | Node.list()] do
-      [:'nonode@nohost'] ->
-        {:error, :node_not_running}
-      nodes ->
-        nodes
-    end
-  end
-
+  @ack_timeout Application.fetch_env!(:elevator_project, :ack_timeout_time_ms)
 
   @doc """
   Init the node nettork on the machine
@@ -50,18 +32,29 @@ defmodule Network do
   @doc """
   Send data to all known nodes on the network to the process receiver_id, iteration should be left blank
   """
-  def send_data_to_all_nodes(sender_id, receiver_id,data, iteration \\ 0)
+  def send_data_all_nodes(sender_id, receiver_id,data)
   do
     message_id = make_ref()
-
     network_list = SystemNode.nodes_in_network()
+
+    send_data_all_nodes_loop(sender:id, receiver_id, data)
+
+    {:ok, message_id}
+  end
+
+
+@doc """
+  heper function to send_data_all_nodes
+  """
+  defp send_data_all_nodes_loop(sender_id, receiver_id, data, iteration \\ 0)
+  do
     receiver_node = Enum.at(network_list, iteration)
 
     if receiver_node != :nil do
       send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})
-      send_data_to_all_nodes(sender_id, receiver_id, data, iteration + 1)
+      send_data_all_nodes_loop(sender_id, receiver_id, data, iteration + 1)
     end
-    {:ok, network_list}
+
   end
 
   @doc """
@@ -72,6 +65,7 @@ defmodule Network do
     message_id = make_ref()
 
     send({receiver_id, Node.self()}, {sender_id, Node.self(), message_id, data})
+    {:ok, message_id}
   end
 
  @doc """
@@ -81,6 +75,7 @@ defmodule Network do
     do
       message_id = make_ref()
       send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})
+      {:ok, message_id}
     end
 
    @doc """
@@ -95,6 +90,37 @@ defmodule Network do
     after
       10_000 -> IO.puts("Connection timeout")
 
+    end
+  end
+
+
+    @doc """
+  Function that looks for acks with the message_id, message_id
+  """
+  def receive_ack(message_id)
+  do
+    receive do
+      {receiver_id, _from_node, _ack_message_id, {message_id, :ack}} ->
+        {:ok, receiver_id}
+      after @ack_timeout ->
+        {:no_ack, :no_id}
+    end
+  end
+
+    @doc """
+  Detects all nodes on the network
+
+  RETURNS:                      IF:
+    nodes                         If nodes discovered
+    {:error, :node_not_running}   If no nodes discovered
+  """
+  def detect_nodes()
+  do
+    case [Node.self() | Node.list()] do
+      [:'nonode@nohost'] ->
+        {:error, :node_not_running}
+      nodes ->
+        nodes
     end
   end
 

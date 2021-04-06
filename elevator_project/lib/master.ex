@@ -715,15 +715,7 @@ defmodule Master do
     receive_data()
   end
 
-  def receive_ack(message_id)
-  do
-    receive do
-      {receiver_id, _from_node, _ack_message_id, {message_id, :ack}} ->
-        {:ok, receiver_id}
-      after Application.fetch_env!(:elevator_project, :ack_timeout_time_ms) ->
-        {:no_ack, :no_id}
-    end
-  end
+
 
   def init_receive()
   do

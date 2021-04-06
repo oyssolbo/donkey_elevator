@@ -79,6 +79,14 @@ defmodule Elevator do
     elevator_data = Timer.start_timer(self(), data, :timer, :init_timer, @init_time)
     spawn(fn-> read_current_floor() end)
 
+    case Process.whereis(:elevator_receive) do
+      :nil->
+        Logger.info("Starting receive-process for elevator")
+        init_receive()
+      _->
+        Logger.info("Receive-process for elevator already active")
+    end
+
     Logger.info("Elevator initialized")
     {:ok, :init_state, elevator_data}
   end
@@ -105,26 +113,35 @@ defmodule Elevator do
   end
 
 
-##### Interface to external modules #####
-
-
-  @doc """
-  Function for external modules (either Panel or Master) to call when a new order is detected
-  """
-  def delegate_order(order)
-  do
-    #GenStateMachine.call(@node_name, {:received_order, order})
-    IO.inspect(order)
-    GenStateMachine.cast(@node_name, {:received_order, order})
-  end
+##### Networking and interface to external modules #####
 
   @doc """
-  Work in progress - must be decided alongside the interface of Panel and Master
+  Process for receiving data from master and panel, and calls the respective
+  handlers in the GenStateMachine-server
   """
-  def wip()
+  defp receive_thread()
   do
-    :ok
+    receive do
+      {:master, _node, message_id, data} ->
+        Logger.info("Elevator received order from master")
+        Network.send_data_to_all_nodes(:elevator, :master, {message_id, :ack})
+        GenStateMachine.cast(@node_name, {:received_order, data})
+
+      {:panel, _node, message_id, data} ->
+        Logger.info("Elevator received order from panel")
+        Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
+        GenStateMachine.cast(@node_name, {:received_order, data})
+    end
+
+    receive_thread()
   end
+
+  defp init_receive()
+  do
+    spawn(fn -> receive_thread() end) |>
+      Process.register(:elevator_receive)
+  end
+
 
 
 ###################################### Events and transitions ######################################
@@ -644,38 +661,5 @@ defmodule Elevator do
     Driver.set_motor_direction(:stop)
     Process.sleep(@restart_time)
     Process.exit(self(), :shutdown)
-  end
-
-##### Networking #####
-
-  #sending data, should be copy pased into suitable loccation
-  #send_data_to_all_nodes(:elevator, :master, elevator_data)
-
-
-  def receive_thread()
-  do
-    receive do
-      {:master, _node, message_id, data} ->
-        IO.puts("Got the following data from master #{data}")
-        Network.send_data_to_all_nodes(:elevator, :master, {message_id, :ack})
-        GenStateMachine.cast(@node_name, {:received_order, data}) # will this work?
-
-      {:panel, _node, message_id, data} ->
-        IO.puts("Got the following data from panel #{data}")
-        Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
-        GenStateMachine.cast(@node_name, {:received_order, data}) # will this work?
-
-    #after
-    #  10_000 -> IO.puts("Connection timeout")
-
-    end
-
-    receive_thread()
-  end
-
-  def init_receive()
-  do
-    pid = spawn(fn -> receive_thread() end)
-    Process.register(pid, :elevator)
   end
 end

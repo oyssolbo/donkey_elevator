@@ -646,7 +646,7 @@ defmodule Elevator do
     Process.exit(self(), :shutdown)
   end
 
-  ##### Networking #####
+##### Networking #####
 
   #sending data, should be copy pased into suitable loccation
   #send_data_to_all_nodes(:elevator, :master, elevator_data)

@@ -114,4 +114,19 @@ defmodule OrderTest do
     Order.extract_orders(:cab, [order1, order2, order3]) |> IO.inspect()
   end
 
+
+  def test_find_and_remove_empty()
+  do
+    order1 = Order.create_rnd_order(0, :up)
+    order2 = Order.create_rnd_order(1, :down)
+    order3 = Order.create_rnd_order(1, :cab)
+
+    test_order_id = 1
+
+    order = Order.extract_orders(test_order_id, [order1, order2, order3])
+    Order.remove_orders(order, [order1, order2, order3])
+    
+    #Enum.map([order], fn o -> Order.remove_orders(o, [order1, order2, order3]) end) |> IO.inspect()
+  end
+
 end

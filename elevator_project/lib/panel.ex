@@ -2,11 +2,14 @@
 Syntax
     @Order{order_ID, order_type, order_floor}
 """
+
+
 defmodule Panel do
     require Driver
-    require UDP
     require Network
     require Order
+
+    use GenServer
 
     #@button_map %{:hall_up => 0, :hall_down => 1, :cab => 2}
     #@state_map  %{:on => 1, :off => 0}
@@ -15,7 +18,7 @@ defmodule Panel do
     @num_floors Application.fetch_env!(:elevator_project, :project_num_floors)
     # floor_table: Array of the floors; makes it easier to iterate through
 
-    # TODO: Replace mid1, mid2, eid with send_local_node func. For master send; send_data_to_all_nodes.
+    # TODO: Replace mid1, mid2, eid with send_local_node func. For master send; send_data_all_nodes.
     def init(floor_table \\ Enum.to_list(0..@num_floors-1)) do
 
         checker_ID = spawn(fn -> order_checker([], floor_table) end)
@@ -26,6 +29,7 @@ defmodule Panel do
         Process.register(sender_ID, :panel)
 
         {checker_ID, sender_ID}
+        {:ok, "hello"}
     end
 
     defp order_checker(old_orders, floor_table) when is_list(old_orders) do
@@ -54,7 +58,7 @@ defmodule Panel do
 
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
-            Network.send_data_to_all_nodes(:panel, :master, outgoing_orders)
+            Network.send_data_all_nodes(:panel, :master, outgoing_orders)
             Network.send_data_inside_node(:panel, :master, Order.extract_orders(:cab, outgoing_orders))
             #send({:elevator, node}, {:cab_orders, :panel, self(), extract_cab_orders(orders)})
 
@@ -104,6 +108,13 @@ defmodule Panel do
 
     defp check_4_orders(table \\ Enum.to_list(0..@num_floors-1)) do
         orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
+    end
+
+
+    def start_link(init_arg \\ [])
+    do
+        server_opts = [name: :panel_module]
+        GenServer.start_link(__MODULE__, init_arg, server_opts)
     end
 
 end

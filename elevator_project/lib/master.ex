@@ -1,7 +1,6 @@
 defmodule Master do
   @moduledoc """
   Barebone master-module that must be developed further.
-
   Requirements:
     - Network
     - Order
@@ -60,7 +59,6 @@ defmodule Master do
 
   @doc """
   Function to initialize the master, and transitions the master into backup_state
-
   The function
     - establishes connection to GenStateMachine-server
     - stores the current data on the server
@@ -115,7 +113,6 @@ defmodule Master do
 
   @doc """
   Function to send an order to an elevator
-
   Will continue to try until it receives an ack or a timeout is triggered
   """
   defp send_order_to_elevator(
@@ -179,7 +176,6 @@ defmodule Master do
 
   @doc """
   Function to handle if data has been sent from the active-master to the passive master
-
   The heartsbeats / messages are only considered valid if the message-id exceeds the internal /
   previous message-id
   """
@@ -308,7 +304,6 @@ defmodule Master do
 
   @doc """
   Function that updates the backup-master about the current active orders
-
   This update functions as a heartbeat, such that the backup can take over if something
   occurs with the active master
   """
@@ -413,10 +408,8 @@ defmodule Master do
 
   @doc """
   Function to handle if an elevator gets a timeout / is disconnected
-
   The function detects which external orders are affected by the disconnect, and
   redelegates them to the other elevators.
-
   If there are no connected elevators, the orders' delegated field are set to :nil.
   When one elevator becomes active again, it will receive all orders with field set
   to :nil
@@ -451,7 +444,6 @@ defmodule Master do
 
   @doc """
   Function to handle if the GenStateMachine-server receives a list of orders
-
   Important that the function get a list of orders
   """
   def handle_event(
@@ -492,13 +484,11 @@ defmodule Master do
 
   @doc """
   Function that merges two master_data-structs into one single master-data-struct
-
   Since we cannot know which master-data struct contains the most correct information,
   the orders are OR-ed together, with the field :delegated_order set to :nil. The
   information about the elevators are discarded, since that is the simplest. It is
   however possible to use the last-message time to find the updated value, however
   that could result in hasardious code. Instead all of the timers are canceled.
-
   It is assumed that the elevators spam out their information often enough, such that
   it should not be a problem. It will not be as efficient, as one elevator may become
   overloaded with work, but that is a consequence we are prepared to face
@@ -544,7 +534,6 @@ defmodule Master do
   @doc """
   Unassigns all orders. In other words, it sets the delegated elevator to :nil for all
   orders in the list.
-
   Returns a list of the new-undelegated orders
   """
   defp unassign_all_orders([order | rest_orders])
@@ -561,13 +550,10 @@ defmodule Master do
 
   @doc """
   Function to delegate a set of orders to the optimal elevator(s).
-
   The function finds the optimal elevator to perform each order, and then delegates
   the order to said elevator.
-
   If no elevators are connected, all of the orders' attribute is set to :nil. Otherwise
   set to the delegated elevator.
-
   Returns a list of orders with the correct assigned elevator
   """
   defp delegate_orders(
@@ -622,7 +608,6 @@ defmodule Master do
 ## Determine elevator ##
   @doc """
   Function that finds the optimal elevator to serve an order.
-
   The function uses previous information, which means the optimal elevator can
   be the worst elevator to perform the order. It is assumed that there are enough
   elevators and not enough floors to be relevant. For a larger building, a better
@@ -663,7 +648,6 @@ defmodule Master do
 
   @doc """
   Calculates the cost an elevator would have to an order.
-
   The function uses the difference between order_floor and elevator_floor, and
   multiplies by 1000 if the elevator must change direction
   """
@@ -691,7 +675,6 @@ defmodule Master do
 
   @doc """
   Function that checks if an elevator moves towards an order or not.
-
   Ugly boolean logic
   """
   defp check_elevator_in_dir?(

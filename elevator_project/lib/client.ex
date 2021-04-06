@@ -11,10 +11,10 @@ defmodule Client do
   require Logger
 
   defstruct [
-    client_id:          :nil, # IP-address to differentiate
-    client_data:        :nil,
-    last_message_time:  :nil, # Last time a message was received. Useful for throwing a timeout
-    last_message_id:    0
+    client_id:        :nil, # IP-address to differentiate
+    client_data:      :nil,
+    client_timer:     :nil, # Last time a message was received. Useful for throwing a timeout
+    last_message_id:  0
   ]
 
 ## Add client(s) ##
@@ -89,6 +89,14 @@ defmodule Client do
 
   It is assumed that there is only one copy of each order in the list
   """
+  def remove_clients(
+        [],
+        client_list)
+  when is_list(client_list)
+  do
+    client_list
+  end
+
   def remove_clients(
         clients,
         client_list)

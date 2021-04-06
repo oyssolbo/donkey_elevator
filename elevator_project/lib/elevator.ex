@@ -37,6 +37,8 @@ defmodule Elevator do
   @moving_time          Application.fetch_env!(:elevator_project, :elevator_timeout_moving_ms)
   @status_update_time   Application.fetch_env!(:elevator_project, :elevator_update_status_time_ms)
 
+  @restart_time         Application.fetch_env!(:elevator_project, :elevator_restart_time_ms)
+
   @node_name            :elevator
 
   @enforce_keys         [:orders, :last_floor, :dir, :timer, :elevator_id]
@@ -139,25 +141,43 @@ defmodule Elevator do
         :cast,
         {:received_order, new_order},
         state,
-        %Elevator{orders: prev_orders, last_floor: last_floor} = elevator_data)
+        %Elevator{orders: prev_orders} = elevator_data)
+  when state in [:init_state, :active_state, :door_state, :moving_state]
   do
     IO.inspect(@init_time)
 
     #Logger.info("Elevator received order from #{from}")
     Logger.info("Elevator received order")
 
-    # First check if the order is valid - throws an error if not
-    Order.check_valid_order(new_order)
+    new_elevator_data =
+      case Order.check_valid_order(new_order_list) do
+        :true->
+          # Checking if order already exists - if not, add to list and calculate next direction
+          updated_order_list = Order.add_orders(new_order_list, prev_orders)
+          new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
 
-    # Checking if order already exists - if not, add to list and calculate next direction
-    updated_order_list = Order.add_order(new_order, prev_orders)
-    new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
-    Storage.write(updated_order_list)
+          Storage.write(updated_order_list)
+          Lights.set_order_lights(updated_order_list)
 
-    Lights.set_order_lights(updated_order_list)
+          new_elevator_data
+
+        :false->
+          elevator_data
+      end
 
     {:next_state, state, new_elevator_data}
   end
+
+  def handle_event(
+        :cast,
+        {:received_order, _new_order_list},
+        :restart_state,
+        elevator_data)
+  do
+    Logger.info("Elevator received order while in restart_state")
+    {:next_state, :restart_state, elevator_data}
+  end
+
 
 # udp_timer #
   @doc """
@@ -610,16 +630,18 @@ defmodule Elevator do
 
   @doc """
   Function to kill the module in case of an error
+
+  The function puts the process to sleep for @restart_time. This should trigger a
+  timeout in master and redistribute any external orders to other elevators
   """
   defp restart_process()
   do
-    # Should pherhaps consider sending a message to master or something ?
-    # Network.send_data_to_all_nodes(:elevator, :master, :restarting})
     Driver.set_motor_direction(:stop)
+    Process.sleep(@restart_time)
     Process.exit(self(), :shutdown)
   end
 
-  ##### Networking #####
+##### Networking #####
 
   #sending data, should be copy pased into suitable loccation
   #send_data_to_all_nodes(:elevator, :master, elevator_data)

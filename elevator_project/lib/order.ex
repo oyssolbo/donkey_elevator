@@ -70,12 +70,20 @@ defmodule Order do
   It is assumed that there is only one copy of each order in the list
   """
   def remove_orders(
+        [],
+        order_list)
+  when is_list(order_list)
+  do
+    order_list
+  end
+
+  def remove_orders(
         orders,
         order_list)
   when is_list(orders) and is_list(order_list)
   do
     if is_order_list(order_list) and is_order_list(orders) do
-      Enum.each(orders, fn order -> remove_orders(order, order_list) end)
+      Enum.map(orders, fn order -> remove_orders(order, order_list) end)
     else
       Logger.info("Not an order-list")
       []

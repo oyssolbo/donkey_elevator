@@ -8,120 +8,188 @@ defmodule Client do
   """
 
   require Timer
-  require ListOperations
+  require Logger
 
   defstruct [
-    client_id:          :nil,                 # IP-address to differentiate
-    last_message_time:  Timer.get_utc_time(), # Last time a message was received. Useful for throwing a timeout
-    data:               :nil
+    client_id:        :nil, # IP-address to differentiate
+    client_data:      :nil,
+    client_timer:     :nil, # Last time a message was received. Useful for throwing a timeout
+    last_message_id:  0
   ]
 
+## Add client(s) ##
+  @doc """
+  Function to add client(s) to a list of clients
+  """
+  def add_clients(
+        %Client{} = new_client,
+        client_list)
+  when is_list(client_list)
+  do
+    old_client = extract_client(new_client.client_id, client_list)
 
+    case client_list do
+      []->
+        [new_client]
+      _->
+        case old_client do
+          []->
+            client_list ++ [new_client]
+          _->
+            temp_client_list = remove_clients(old_client, client_list)
+            temp_client_list ++ [new_client]
+        end
+    end
+  end
+
+  def add_clients(
+        [client | rest_clients],
+        client_list)
+  when is_list(client_list)
+  do
+    temp_client_list = add_clients(client, client_list)
+    add_clients(rest_clients, temp_client_list)
+  end
+
+  def add_clients(
+        [],
+        client_list)
+  when is_list(client_list)
+  do
+    client_list
+  end
+
+
+## Remove client(s) ##
+  @doc """
+  Function that removes a single or a list of clients from another list of clients
+
+  The function searches through the entire list, such that if a duplicated
+  client has occured, all duplicates are removed
+  """
+  def remove_clients(
+        %Client{} = client,
+        client_list)
+  when is_list(client_list)
+  do
+    original_length = length(client_list)
+    new_list = List.delete(client_list, client)
+    new_length = length(new_list)
+
+    case new_length < original_length do
+      :true->
+        remove_clients(client, new_list)
+      :false->
+        new_list
+    end
+  end
+
+  @doc """
+  Function to remove a list of clients from another list of clients
+
+  It is assumed that there is only one copy of each order in the list
+  """
+  def remove_clients(
+        [],
+        client_list)
+  when is_list(client_list)
+  do
+    client_list
+  end
+
+  def remove_clients(
+        clients,
+        client_list)
+  when is_list(clients) and is_list(client_list)
+  do
+    if is_client_list(client_list) and is_client_list(clients) do
+      Enum.map(clients, fn client -> remove_clients(client, client_list) end)
+    else
+      Logger.info("Not a client-list")
+      []
+    end
+  end
+
+
+## Extract client(s) ##
   @doc """
   Function that finds a client with client_id: 'id' in a list of clients
 
   The function returns a client with correct client_id, or an empty list
   if the client is not found
   """
-  def find_client(
-        id,
-        #[check_client | rest_client])
+  def extract_client(
+        client_id,
         client_list)
+  when client_list |> is_list()
   do
-    ListOperations.find_element_with_value(client_list, :client_id, id)
-
-    # check_client_id = Map.get(check_client, :client_id)
-
-    # case check_client_id == id do
-    #   :true->
-    #     check_client
-    #   :false->
-    #     find_client(id, rest_client)
-    # end
-  end
-
-  # def find_client(
-  #       id,
-  #       [])
-  # do
-  #   []
-  # end
-
-
-  @doc """
-  Function that removes a client from a list of clients
-  """
-  def remove_client(
-        client,
-        client_list)
-  do
-    ListOperations.remove_element_from_list(client, client_list)
-  end
-
-
-  @doc """
-  Function that adds a client to a list of client
-
-  The function checks if a client with the corresponding client_id already
-  exists in the list. If false, the client is added to the list.
-  """
-  def add_client(
-        client,
-        client_list)
-  do
-    # client_id = Map.get(client, :client_id)
-    # client_id_in_list = ListOperations.find_element_with_value(client_list, :client_id, client_id)
-
-    # Checking only id, since different time can affect the result
-    # Since we are adding an element based on a certain requirement, it is
-    # alright to not use the ListOperation-module here
-    client_id_in_list =
-      Map.get(client, :client_id) |>
-      find_client(client_list)
-
-    if client_id_in_list != [] do
-      client_list
+    if is_client_list(client_list) do
+      Enum.filter(client_list, fn x -> x.client_id == client_id end)
     else
-      [client_list | client]
+      Logger.info("Not a client-list")
+      []
+    end
+  end
+
+
+## Check client(s) ##
+  @doc """
+  Function to check whether list contains only clients. Returns :false if
+  at least one element is not of struct %Client{}
+  """
+  defp is_client_list(list)
+  when is_list(list)
+  do
+    Enum.all?(list, fn
+      %Client{} -> :true
+      _ -> :false
+    end)
+  end
+
+## Modify client ##
+  @doc """
+  Function that modifies a field in either a single client or a list of clients. The
+  field 'field' is set to value 'value'.
+
+  The list if clients is only modified if the entire list is made of % Clients
+  """
+  def modify_client_field(
+        %Client{} = client,
+        field,
+        value)
+  do
+    Map.put(client, field, value)
+  end
+
+  def modify_client_field(
+        clients,
+        field,
+        value)
+  when clients |> is_list()
+  do
+    if is_client_list(clients) do
+      Enum.map(clients, fn client -> Map.put(client, field, value) end)
+    else
+      Logger.info("Not a client-list")
+      clients
     end
   end
 
 
   @doc """
-  Function to assign a field 'field' in the client-struct to a value 'value'
-  """
-  def set_client_field(
-        client_list,
-        field,
-        value)
-  do
-    # updated_client = Map.put(client, field, value)
-    # [updated_client | set_client_field(rest_clients, field, value)]
-
-    ListOperations.set_element_field(client_list, field, value)
-  end
-
-  def set_client_field(
-        [],
-        field,
-        value)
-  do
-    []
-  end
-
-
-  @doc """
   Function to cancel the timers in a list of clients
-  """
-  def cancel_all_client_timers([client | rest_clients])
-  do
-    Timer.stop_timer(client, :last_message_time)
-    [client | cancel_all_client_timers(rest_clients)]
-  end
 
-  def cancel_all_client_timers([])
+  The function assumes that the parameter 'clients' is a list
+  """
+  def cancel_all_client_timers(clients)
+  when is_list(clients)
   do
-    []
+    if is_client_list(clients) do
+      Enum.map(clients, fn client -> Timer.stop_timer(client, :last_message_time) end)
+    else
+      Logger.info("Not a client-list")
+      clients
+    end
   end
 
 end

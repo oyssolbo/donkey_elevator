@@ -3,6 +3,7 @@ Syntax
     @Order{order_ID, order_type, order_floor}
 """
 
+
 defmodule Panel do
     @moduledoc """
     Module for detecting button inputs on the elevator panel, and passing the information on to relevant modules.
@@ -14,9 +15,9 @@ defmodule Panel do
     - Order
     """
     require Driver
-    require UDP
     require Network
     require Order
+
 
     @num_floors Application.fetch_env!(:elevator_project, :project_num_floors)
     # floor_table: Array of the floors; makes it easier to iterate through
@@ -47,6 +48,7 @@ defmodule Panel do
         #---------------#
 
         {checker_ID, sender_ID}
+        {:ok, "hello"}
     end
 
     def init_checker(floor_table) do
@@ -73,7 +75,6 @@ defmodule Panel do
 
 
     # MODULE PROCESSES
-
     defp order_checker(old_orders, floor_table) when is_list(old_orders) do
 
         checkerSleep = 200
@@ -119,7 +120,7 @@ defmodule Panel do
         if outgoing_orders != [] do
             # ... send orders to all masters on network, and send cab orders to local elevator
             Network.send_data_to_all_nodes(:panel, :master, {outgoing_orders, send_ID})
-            Network.send_data_inside_node(:panel, :master, Order.extract_cab_orders(outgoing_orders))
+            Network.send_data_inside_node(:panel, :master, Order.extract_orders(:cab, outgoing_orders))
 
             # ... and wait for an ack
             receive do

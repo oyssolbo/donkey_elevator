@@ -12,7 +12,7 @@ defmodule UDP_discover do
   @broadcast_port 9876
   @init_port 6789
   @num_tries 5
-  @default_timeout 15000
+  @default_timeout 45000 #increased for testing purposes (easier to debug)
 
   @doc """
   @brief        Function that hopefully returns the IP-address of the system
@@ -26,23 +26,16 @@ defmodule UDP_discover do
                                                     resolved
   """
   def get_ip(port \\ @init_port) do
-    case UDP.open_connection(port, [active: false, broadcast: true]) do
+    case :gen_udp.open(port, [active: false, broadcast: true]) do
       {:ok, socket} ->
-        #UDP.send_data(socket, @broadcast_address, port, "Test")
-        :gen_udp.send(socket, {255,255,255,255}, 6789, "test packet")
-        # case UDP.receive_data(socket) do
-        #   {:recv, {ip, _port, _data}} ->
-        #     {:recv, ip}
-        #   {:error, _} ->
-        #     {:error, :could_not_get_ip}
-        # end
+        :gen_udp.send(socket, @broadcast_address, port, "test packet")
 
         ip = case :gen_udp.recv(socket, 100, 1000) do
           {:ok, {ip, _port, _data}} -> ip
           {:error, _} -> {:error, :could_not_get_ip}
         end
 
-        UDP.close_socket(socket)
+        :gen_udp.close(socket)
         :inet.ntoa(ip) |> to_string()
 
         {:nil, _} ->
@@ -55,16 +48,18 @@ defmodule UDP_discover do
     end
   end
 
+
   @doc """
   @brief        Helper function to open UDP socket on the broadcast port with the broadcast options
   """
-  def broadcast_open_connection(port \\ @broadcast_port)
+  def broadcast_open_socket(port \\ @broadcast_port)
   do
-    case UDP.open_connection(port, [active: false, broadcast: true, reuseaddr: :true]) do
+    case :gen_udp.open(port, [active: false, broadcast: true, reuseaddr: :true]) do
       {:ok, socket} ->
         {:ok, socket}
 
       {:error, reason} ->
+        Logger.error("An error occurred when opening the port #{port}")
         {:error, reason}
     end
   end
@@ -76,10 +71,10 @@ defmodule UDP_discover do
   """
   def broadcast_cast(node_name, port \\ @broadcast_port)
   do
-    case broadcast_open_connection() do
+    case broadcast_open_socket() do
       {:ok, socket} ->
         #:gen_udp.send(socket, @broadcast_address, @broadcast_port, node_name)
-        spawn (fn -> broadcast_cast_loop(node_name,socket) end)
+        spawn (fn -> broadcast_cast_loop(node_name, socket, port) end)
       {:error, reason} ->
         Logger.error("The error #{reason} occured while trying to broadcast #{node_name}")
     end
@@ -89,11 +84,11 @@ defmodule UDP_discover do
   @brief        Function that will broadcast the node_name on the broadcast port
                 will loop in infinity
   """
-  def broadcast_cast_loop(node_name, socket, port \\ @broadcast_port)
+  defp broadcast_cast_loop(node_name, socket, port)
   do
-      :gen_udp.send(socket, @broadcast_address, @broadcast_port, node_name)
+      :gen_udp.send(socket, @broadcast_address, port, node_name)
       Process.sleep(@default_timeout)
-      broadcast_cast_loop(node_name,socket)
+      broadcast_cast_loop(node_name,socket, port)
   end
 
 
@@ -102,7 +97,7 @@ defmodule UDP_discover do
   """
   def broadcast_listen(port \\ @broadcast_port)
     do
-      case broadcast_open_connection() do
+      case broadcast_open_socket(port) do
         {:ok, socket} ->
           spawn( fn -> broadcast_receive_and_connect(socket) end)
       end
@@ -110,9 +105,9 @@ defmodule UDP_discover do
 
 
 @doc """
-@brief Helper function tp broadcast_receive and connect
+@brief Helper function to broadcast_receive and connect to the node recived, will loop and should only be spawned by broadcast_listen
 """
-  def broadcast_receive_and_connect(socket)
+  defp broadcast_receive_and_connect(socket)
     do
       case :gen_udp.recv(socket, 0)  do
         {:ok, recv_packet} ->

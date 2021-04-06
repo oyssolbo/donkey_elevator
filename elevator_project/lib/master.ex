@@ -1,6 +1,12 @@
 defmodule Master do
   @moduledoc """
-  Barebone master-module that must be developed further.
+  Module implementing the master-module. The model is a combined process-pair between
+  an active and a backup process. The master is initialized as backup, however if a
+  timeout occurs without any heartbeats from active master, it is activated. If for
+  some reason, there are two active masters available, the master which was
+  activated first is considered active. Since we cannot know which are most valid
+  (in case of a network-error), the orders are OR-ed in.
+
   Requirements:
     - Network
     - Order
@@ -32,6 +38,9 @@ defmodule Master do
   @timeout_active_master_time Application.fetch_env!(:elevator_project, :master_timeout_active_ms)
   @timeout_elevator_time      Application.fetch_env!(:elevator_project, :master_timeout_elevator_ms)
 
+  @ack_timeout_time           Application.fetch_env!(:elevator_project, :ack_timeout_time_ms)
+  @max_resends                Application.fetch_env!(:elevator_project, :resend_max_counter)
+
   @node_name                  :master
 
   @enforce_keys [
@@ -39,8 +48,7 @@ defmodule Master do
     :master_timer,            # Time of last connection with active master
     :master_message_id,       # ID of last message received from active_master
     :activation_time,         # Time the master became active
-    :connected_elevator_list, # List of connection-id the master has with each elevator
-    :master_id
+    :connected_elevator_list # List of connection-id the master has with each elevator
   ]
 
   defstruct [
@@ -48,8 +56,7 @@ defmodule Master do
     master_timer:             :nil,
     master_message_id:        0,
     activation_time:          :nil,
-    connected_elevator_list:  [],
-    master_id:                :nil
+    connected_elevator_list:  []
   ]
 
 ###################################### External functions ######################################
@@ -73,12 +80,19 @@ defmodule Master do
       master_timer:             make_ref(),
       master_message_id:        0,
       activation_time:          :nil,
-      connected_elevator_list:  [],
-      master_id:                0 # Atom.to_string(@node_name) <> Network.get_ip()
+      connected_elevator_list:  []
     }
 
     # Starting process for error-handling
     master_data = Timer.start_timer(self(), data, :master_timer, :master_active_timeout, @timeout_active_master_time)
+
+    case Process.whereis(:master_receive) do
+      :nil->
+        Logger.info("Starting receive-process for master")
+        init_receive()
+      _->
+        Logger.info("Receive-process for master already active")
+    end
 
     Logger.info("Master initialized")
 
@@ -91,8 +105,6 @@ defmodule Master do
   """
   def start_link(init_arg \\ [])
   do
-    # Could potentially be a problem with using @node_name, as two servers
-    # then will operate on the same name
     server_opts = [name: @node_name]
     GenStateMachine.start_link(__MODULE__, init_arg, server_opts)
   end
@@ -108,28 +120,84 @@ defmodule Master do
   end
 
 
-##### Interface to external modules #####
+##### Networking and interface to external modules #####
+
+  @doc """
+  Receives messages from elevator, panel or other master. The function casts a message
+  to the GenStateMachine-server, such that all events can be handled properly
+  """
+  defp receive_thread()
+  do
+    receive do
+      {:master, _from_node, _message_id, {event_name, data}} ->
+        Logger.info("Got message from other master")
+        GenStateMachine.cast(@node_name, {event_name, data})
+
+      {:elevator, from_node, message_id, {event_name, data}} ->
+        Logger.info("Got message from elevator")
+        GenStateMachine.cast(@node_name, {event_name, data})
+        Network.send_data_spesific_node(:master, :elevator, from_node, {message_id, :ack})
+
+      {:panel, from_node, message_id, order_list} ->
+        Logger.info("Got message from panel")
+        GenStateMachine.cast(@node_name, {:panel_received_order, order_list})
+        Network.send_data_spesific_node(:master, :panel, from_node, {message_id, :ack})
+    end
+
+    receive_thread()
+  end
+
+  defp init_receive()
+  do
+    spawn(fn -> receive_thread() end) |>
+      Process.register(:master_receive)
+  end
 
 
   @doc """
   Function to send an order to an elevator
-  Will continue to try until it receives an ack or a timeout is triggered
+
+  Will continue to try until it receives an ack or a certain amount of
+  time has passed. It is assumed that the master receives a timeout/timer-interrupt,
+  which removes the elevator from the list if network-communication is lost. Therefore
+  it should not be required for the function to throw a message to the GenStateMachine
+  to indicate that the process has died. The function could send a message if it is a
+  problem
   """
   defp send_order_to_elevator(
-        _order,
-        _elevator_id,
-        _counter \\ 0)
+        order,
+        elevator_id,
+        counter \\ 0)
+  when counter < @max_resends
   do
-    # pid = Process.whereis(elevator_id)
-    # Process.send(pid, order)
+    message_id = Network.send_data_spesific_node(:master, :elevator, elevator_id, order)
+    case Network.receive_ack(message_id) do
+      {:ok, _receiver_id}->
+        :ok
+      {:no_ack, :no_id}->
+        send_order_to_elevator(order, elevator, counter + 1)
+    end
   end
 
-  @doc """
-  Function for other modules to send order to the master
-  """
-  def give_master_orders(order)
+  defp send_order_to_elevator(
+        _order,
+        elevator_id,
+        _counter)
   do
-    GenStateMachine.cast(@node_name, {:panel_received_order, order})
+    Logger.info("Master is unable to send order to elevator")
+    IO.inspect(elevator_id)
+    :ok
+  end
+
+
+  @doc """
+  Function for sending data to other master
+
+  No acks are used, since these messages are sent often enough
+  """
+  defp send_data_to_master(%Master{} = master_data)
+  do
+    Network.send_data_all_nodes(:master, :master, master_data)
   end
 
 
@@ -282,22 +350,10 @@ defmodule Master do
   do
     Timer.interrupt_after(self(), :master_update_timer, @update_active_time)
 
-    # Update this when we know how to send data
-    backup_master_pid = Process.whereis(:backup_master)
-
     updated_message_id = Map.get(master_data, :master_message_id) + 1
-
-    if backup_master_pid != :nil do
-      activation_time = Map.get(master_data, :activation_time)
-      active_order_list = Map.get(master_data, :active_order_list)
-
-      # Unsure if the backup-master really requires to know which elevators are connected or not
-      connection_list = Map.get(master_data, :connected_elevator_list)
-      Process.send(backup_master_pid, {self(), activation_time, updated_message_id, active_order_list, connection_list}, [])
-    end
-
     new_master_data = Map.put(master_data, :master_message_id, updated_message_id)
 
+    send_data_to_master(new_master_data)
     {:next_state, :active_state, new_master_data}
   end
 
@@ -497,12 +553,8 @@ defmodule Master do
         intern_master_data,
         extern_master_data)
   do
-    Logger.info("Entered combine data")
     intern_orders = Map.get(intern_master_data, :active_order_list)
     extern_orders = Map.get(extern_master_data, :active_order_list)
-
-    #IO.inspect(intern_orders)
-    #IO.inspect(extern_orders)
 
     intern_connected_elevators = Map.get(intern_master_data, :connected_elevator_list)
     extern_connected_elevators = Map.get(extern_master_data, :connected_elevator_list)
@@ -698,48 +750,5 @@ defmodule Master do
         # Any other case
         :false
     end
-  end
-
-
-## Networking ##
-
-  ## send data to elevator or panel ##
-  #send_data_spesific_node(:master, :elevator, receiver_node, data)
-  #send_data_spesific_node(:master, :panel, receiver_node, data)
-
-  ## send data to other master ##
-  #send_data_to_all_nodes(:master, :master,data)
-
-  @doc """
-  Receives messages from elevator, panel or other master. The function casts a message
-  to the GenStateMachine-server, such that all events can be handled properly
-  """
-  def receive_thread()
-  do
-    receive do
-      {:master, _from_node, _message_id, {event_name, data}} ->
-        Logger.info("Got message from other master")
-        GenStateMachine.cast(@node_name, {event_name, data})
-
-      {:elevator, _from_node, _message_id, {event_name, data}} ->
-        Logger.info("Got message from elevator")
-        GenStateMachine.cast(@node_name, {event_name, data})
-
-      {:panel, from_node, message_id, order_list} ->
-        Logger.info("Got message from panel")
-        GenStateMachine.cast(@node_name, {:panel_received_order, order_list})
-        Network.send_data_spesific_node(:master, :panel, from_node, {message_id, :ack})
-
-    after
-      10_000 -> Logger.info("Connection timeout for master")
-
-    end
-    receive_thread()
-  end
-
-  def init_receive()
-  do
-    pid = spawn(fn -> receive_thread() end)
-    Process.register(pid, :master_receive)
   end
 end

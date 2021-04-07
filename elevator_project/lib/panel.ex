@@ -19,6 +19,10 @@ defmodule Panel do
     require Order
 
     @num_floors Application.fetch_env!(:elevator_project, :project_num_floors)
+    @ack_timeout Application.fetch_env!(:elevator_project, :panel_ack_timeout)
+    @checker_timeout Application.fetch_env!(:elevator_project, :panel_checker_timeout)
+    @checker_sleep Application.fetch_env!(:elevator_project, :panel_checker_sleep)
+
     # floor_table: Array of the floors; makes it easier to iterate through
 
     # INITIALIZATION FUNTIONS
@@ -76,29 +80,25 @@ defmodule Panel do
 
     defp order_checker(old_orders, floor_table) when is_list(old_orders) do
 
-        checkerSleep = 200
+        checkerSleep = @checker_sleep
 
         # Update order list by reading all HW order buttons
         new_orders = check_4_orders(floor_table)
         orders = old_orders++new_orders
         #orders = old_orders++check_4_orders
 
-        #---TEST CODE - REMOVE BEFORE LAUNCH---#
+        #---TEST CODE ---#
         if new_orders != [] do
             IO.inspect("Recieved #{inspect length(new_orders)} new orders",label: "orderChecker")
             Process.sleep(checkerSleep)
         end
+        #----------------#
 
         # Check for request from sender. If there is, send order list and recurse with reset list
         receive do
             {:panel, {_message_ID, :gibOrdersPls}} ->
-                #send(sender_addr, {:order_checker, orders})
                 Network.send_data_inside_node(:order_checker, :panel, orders)
 
-                #---TEST CODE - REMOVE BEFORE LAUNCH---#
-                #IO.inspect("Received send request. Sent #{inspect length(orders)} orders" ,label: "orderChecker")
-                #Process.sleep(checkerSleep)
-                #--------------------------------------#
                 order_checker([], floor_table)
                 
             {_sender, {_messageID, {:special_delivery, special_orders}}} ->
@@ -112,8 +112,8 @@ defmodule Panel do
     end
 
     defp order_sender(floor_table, send_ID, outgoing_orders) when is_list(outgoing_orders) do
-        ackTimeout = 800
-        checkerTimeout = 1000
+        ackTimeout = @ack_timeout
+        checkerTimeout = @checker_timeout
 
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
@@ -126,7 +126,6 @@ defmodule Panel do
                 {:ack, sentID} ->
                     # When ack is recieved for current send_ID, send request to checker for latest order matrix
                     if sentID == send_ID do
-                        #send(checker_addr, {:gibOrdersPls, self()})
                         Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
                         IO.inspect("Received ack on SendID #{sentID}", label: "orderSender")   # TEST CODE
                     end
@@ -145,7 +144,7 @@ defmodule Panel do
             end
 
         else
-            # If order matrix is empty, send request to checker for latest orders. Recurse with those (but same sender ID)
+            # If no orders, send request to checker for latest orders. Recurse with those (but same sender ID)
             Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
             receive do
                 {:order_checker, {_messageID, updated_orders}} ->
@@ -163,8 +162,7 @@ defmodule Panel do
     def hardware_order_checker(floor, type) do
         try do
             if Driver.get_order_button_state(floor, type) == 1 do
-                # TODO: Replace Time.utc_now() with wrapper func from Timer module
-                order = struct(Order, [order_id: Time.utc_now(), order_type: type, order_floor: floor])
+                order = struct(Order, [order_id: Timer.get_utc_time(), order_type: type, order_floor: floor])
             else
                 order = []
             end            

@@ -84,19 +84,6 @@ defmodule Lights do
     end
     set_all_order_lights(rst_ordrs)
   end
-  # defp set_all_order_lights([%Order{order_type: type, order_floor: floor} = _order | rest_orders])
-  # do
-  #   if type == :down do
-  #     Driver.set_order_button_light(:hall_down, floor, :on)
-  #   end
-  #   if type == :up do
-  #     Driver.set_order_button_light(:hall_up, floor, :on)
-  #   end
-  #   if type == :cab do
-  #     Driver.set_order_button_light(:cab, floor, :on)
-  #   end
-  #   set_all_order_lights(rest_orders)
-  # end
 
   defp set_all_order_lights([])
   do

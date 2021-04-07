@@ -1,11 +1,9 @@
 defmodule Panel.Supervisor do
   @moduledoc """
-    ****w
+  Supervisor supervising the Panel.
   """
 
-
   use Supervisor
-
 
   @doc """
   Starts a link from the supervisor to the module
@@ -33,7 +31,7 @@ defmodule Panel.Supervisor do
     opts = [
       strategy: :one_for_one,
       max_seconds: 2,
-      name: Panel.Supervisor
+      name: :panel_supervisor
     ]
     Supervisor.init(children, opts)
   end

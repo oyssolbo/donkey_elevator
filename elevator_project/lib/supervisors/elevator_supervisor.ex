@@ -36,7 +36,7 @@ defmodule Elevator.Supervisor do
     opts = [
       strategy: :one_for_one,
       max_seconds: 2,
-      name: Elevator.Supervisor
+      name: :elevator_supervisor
     ]
     Supervisor.init(children, opts)
   end

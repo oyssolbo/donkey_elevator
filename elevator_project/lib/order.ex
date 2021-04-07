@@ -209,7 +209,7 @@ defmodule Order do
         floor,
         dir)
   do
-    case extract_orders(orders, floor, dir) do
+    case extract_orders(floor, dir, orders) do
       [] ->
         {:false, []}
       orders ->

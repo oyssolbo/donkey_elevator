@@ -35,7 +35,7 @@ defmodule Master.Supervisor do
     opts = [
       strategy: :one_for_one,
       max_seconds: 2,
-      name: Master.Supervisor
+      name: :master_supervisor
     ]
     Supervisor.init(children, opts)
   end

@@ -37,7 +37,7 @@ defmodule Network do
     message_id = make_ref()
     network_list = SystemNode.nodes_in_network()
 
-    send_data_all_nodes_loop(sender_id, receiver_id, network_list, message_id, data)
+    send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id)
 
     {:ok, message_id}
   end

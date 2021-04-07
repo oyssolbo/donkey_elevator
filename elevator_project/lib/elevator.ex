@@ -78,7 +78,7 @@ defmodule Elevator do
 
     # Starting process for error-handling
     elevator_data = Timer.start_timer(self(), data, :timer, :init_timer, @init_time)
-    spawn(fn-> read_current_floor() end)
+    spawn_link(fn-> read_current_floor() end)
 
     case Process.whereis(:elevator_receive) do
       :nil->
@@ -125,7 +125,7 @@ defmodule Elevator do
     receive do
       {:master, _node, message_id, data} ->
         Logger.info("Elevator received order from master")
-        Network.send_data_to_all_nodes(:elevator, :master, {message_id, :ack})
+        Network.send_data_all_nodes(:elevator, :master, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:received_order, data})
 
       {:panel, _node, message_id, data} ->
@@ -139,8 +139,23 @@ defmodule Elevator do
 
   defp init_receive()
   do
-    spawn(fn -> receive_thread() end) |>
+    spawn_link(fn -> receive_thread() end) |>
       Process.register(:elevator_receive)
+  end
+
+
+  defp send_served_orders(orders)
+  when orders |> is_list()
+  do
+    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master, {:elevator_served_order, orders}) end)
+  end
+
+
+  defp send_status_update(
+        last_dir,
+        last_floor)
+  do
+    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master, {:elevator_status_update, last_dir, last_floor}) end)
   end
 
 
@@ -207,7 +222,7 @@ defmodule Elevator do
         %Elevator{dir: dir, last_floor: last_floor} = elevator_data)
   do
     Timer.interrupt_after(self(), :udp_timer, @status_update_time)
-    Network.send_data_all_nodes(:elevator, :master,  {Map.get(elevator_data, :elevator_id), Map.get(elevator_data, :dir), Map.get(elevator_data, :last_floor)})
+    send_status_update(dir, last_floor)
 
     {:next_state, state, elevator_data}
   end
@@ -322,7 +337,7 @@ defmodule Elevator do
     all_orders = Map.get(elevator_data, :orders)
     direction = Map.get(elevator_data, :dir)
 
-    {order_at_floor, _valid_orders} = Order.check_orders_at_floor(all_orders, floor, direction)
+    {order_at_floor, floor_orders} = Order.check_orders_at_floor(all_orders, floor, direction)
 
     # Updating moving-timer and last_floor
     IO.inspect(elevator_data)
@@ -334,7 +349,7 @@ defmodule Elevator do
       case order_at_floor do
         :true->
           # The floor has an order. Stop and serve
-          new_elevator_data = reached_order_floor(temp_elevator_data, floor)
+          new_elevator_data = reached_order_floor(temp_elevator_data, floor, floor_orders)
           {:door_state, new_elevator_data}
 
         :false->
@@ -437,7 +452,7 @@ defmodule Elevator do
   """
   defp read_current_floor()
   do
-    Stream.iterate(0, &(&1+1)) |> Enum.reduce_while(0, fn i, acc ->
+    Stream.iterate(0, &(&1+1)) |> Enum.reduce_while(0, fn _i, acc ->
       Process.sleep(5)
       Driver.get_floor_sensor_state() |> check_at_floor()
       {:cont, acc + 1}
@@ -513,19 +528,20 @@ defmodule Elevator do
   """
   defp reached_order_floor(
         %Elevator{orders: order_list, dir: dir} = elevator_data,
-        floor)
+        floor,
+        floor_orders)
+  when is_list(floor_orders)
   do
     Driver.set_motor_direction(:stop)
     Logger.info("Reached target floor at floor #{floor}")
 
-    # Open door and start timer
+    # Open door, start timer and message master
     open_door()
     timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
+    send_served_orders(floor_orders)
 
     # Remove old orders and calculate new target_order
-    updated_orders =
-      Order.extract_orders(floor, dir, order_list) |>
-      Order.remove_orders(order_list)
+    updated_orders = Order.remove_orders(floor_orders, order_list)
     orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
 
     Storage.write(updated_orders)
@@ -652,7 +668,6 @@ defmodule Elevator do
   defp restart_process()
   do
     Driver.set_motor_direction(:stop)
-    Process.sleep(@restart_time)
     Process.exit(self(), :shutdown)
   end
 end

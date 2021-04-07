@@ -129,9 +129,9 @@ defmodule Master do
   defp receive_thread()
   do
     receive do
-      {:master, _from_node, _message_id, {event_name, data}} ->
+      {:master, from_node, _message_id, {event_name, data}} ->
         Logger.info("Got message from other master")
-        GenStateMachine.cast(@node_name, {event_name, data})
+        GenStateMachine.cast(@node_name, {event_name, from_node, data})
 
       {:elevator, from_node, message_id, {event_name, data}} ->
         Logger.info("Got message from elevator")
@@ -149,7 +149,7 @@ defmodule Master do
 
   defp init_receive()
   do
-    spawn(fn -> receive_thread() end) |>
+    spawn_link(fn -> receive_thread() end) |>
       Process.register(:master_receive)
   end
 
@@ -175,7 +175,7 @@ defmodule Master do
       {:ok, _receiver_id}->
         :ok
       {:no_ack, :no_id}->
-        send_order_to_elevator(order, elevator, counter + 1)
+        send_order_to_elevator(order, elevator_id, counter + 1)
     end
   end
 

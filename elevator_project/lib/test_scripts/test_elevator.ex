@@ -3,6 +3,7 @@ defmodule ElevatorTest do
   require Logger
   require Elevator
   require Order
+  require Timer
 
   def test_elevator_init()
   do
@@ -21,7 +22,7 @@ defmodule ElevatorTest do
   do
     # The elevator does not transition from idle to moving (order not registered)
     test_elevator_init_to_idle()
-    opts = [order_id: make_ref(), order_type: :cab, order_floor: 2]
+    opts = [order_id: Timer.get_utc_time(), order_type: :cab, order_floor: 2]
     order = struct(Order, opts)
     Elevator.delegate_order(order)
     Elevator.check_at_floor(1)
@@ -133,19 +134,19 @@ defmodule ElevatorTest do
     opts2 = [order_id: make_ref(), order_type: :down, order_floor: 3]
     order2 = struct(Order, opts2)
 
-    order_floor_1_down = Order.get_order_at_floor([order1, order2], 1, :down)
+    order_floor_1_down = Order.get_orders_at_floor([order1, order2], 1, :down)
     IO.puts("Orders at floor 1 going down")
     IO.inspect(order_floor_1_down)
 
-    order_floor_1_up = Order.get_order_at_floor([order1, order2], 1, :up)
+    order_floor_1_up = Order.get_orders_at_floor([order1, order2], 1, :up)
     IO.puts("Orders at floor 1 going up")
     IO.inspect(order_floor_1_up)
 
-    order_floor_3_down = Order.get_order_at_floor([order1, order2], 3, :down)
+    order_floor_3_down = Order.get_orders_at_floor([order1, order2], 3, :down)
     IO.puts("Orders at floor 3 going down")
     IO.inspect(order_floor_3_down)
 
-    order_floor_3_up = Order.get_order_at_floor([order1, order2], 3, :up)
+    order_floor_3_up = Order.get_orders_at_floor([order1, order2], 3, :up)
     IO.puts("Orders at floor 3 going up")
     IO.inspect(order_floor_3_up)
 

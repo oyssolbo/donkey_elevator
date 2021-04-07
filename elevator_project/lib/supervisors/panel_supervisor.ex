@@ -1,7 +1,8 @@
-defmodule Storage.Supervisor do
+defmodule Panel.Supervisor do
   @moduledoc """
-  Supervisor for the elevator
+    ****w
   """
+
 
   use Supervisor
 
@@ -15,19 +16,25 @@ defmodule Storage.Supervisor do
 
 
   @doc """
-  Function for initializing the supervisor and children
+  Function for initializing the supervisor and 'children' (child = master)
   """
   @impl true
-  def init(_init_arg) do
+  def init(_init_arg)
+  do
     children = [
-      {Storage, []}
+      {Panel, []}
     ]
 
-    # one_for_one: One supervisor for one elevator
+    # one_for_one: Only one module will be spawned at crash
     # max_seconds: Number of seconds we allow max_restarts to occur.
     #               Defaults to 5
     # max_restarts: Number of restarts we allow within max_seconds.
     #               Defaults to 3
-    Supervisor.init(children, [strategy: :one_for_one, :max_seconds 2])
-
+    opts = [
+      strategy: :one_for_one,
+      max_seconds: 2,
+      name: Panel.Supervisor
+    ]
+    Supervisor.init(children, opts)
+  end
 end

@@ -2,6 +2,8 @@
 
 defmodule Storage do
 
+    require Order
+
     @moduledoc """
     Rudamentary file storage module. Allows sent data to be written to file, or read from it.
     Use atoms :write or :read to tell it what you want. Be sure to include MasterID and versionID

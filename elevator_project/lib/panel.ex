@@ -18,6 +18,8 @@ defmodule Panel do
     require Network
     require Order
 
+    # use GenServer
+
 
     @num_floors Application.fetch_env!(:elevator_project, :project_num_floors)
     @ack_timeout Application.fetch_env!(:elevator_project, :panel_ack_timeout)
@@ -29,6 +31,8 @@ defmodule Panel do
     # INITIALIZATION FUNTIONS
 
     @doc """
+    start_link is the true init
+
     Initializes the panel module by spawning the 'order checker' and 'order sender' processes,
     and registering them at the local node as :order_checker and :panel respectively.
 
@@ -37,6 +41,13 @@ defmodule Panel do
     init(sender_ID, floor_table) will only initialize the checker process and is used by the sender
     in the case that the checker stops responding.
     """
+
+    # def start_link(init_arg \\ [])
+    # do
+    #     server_opts = [name: :panel_module]
+    #     GenServer.start_link(__MODULE__, init_arg, server_opts)
+    # end
+
     def init(floor_table \\ Enum.to_list(0..@num_floors-1)) do
 
         checker_ID = spawn(fn -> order_checker([], floor_table) end)
@@ -51,9 +62,9 @@ defmodule Panel do
         Process.register(dummy, :master)
         #---------------#
 
-        {checker_ID, sender_ID}
-        {:ok, "hello"}
+        {:ok, checker_ID, sender_ID}
     end
+
 
     def init_checker(floor_table) do
         must_die = Process.whereis(:order_checker)
@@ -74,7 +85,7 @@ defmodule Panel do
         sender_ID = spawn(fn -> order_sender(floor_table, 0, []) end)
         Process.register(sender_ID, :panel)
 
-        sender_ID        
+        sender_ID
     end
 
 
@@ -101,7 +112,7 @@ defmodule Panel do
                 Network.send_data_inside_node(:order_checker, :panel, orders)
 
                 order_checker([], floor_table)
-                
+
             {_sender, {_messageID, {:special_delivery, special_orders}}} ->
                 order_checker(orders++special_orders, floor_table)
             after
@@ -119,7 +130,7 @@ defmodule Panel do
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
             # ... send orders to all masters on network, and send cab orders to local elevator
-            Network.send_data_to_all_nodes(:panel, :master, {outgoing_orders, send_ID})
+            Network.send_data_all_nodes(:panel, :master, {outgoing_orders, send_ID})
             Network.send_data_inside_node(:panel, :master, Order.extract_orders(:cab, outgoing_orders))
 
             # ... and wait for an ack
@@ -166,14 +177,14 @@ defmodule Panel do
                 order = struct(Order, [order_id: Timer.get_utc_time(), order_type: type, order_floor: floor])
             else
                 order = []
-            end            
+            end
 
         catch
-            :exit, reason -> 
+            :exit, reason ->
                 IO.inspect("EXIT: #{inspect reason}\n Check if panel is connected to elevator HW.", label: "HW Order Checker")
                 order = []
         end
-        
+
     end
 
     def check_order(orderType, table \\ Enum.to_list(0..@num_floors-1)) do
@@ -210,5 +221,9 @@ defmodule Panel do
         end
         dummy_master()
     end
+
+
+
+
 
 end

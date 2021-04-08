@@ -454,6 +454,20 @@ defmodule Elevator do
     {:next_state, :restart_state, elevator_data}
   end
 
+  ##### Evrything else #####
+  @doc """
+  Function to handle if the GenStateMachine-server receives an unexpected event
+  """
+  def handle_event(
+      _,
+      _,
+      state,
+      elevator_data)
+  do
+    {:next_state, state, elevator_data}
+  end
+
+
 
 ###################################### Actions ######################################
 

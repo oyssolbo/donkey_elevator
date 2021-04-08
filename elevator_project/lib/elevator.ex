@@ -10,9 +10,6 @@ defmodule Elevator do
     - Lights
     - Timer
     - Storage
-  TODO:
-    More testing
-    Writing code for combining with Master and Panel
   """
 
 ##### Module definitions #####
@@ -71,6 +68,9 @@ defmodule Elevator do
       timer:        make_ref(),
       elevator_id:  Node.self()
     }
+
+    # Messaging master that elevator is inited
+    broadcast_elevator_init()
 
     # Close door and set direction down
     close_door()
@@ -144,14 +144,29 @@ defmodule Elevator do
   end
 
 
-  defp send_served_orders(orders)
+  @doc """
+  Functions for broadcasting different information to other nodes:
+
+    broadcast_elevator_init: broadcasts to all nodes that the elevator is just initialized
+
+    broadcast_served_orders: broadcasts a list of orders that the elevator has served
+
+    broadcast_elevator_status: broadcast the status (dir, last_floor) to all other nodes
+  """
+  defp broadcast_elevator_init()
+  do
+    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master, :elevator_init) end)
+  end
+
+
+  defp broadcast_served_orders(orders)
   when orders |> is_list()
   do
     spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master, {:elevator_served_order, orders}) end)
   end
 
 
-  defp send_status_update(
+  defp broadcast_elevator_status(
         last_dir,
         last_floor)
   do
@@ -199,15 +214,15 @@ defmodule Elevator do
     {:next_state, state, new_elevator_data}
   end
 
-  def handle_event(
-        :cast,
-        {:received_order, _new_order_list},
-        :restart_state,
-        elevator_data)
-  do
-    Logger.info("Elevator received order while in restart_state")
-    {:next_state, :restart_state, elevator_data}
-  end
+  # def handle_event(
+  #       :cast,
+  #       {:received_order, _new_order_list},
+  #       :restart_state,
+  #       elevator_data)
+  # do
+  #   Logger.info("Elevator received order while in restart_state")
+  #   {:next_state, :restart_state, elevator_data}
+  # end
 
 
 # udp_timer #
@@ -222,10 +237,11 @@ defmodule Elevator do
         %Elevator{dir: dir, last_floor: last_floor} = elevator_data)
   do
     Timer.interrupt_after(self(), :udp_timer, @status_update_time)
-    send_status_update(dir, last_floor)
+    broadcast_elevator_status(dir, last_floor)
 
     {:next_state, state, elevator_data}
   end
+
 
 ##### init_state #####
 # at_floor #
@@ -246,7 +262,7 @@ defmodule Elevator do
     Process.cancel_timer(timer)
 
     # Reading previously saved orders, and starting timer
-    stored_orders = Storage.read()
+    stored_orders = [] #Storage.read()
     prev_orders =
       case Order.check_valid_order(stored_orders) do
         :true->
@@ -275,12 +291,12 @@ defmodule Elevator do
         elevator_data)
   do
     Logger.info("Elevator did not get to a defined floor before timeout. Restarting")
+    kill_process()
     {:next_state, :restart_state, elevator_data}
   end
 
 
-
-  ##### idle_state #####
+##### idle_state #####
 
   @doc """
   Function to handle when the elevator is in idle
@@ -292,7 +308,7 @@ defmodule Elevator do
         :idle_state,
         elevator_data)
   do
-    Logger.info("Elevator in idle_state")
+    # Logger.info("Elevator in idle_state")
 
     last_floor = Map.get(elevator_data, :last_floor)
     last_dir = Map.get(elevator_data, :dir)
@@ -303,7 +319,7 @@ defmodule Elevator do
     {new_state, new_data} =
       case new_dir do
         :nil->
-          Logger.info("Continuing in idle")
+          # Logger.info("Continuing in idle")
           {:idle_state, elevator_data}
 
         _->
@@ -401,6 +417,7 @@ defmodule Elevator do
         elevator_data)
   do
     Logger.info("Elevator spent too long time moving. Engine failure - restarting.")
+    kill_process()
     {:next_state, :restart_state, elevator_data}
   end
 
@@ -428,14 +445,13 @@ defmodule Elevator do
   Function to handle if the elevator enters a restart
   """
   def handle_event(
-        :cast,
-         _,
+        _,
+        _,
         :restart_state,
         elevator_data)
   do
-    Logger.info("Elevator restarts")
-    restart_process()
-    {:next_state, :init_state, elevator_data}
+    kill_process()
+    {:next_state, :restart_state, elevator_data}
   end
 
 
@@ -538,7 +554,7 @@ defmodule Elevator do
     # Open door, start timer and message master
     open_door()
     timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
-    send_served_orders(floor_orders)
+    broadcast_served_orders(floor_orders)
 
     # Remove old orders and calculate new target_order
     updated_orders = Order.remove_orders(floor_orders, order_list)
@@ -661,12 +677,13 @@ defmodule Elevator do
 
 
   @doc """
-  Function to kill the module in case of an error
-  The function puts the process to sleep for @restart_time. This should trigger a
-  timeout in master and redistribute any external orders to other elevators
+  Function to kill the module in case of an error. Orders are NOT stored via this function.
+  Otherwise, one may risk that old orders are overwritten, if this function is invoked during
+  init. It is therefore assumed that all orders are handled when they are recieved / removed
   """
-  defp restart_process()
+  defp kill_process()
   do
+    Logger.info("Killing elevator")
     Driver.set_motor_direction(:stop)
     Process.exit(self(), :shutdown)
   end

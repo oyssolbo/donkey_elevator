@@ -111,9 +111,7 @@ defmodule UDP_discover do
     do
       case :gen_udp.recv(socket, 0) do
         {:ok, recv_packet} ->
-
-          node_list = Kernel.elem(recv_packet, 2)
-          node_atom = String.to_atom(to_string(node_list))
+          node_atom = Kernel.elem(recv_packet, 2) |> to_string() |> String.to_atom()
 
         if (node_atom != Node.self()) do
           SystemNode.connect_node_network(node_atom)

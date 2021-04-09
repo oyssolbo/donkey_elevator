@@ -21,12 +21,10 @@ defmodule Panel do
 
     # use GenServer
 
-
-    @num_floors Application.fetch_env!(:elevator_project, :project_num_floors)
-    @ack_timeout Application.fetch_env!(:elevator_project, :panel_ack_timeout)
-    @checker_timeout Application.fetch_env!(:elevator_project, :panel_checker_timeout)
-    @checker_sleep Application.fetch_env!(:elevator_project, :panel_checker_sleep)
-
+    @num_floors      Application.fetch_env!(:elevator_project, :project_num_floors)
+    @ack_timeout     Application.fetch_env!(:elevator_project, :ack_timeout_time_ms)
+    @checker_timeout Application.fetch_env!(:elevator_project, :panel_checker_timeout_ms)
+    @checker_sleep   Application.fetch_env!(:elevator_project, :panel_checker_sleep_ms)
     # floor_table: Array of the floors; makes it easier to iterate through
 
     # INITIALIZATION FUNTIONS

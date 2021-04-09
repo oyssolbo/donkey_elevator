@@ -134,11 +134,15 @@ defmodule OrderTest do
 
   def test_extract_list()
   do
+    # Test passed
+
     order1 = Order.create_rnd_order(0, :up)
     order2 = Order.create_rnd_order(1, :down)
     order3 = Order.create_rnd_order(1, :cab)
 
     Order.extract_order([order1.order_id, order2.order_id], [order1, order2, order3])
+
+    Order.extract_order([], [order1, order2, order3])
   end
 
 end

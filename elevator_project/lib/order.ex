@@ -281,15 +281,14 @@ defmodule Order do
     rnd_id = Time.utc_now()
     rnd_type = Enum.random([:hall_up, :hall_down, :cab])
     rnd_floor = Enum.random(0..@max_floor)
-    rnd_order = struct(Order, [order_id: rnd_id, order_type: rnd_type, order_floor: rnd_floor])
+    struct(Order, [order_id: rnd_id, order_type: rnd_type, order_floor: rnd_floor])
   end
-
+  
   def create_rnd_order(
-        floor,
-        type)
+        floor, 
+        type) 
   do
     rnd_id = Time.utc_now()
-    rnd_order = struct(Order, [order_id: rnd_id, order_type: type, order_floor: floor])
+    struct(Order, [order_id: rnd_id, order_type: type, order_floor: floor])
   end
-
 end

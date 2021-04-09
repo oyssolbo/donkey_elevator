@@ -137,6 +137,7 @@ defmodule Elevator do
 
       {:panel, _node, message_id, data} ->
         Logger.info("Elevator received order from panel")
+        IO.inspect(data)
         Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:received_order, data})
     end
@@ -205,11 +206,12 @@ defmodule Elevator do
     new_elevator_data =
       case Order.check_valid_order(new_order_list) do
         :true->
+          Logger.info("valid order")
           IO.inspect(new_order_list)
-
           # Checking if order already exists - if not, add to list and calculate next direction
           updated_order_list = Order.add_orders(new_order_list, prev_orders)
           new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
+          IO.inspect(new_elevator_data)
 
           IO.inspect(updated_order_list)
 
@@ -219,6 +221,7 @@ defmodule Elevator do
           new_elevator_data
 
         :false->
+          Logger.info("invalid order")
           elevator_data
       end
 
@@ -328,6 +331,7 @@ defmodule Elevator do
     {new_state, new_data} =
       case new_dir do
         :nil->
+
           {:idle_state, elevator_data}
 
         _->
@@ -475,6 +479,20 @@ defmodule Elevator do
     kill_process()
     {:next_state, :restart_state, elevator_data}
   end
+
+  ##### Evrything else #####
+  @doc """
+  Function to handle if the GenStateMachine-server receives an unexpected event
+  """
+  def handle_event(
+      _,
+      _,
+      state,
+      elevator_data)
+  do
+    {:next_state, state, elevator_data}
+  end
+
 
 
 ###################################### Actions ######################################

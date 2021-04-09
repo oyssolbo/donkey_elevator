@@ -147,7 +147,7 @@ defmodule Elevator do
   @doc """
   Functions for broadcasting different information to other nodes:
 
-    broadcast_elevator_timedout: broadcasts to all nodes that the elevator is just initialized
+    broadcast_elevator_init: broadcasts to all nodes that the elevator is just initialized
 
     broadcast_served_orders: broadcasts a list of orders that the elevator has served
 

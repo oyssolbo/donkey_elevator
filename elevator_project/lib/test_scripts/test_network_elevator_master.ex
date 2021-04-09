@@ -5,9 +5,11 @@ defmodule NetworkTest do
   do
     Driver.start_link([])
     Network.init_node_network()
-    Elevator.start_link([])
+    #Elevator.start_link([])
     Master.start_link([])
+    spawn( fn -> Panel.init() end)
   end
+
 
 
 end

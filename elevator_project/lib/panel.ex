@@ -58,10 +58,6 @@ defmodule Panel do
         Process.register(checker_ID, :order_checker)
         Process.register(sender_ID, :panel)
 
-        #---TEST CODE---#
-        dummy = spawn(fn -> dummy_master() end)
-        Process.register(dummy, :master)
-        #---------------#
 
         {:ok, checker_ID, sender_ID}
     end
@@ -132,7 +128,8 @@ defmodule Panel do
         if outgoing_orders != [] do
             # ... send orders to all masters on network, and send cab orders to local elevator
             Logger.info("sending data")
-            ack_message_id_master = Network.send_data_all_nodes(:panel, :master_receive, {outgoing_orders, send_ID})
+            IO.inspect(outgoing_orders)
+            ack_message_id_master = Network.send_data_all_nodes(:panel, :master_receive, outgoing_orders)
             ack_message_id_elevator = Network.send_data_inside_node(:panel, :elevator_receive, Order.extract_orders(:cab, outgoing_orders))
 
             # ... and wait for an ack
@@ -154,8 +151,9 @@ defmodule Panel do
                     end
                 # If no ack is received after 'ackTimeout' number of milliseconds: Recurse and repeat
                 after
-                    ackTimeout -> IO.inspect("OrderSender timed out waiting for ack on Send_ID #{send_ID}", label: "Error")
-                    order_sender(floor_table, send_ID, outgoing_orders)
+                    ackTimeout ->
+                        IO.inspect("OrderSender timed out waiting for ack", label: "Warning")
+                        order_sender(floor_table, send_ID, outgoing_orders)
             end
 
         else
@@ -201,31 +199,31 @@ defmodule Panel do
         orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
     end
 
-    ### TEST CODE ###
+    # ### TEST CODE ###
 
-    def annihilate() do
-        checkerID = Process.whereis(:order_checker)
-        senderID = Process.whereis(:panel)
+    # def annihilate() do
+    #     checkerID = Process.whereis(:order_checker)
+    #     senderID = Process.whereis(:panel)
 
-        if checkerID != nil do
-            Process.exit(checkerID, :kill)
-        end
-        if senderID != nil do
-            Process.exit(senderID, :kill)
-        end
-    end
+    #     if checkerID != nil do
+    #         Process.exit(checkerID, :kill)
+    #     end
+    #     if senderID != nil do
+    #         Process.exit(senderID, :kill)
+    #     end
+    # end
 
-    def dummy_master() do
-        Process.sleep(1000)
-        receive do
-            {sender_id, {_message_id, {orders, sendID}}} ->
-                send(sender_id, {:ack, sendID})
-                Lights.set_order_lights(orders)
-                after
-                    0 -> :ok
-        end
-        dummy_master()
-    end
+    # def dummy_master() do
+    #     Process.sleep(1000)
+    #     receive do
+    #         {sender_id, {_message_id, {orders, sendID}}} ->
+    #             send(sender_id, {:ack, sendID})
+    #             Lights.set_order_lights(orders)
+    #             after
+    #                 0 -> :ok
+    #     end
+    #     dummy_master()
+    # end
 
 
 

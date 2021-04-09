@@ -115,10 +115,10 @@ defmodule SystemNode do
   """
   def connect_node_network(node) do
     case Node.ping(node) do
-    {:pong} ->
-      Logger.info("Succesfully connected to #{node}")
-    {:pang} ->
-      Logger.info("Unable to conenct to #{node}")
+      :pong ->
+        Logger.info("Succesfully connected to #{node}")
+      :pang ->
+        Logger.info("Unable to conenct to #{node}")
     end
   end
 

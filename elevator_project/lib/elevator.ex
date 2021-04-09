@@ -207,10 +207,13 @@ defmodule Elevator do
       case Order.check_valid_order(new_order_list) do
         :true->
           Logger.info("valid order")
+          IO.inspect(new_order_list)
           # Checking if order already exists - if not, add to list and calculate next direction
           updated_order_list = Order.add_orders(new_order_list, prev_orders)
           new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
           IO.inspect(new_elevator_data)
+
+          IO.inspect(updated_order_list)
 
           Storage.write(updated_order_list)
           Lights.set_order_lights(updated_order_list)
@@ -431,6 +434,7 @@ defmodule Elevator do
 
 ##### door_state #####
 
+# Door timer #
   @doc """
   Closes the door and transitions into idle
   """
@@ -445,6 +449,21 @@ defmodule Elevator do
     {:next_state, :idle_state, elevator_data}
   end
 
+# at_floor #
+  @doc """
+  Handler that acknowledges messages from the floor-sensor that the
+  elevator is at a floor. Made only to prevent the elevator from
+  crashing
+  """
+  def handle_event(
+        :cast,
+        {:at_floor, floor},
+        :door_state,
+        elevator_data)
+  do
+    {:next_state, :door_state, elevator_data}
+  end
+  
 
 ##### restart_state #####
 

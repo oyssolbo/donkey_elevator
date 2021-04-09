@@ -17,46 +17,18 @@ defmodule Storage do
     """
     @doc """
     Writes to or reads from file.
-
-    ## Example
-        Write:
-      iex> strg = Storage.init
-      send(strg, {self(), :write, "This shall be written.", <masterID>, <versionID>})
-
-        Read:
-      send(strg, {self(), :read})
     """
-    def init() do
-        spawn(fn -> storage_module() end)
-    end
-
-    defp storage_module do
-        receive do
-            {from,:write, data, masterID, versID} ->
-                data_tag = Enum.join(["\nMasterID: ", masterID, ", Version ID: ", versID])
-                write_data = Enum.join([data, data_tag])
-                result = File.write("save_data.txt", write_data)
-                send(from, {:Storage, data_tag, result})
-                storage_module()
-
-            {from, :read} ->
-                send(from, {:Storage, File.read("save_data.txt")})
-                storage_module()
-
-        end
-
-    end
 
     def write(data, fileName \\ "save_data.txt") do
         # TODO: Format order struct into string
-        dataMap = Map.from_struct(data)
-        textData = Poison.encode!(dataMap)#Map
+        dataMap = Enum.map(data, fn x -> Map.from_struct(x) end)
+        textData = Poison.encode!(dataMap)
         result = File.write(fileName, textData)
     end
 
     def read(fileName \\ "save_data.txt") do
         result = File.read!(fileName)   #Beware! read! embeds errors into results, without error messages
-        ordr = struct(Order, Poison.decode!(result))
+        ordrs = Enum.map(Poison.decode!(result), fn x -> Kernel.struct(Order, x) end)
     end
 
 @doc """

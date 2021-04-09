@@ -139,7 +139,7 @@ defmodule Elevator do
         Logger.info("Elevator received order from panel")
         IO.inspect(data)
         Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
-        spawn_link( fn -> GenStateMachine.cast(@node_name, {:received_order, data}) end)
+        GenStateMachine.cast(@node_name, {:received_order, data})
     end
 
     receive_thread()
@@ -213,7 +213,7 @@ defmodule Elevator do
           IO.inspect(new_elevator_data)
 
           #Storage.write(updated_order_list)
-         # Lights.set_order_lights(updated_order_list)
+          Lights.set_order_lights(updated_order_list)
 
           new_elevator_data
 
@@ -504,7 +504,7 @@ defmodule Elevator do
   def check_at_floor(floor)
   when floor |> is_integer
   do
-    #Lights.set_floorlight(floor)
+    Lights.set_floorlight(floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
 
@@ -581,7 +581,7 @@ defmodule Elevator do
     updated_orders = Order.remove_orders(floor_orders, order_list)
 
     #Storage.write(updated_orders)
-    #Lights.set_order_lights(updated_orders)
+    Lights.set_order_lights(updated_orders)
 
     Map.put(timer_elevator_data, :orders, updated_orders)
   end

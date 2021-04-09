@@ -199,34 +199,5 @@ defmodule Panel do
         orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
     end
 
-    # ### TEST CODE ###
-
-    # def annihilate() do
-    #     checkerID = Process.whereis(:order_checker)
-    #     senderID = Process.whereis(:panel)
-
-    #     if checkerID != nil do
-    #         Process.exit(checkerID, :kill)
-    #     end
-    #     if senderID != nil do
-    #         Process.exit(senderID, :kill)
-    #     end
-    # end
-
-    # def dummy_master() do
-    #     Process.sleep(1000)
-    #     receive do
-    #         {sender_id, {_message_id, {orders, sendID}}} ->
-    #             send(sender_id, {:ack, sendID})
-    #             Lights.set_order_lights(orders)
-    #             after
-    #                 0 -> :ok
-    #     end
-    #     dummy_master()
-    # end
-
-
-
-
 
 end

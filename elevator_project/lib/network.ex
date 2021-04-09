@@ -1,7 +1,6 @@
 defmodule Network do
   @moduledoc """
   Module for casting and receiving nodenames via UDP broadcast
-
   Dependencies:
   -UDP
   """

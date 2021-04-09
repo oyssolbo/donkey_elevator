@@ -194,7 +194,7 @@ defmodule Master do
     IO.inspect(elevator_id)
 
     # We can assume that the elevator has received a timeout
-    GenStateMachine.cast(@node_name, :elevator_timeout, elevator_id)
+    GenStateMachine.cast(@node_name, {:elevator_timeout, elevator_id})
   end
 
 

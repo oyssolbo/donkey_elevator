@@ -19,35 +19,24 @@ defmodule Panel do
     require Order
     require Logger
 
-    # use GenServer
-
 
     @num_floors Application.fetch_env!(:elevator_project, :project_num_floors)
-    @ack_timeout Application.fetch_env!(:elevator_project, :panel_ack_timeout)
-    @checker_timeout Application.fetch_env!(:elevator_project, :panel_checker_timeout)
-    @checker_sleep Application.fetch_env!(:elevator_project, :panel_checker_sleep)
+    @ack_timeout Application.fetch_env!(:elevator_project, :ack_timeout_time_ms)
+    @checker_timeout Application.fetch_env!(:elevator_project, :panel_checker_timeout_ms)
+    @checker_sleep Application.fetch_env!(:elevator_project, :panel_checker_sleep_ms)
 
-    # floor_table: Array of the floors; makes it easier to iterate through
-
-    # INITIALIZATION FUNTIONS
+##### INITIALIZATION FUNTIONS #####
 
     @doc """
     start_link is the true init
 
     Initializes the panel module by spawning the 'order checker' and 'order sender' processes,
     and registering them at the local node as :order_checker and :panel respectively.
-
     Returns a tuple with their PIDs.
 
     init(sender_ID, floor_table) will only initialize the checker process and is used by the sender
     in the case that the checker stops responding.
     """
-
-    # def start_link(init_arg \\ [])
-    # do
-    #     server_opts = [name: :panel_module]
-    #     GenServer.start_link(__MODULE__, init_arg, server_opts)
-    # end
 
     def init(floor_table \\ Enum.to_list(0..@num_floors-1)) do
 
@@ -57,11 +46,6 @@ defmodule Panel do
         # Register the processes in the local node
         Process.register(checker_ID, :order_checker)
         Process.register(sender_ID, :panel)
-
-        #---TEST CODE---#
-        dummy = spawn(fn -> dummy_master() end)
-        Process.register(dummy, :master)
-        #---------------#
 
         {:ok, checker_ID, sender_ID}
     end
@@ -90,22 +74,11 @@ defmodule Panel do
     end
 
 
-    # MODULE PROCESSES
+##### MODULE PROCESSES #####
     defp order_checker(old_orders, floor_table) when is_list(old_orders) do
-
-        checkerSleep = @checker_sleep
-
         # Update order list by reading all HW order buttons
         new_orders = check_4_orders(floor_table)
         orders = old_orders++new_orders
-        #orders = old_orders++check_4_orders
-
-        #---TEST CODE ---#
-        if new_orders != [] do
-            IO.inspect("Recieved #{inspect length(new_orders)} new orders",label: "orderChecker")
-            Process.sleep(checkerSleep)
-        end
-        #----------------#
 
         # Check for request from sender. If there is, send order list and recurse with reset list
         receive do
@@ -174,7 +147,7 @@ defmodule Panel do
 
     end
 
-    # WORKHORSE FUNCTIONS
+##### WORKHORSE FUNCTIONS #####
 
     def hardware_order_checker(floor, type) do
         try do
@@ -186,7 +159,7 @@ defmodule Panel do
 
         catch
             :exit, reason ->
-                IO.inspect("EXIT: #{inspect reason}\n Check if panel is connected to elevator HW.", label: "HW Order Checker")
+                # IO.inspect("EXIT: #{inspect reason}\n Check if panel is connected to elevator HW.", label: "HW Order Checker")
                 order = []
         end
 
@@ -200,35 +173,4 @@ defmodule Panel do
     def check_4_orders(table \\ Enum.to_list(0..@num_floors-1)) do
         orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
     end
-
-    ### TEST CODE ###
-
-    def annihilate() do
-        checkerID = Process.whereis(:order_checker)
-        senderID = Process.whereis(:panel)
-
-        if checkerID != nil do
-            Process.exit(checkerID, :kill)
-        end
-        if senderID != nil do
-            Process.exit(senderID, :kill)
-        end
-    end
-
-    def dummy_master() do
-        Process.sleep(1000)
-        receive do
-            {sender_id, {_message_id, {orders, sendID}}} ->
-                send(sender_id, {:ack, sendID})
-                Lights.set_order_lights(orders)
-                after
-                    0 -> :ok
-        end
-        dummy_master()
-    end
-
-
-
-
-
 end

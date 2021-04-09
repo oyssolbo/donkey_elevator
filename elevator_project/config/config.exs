@@ -16,14 +16,13 @@ config :elevator_project,
   master_timeout_active_ms:       1000,
   master_timeout_elevator_ms:     2000,
 
-
+  # Elevator
+  elevator_update_status_time_ms: 250,
+  elevator_timeout_init_ms:       5000,
   elevator_restart_time_ms:       2000,
   elevator_timeout_door_ms:       3000,
   elevator_timeout_moving_ms:     5000,
-  elevator_update_status_time_ms: 250,
-  elevator_timeout_init_ms:       5000,
 
   # Panel
-  panel_ack_timeout: 800,
-  panel_checker_timeout: 1000,
-  panel_checker_sleep: 200
+  panel_checker_timeout_ms:       1000,
+  panel_checker_sleep_ms:         200

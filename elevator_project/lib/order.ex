@@ -78,12 +78,14 @@ defmodule Order do
   end
 
   def remove_orders(
-        orders,
+        [first_order | rest_orders] = _orders,
         order_list)
-  when is_list(orders) and is_list(order_list)
+  when is_list(order_list)
   do
-    if is_order_list(order_list) and is_order_list(orders) do
-      Enum.map(orders, fn order -> remove_orders(order, order_list) end)
+    if is_order_list(order_list) do
+      # Enum.map(orders, fn order -> remove_orders(order, order_list) end)
+      new_order_list = remove_orders(first_order, order_list)
+      remove_orders(rest_orders, new_order_list)
     else
       Logger.info("Not an order-list")
       []

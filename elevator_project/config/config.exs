@@ -21,4 +21,8 @@ config :elevator_project,
   elevator_restart_time_ms:       2000,
   elevator_timeout_door_ms:       3000,
   elevator_timeout_moving_ms:     5000,
-  elevator_timeout_init_ms:       5000
+  elevator_timeout_init_ms:       5000,
+
+  # Panel
+  panel_checker_timeout_ms:       1000,
+  panel_checker_sleep_ms:         200

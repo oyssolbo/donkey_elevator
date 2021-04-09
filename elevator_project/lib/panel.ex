@@ -27,6 +27,7 @@ defmodule Panel do
 
 ##### INITIALIZATION FUNTIONS #####
 
+
     @doc """
     start_link is the true init
 
@@ -105,7 +106,8 @@ defmodule Panel do
         if outgoing_orders != [] do
             # ... send orders to all masters on network, and send cab orders to local elevator
             Logger.info("sending data")
-            ack_message_id_master = Network.send_data_all_nodes(:panel, :master_receive, {outgoing_orders, send_ID})
+            IO.inspect(outgoing_orders)
+            ack_message_id_master = Network.send_data_all_nodes(:panel, :master_receive, outgoing_orders)
             ack_message_id_elevator = Network.send_data_inside_node(:panel, :elevator_receive, Order.extract_orders(:cab, outgoing_orders))
 
             # ... and wait for an ack
@@ -127,8 +129,9 @@ defmodule Panel do
                     end
                 # If no ack is received after 'ackTimeout' number of milliseconds: Recurse and repeat
                 after
-                    ackTimeout -> IO.inspect("OrderSender timed out waiting for ack on Send_ID #{send_ID}", label: "Error")
-                    order_sender(floor_table, send_ID, outgoing_orders)
+                    ackTimeout ->
+                        IO.inspect("OrderSender timed out waiting for ack", label: "Warning")
+                        order_sender(floor_table, send_ID, outgoing_orders)
             end
 
         else
@@ -173,4 +176,5 @@ defmodule Panel do
     def check_4_orders(table \\ Enum.to_list(0..@num_floors-1)) do
         orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
     end
+
 end

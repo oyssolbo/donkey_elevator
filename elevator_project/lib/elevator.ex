@@ -213,9 +213,11 @@ defmodule Elevator do
           new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
           IO.inspect(new_elevator_data)
 
+
           IO.inspect(updated_order_list)
 
           Storage.write(updated_order_list)
+          
           Lights.set_order_lights(updated_order_list)
 
           new_elevator_data
@@ -482,7 +484,7 @@ defmodule Elevator do
 
   ##### Evrything else #####
   @doc """
-  Function to handle if the GenStateMachine-server receives an unexpected event
+  Function to handle if the GenStateMachine receives an unexpected event
   """
   def handle_event(
       _,
@@ -599,7 +601,7 @@ defmodule Elevator do
     # Remove old orders and calculate new target_order
     updated_orders = Order.remove_orders(floor_orders, order_list)
 
-    Storage.write(updated_orders)
+    #Storage.write(updated_orders)
     Lights.set_order_lights(updated_orders)
 
     Map.put(timer_elevator_data, :orders, updated_orders)

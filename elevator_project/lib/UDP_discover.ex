@@ -109,11 +109,13 @@ defmodule UDP_discover do
 """
   defp broadcast_receive_and_connect(socket)
     do
-      case :gen_udp.recv(socket, 0)  do
+      case :gen_udp.recv(socket, 0) do
         {:ok, recv_packet} ->
-          data = Kernel.elem(recv_packet, 2)
-          Logger.info("Connecting to the node #{data}")
-          Node.ping(String.to_atom(to_string(data)))
+          node_atom = Kernel.elem(recv_packet, 2) |> to_string() |> String.to_atom()
+
+        if (node_atom != Node.self()) do
+          SystemNode.connect_node_network(node_atom)
+        end
 
         {:error, reason} ->
           Logger.error("Failed to receive due to #{reason}")

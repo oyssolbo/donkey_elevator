@@ -568,6 +568,19 @@ defmodule Master do
   end
 
 
+   @doc """
+  Function to handle if the GenStateMachine-server receives an unexpected event
+  """
+  def handle_event(
+    _,
+    _,
+    state,
+    master_data)
+do
+  {:next_state, state, master_data}
+end
+
+
 ###################################### Actions ######################################
 
 

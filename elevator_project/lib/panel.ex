@@ -5,47 +5,113 @@ Syntax
 
 
 defmodule Panel do
+    @moduledoc """
+    Module for detecting button inputs on the elevator panel, and passing the information on to relevant modules.
+    Dependancies:
+    - Driver
+    - Network
+    - UDP
+    - Order
+    """
     require Driver
     require Network
     require Order
+    require Logger
 
-    use GenServer
+    # use GenServer
 
-    #@button_map %{:hall_up => 0, :hall_down => 1, :cab => 2}
-    #@state_map  %{:on => 1, :off => 0}
-    #@direction_map %{:up => 1, :down => 255, :stop => 0}
 
     @num_floors Application.fetch_env!(:elevator_project, :project_num_floors)
+    @ack_timeout Application.fetch_env!(:elevator_project, :ack_timeout_time_ms)
+    @checker_timeout Application.fetch_env!(:elevator_project, :panel_checker_timeout_ms)
+    @checker_sleep Application.fetch_env!(:elevator_project, :panel_checker_sleep_ms)
+
     # floor_table: Array of the floors; makes it easier to iterate through
 
-    # TODO: Replace mid1, mid2, eid with send_local_node func. For master send; send_data_all_nodes.
+    # INITIALIZATION FUNTIONS
+
+    @doc """
+    start_link is the true init
+    Initializes the panel module by spawning the 'order checker' and 'order sender' processes,
+    and registering them at the local node as :order_checker and :panel respectively.
+    Returns a tuple with their PIDs.
+    init(sender_ID, floor_table) will only initialize the checker process and is used by the sender
+    in the case that the checker stops responding.
+    """
+
+    # def start_link(init_arg \\ [])
+    # do
+    #     server_opts = [name: :panel_module]
+    #     GenServer.start_link(__MODULE__, init_arg, server_opts)
+    # end
+
     def init(floor_table \\ Enum.to_list(0..@num_floors-1)) do
 
         checker_ID = spawn(fn -> order_checker([], floor_table) end)
-        sender_ID = spawn(fn -> order_sender(checker_ID, floor_table, 0, []) end)
+        sender_ID = spawn(fn -> order_sender(floor_table, 0, []) end)
 
         # Register the processes in the local node
         Process.register(checker_ID, :order_checker)
         Process.register(sender_ID, :panel)
 
-        {checker_ID, sender_ID}
-        {:ok, "hello"}
+        #---TEST CODE---#
+        dummy = spawn(fn -> dummy_master() end)
+        Process.register(dummy, :master)
+        #---------------#
+
+        {:ok, checker_ID, sender_ID}
     end
 
-    defp order_checker(old_orders, floor_table) when is_list(old_orders) do
-        orders = []
-        # Update order list by reading all HW order buttons
-        if old_orders == [] do
-            orders = check_4_orders(floor_table)
-        else
-            orders = old_orders++check_4_orders(floor_table)
+
+    def init_checker(floor_table) do
+        must_die = Process.whereis(:order_checker)
+        if must_die != nil do
+            Process.exit(must_die, :kill)
         end
+        checker_ID = spawn(fn -> order_checker([], floor_table) end)
+        Process.register(checker_ID, :order_checker)
+
+        checker_ID
+    end
+
+    def init_sender(floor_table) do
+        must_die = Process.whereis(:panel)
+        if must_die != nil do
+            Process.exit(must_die, :kill)
+        end
+        sender_ID = spawn(fn -> order_sender(floor_table, 0, []) end)
+        Process.register(sender_ID, :panel)
+
+        sender_ID
+    end
+
+
+    # MODULE PROCESSES
+    defp order_checker(old_orders, floor_table) when is_list(old_orders) do
+
+        checkerSleep = @checker_sleep
+
+        # Update order list by reading all HW order buttons
+        new_orders = check_4_orders(floor_table)
+        orders = old_orders++new_orders
+        #orders = old_orders++check_4_orders
+
+        #---TEST CODE ---#
+        if new_orders != [] do
+            IO.inspect("Recieved #{inspect length(new_orders)} new orders",label: "orderChecker")
+            Process.sleep(checkerSleep)
+        end
+        #----------------#
 
         # Check for request from sender. If there is, send order list and recurse with reset list
         receive do
-            {:gibOrdersPls, sender_addr} ->
-                send(sender_addr, {:order_checker, orders})
+            {:panel, _node, _message_ID, :gibOrdersPls} ->
+                Network.send_data_inside_node(:order_checker, :panel, orders)
+
                 order_checker([], floor_table)
+
+            {_sender, _node, _messageID, {:special_delivery, special_orders}} ->
+                order_checker(orders++special_orders, floor_table)
             after
                 0 -> :ok
         end
@@ -54,67 +120,111 @@ defmodule Panel do
         order_checker(orders, floor_table)
     end
 
-    defp order_sender(checker_addr, floor_table, send_ID, outgoing_orders) when is_list(outgoing_orders) do
+    defp order_sender(floor_table, send_ID, outgoing_orders) when is_list(outgoing_orders) do
+        ackTimeout = @ack_timeout
+        checkerTimeout = @checker_timeout
 
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
-            Network.send_data_all_nodes(:panel, :master, outgoing_orders)
-            Network.send_data_inside_node(:panel, :master, Order.extract_orders(:cab, outgoing_orders))
-            #send({:elevator, node}, {:cab_orders, :panel, self(), extract_cab_orders(orders)})
+            # ... send orders to all masters on network, and send cab orders to local elevator
+            Logger.info("sending data")
+            ack_message_id_master = Network.send_data_all_nodes(:panel, :master_receive, {outgoing_orders, send_ID})
+            ack_message_id_elevator = Network.send_data_inside_node(:panel, :elevator_receive, Order.extract_orders(:cab, outgoing_orders))
 
             # ... and wait for an ack
             receive do
-                {:ack, from, sentID} ->
+                {_sender_id, _node, _messageID, {ack_message_id_elevator, :ack}} ->
                     # When ack is recieved for current send_ID, send request to checker for latest order matrix
-                    if sentID == send_ID do
-                        send(checker_addr, {:gibOrdersPls, self()})
-                    end
+                    Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
+                    IO.inspect("Received ack from elevator")   # TEST CODE
+
                     receive do
                         # When latest order matrix is received, recurse with new orders and iterated send_ID
-                        {:order_checker, updated_orders} ->
-                            order_sender(checker_addr, floor_table, send_ID+1, updated_orders)
+                        {:order_checker, _node, _messageID, updated_orders} ->
+                            order_sender(floor_table, send_ID+1, updated_orders)
                             after
-                                2000 -> # Send some kind of error, "no response from order_checker"
+                                checkerTimeout ->
+                                Logger.info("Timeout from order checker")
+                                 #IO.inspect("OrderSender timed out waiting for orders from orderChecker[1]", label: "Error")# Send some kind of error, "no response from order_checker" # TEST CODE
+                                order_sender(floor_table, send_ID, outgoing_orders)
                     end
-                # If no ack is received after 1.5 sec: Recurse and repeat
+                # If no ack is received after 'ackTimeout' number of milliseconds: Recurse and repeat
                 after
-                    1500 -> order_sender(checker_addr, floor_table, send_ID, outgoing_orders)
+                    ackTimeout -> IO.inspect("OrderSender timed out waiting for ack on Send_ID #{send_ID}", label: "Error")
+                    order_sender(floor_table, send_ID, outgoing_orders)
             end
 
         else
-            # If order matrix is empty, send request to checker for latest orders. Recurse with those (but same sender ID)
-            send(checker_addr, {:gibOrdersPls, self()})
+            # If no orders, send request to checker for latest orders. Recurse with those (but same sender ID)
+
+            Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
             receive do
-                {:order_checker, updated_orders} ->
-                    order_sender(checker_addr, floor_table, send_ID, updated_orders)
+                {:order_checker, _node, _messageID, updated_orders} ->
+                    order_sender(floor_table, send_ID, updated_orders)
+                after
+                    checkerTimeout -> #IO.inspect("OrderSender timed out waiting for orders from orderChecker [2]", label: "Error")# Send some kind of error, "no response from order_checker"
+                    Logger.info("Did not get reply from order checker")
+                    order_sender(floor_table, send_ID, outgoing_orders)
             end
         end
 
     end
 
-    defp hardware_order_checker(floor, type) do
-        if Driver.get_order_button_state(floor, type) == :on do
-            # TODO: Replace Time.utc_now() with wrapper func from Timer module
-            order = struct(Order, [order_id: Time.utc_now(), order_type: type, order_floor: floor])
-        else
-            order = []
+    # WORKHORSE FUNCTIONS
+
+    def hardware_order_checker(floor, type) do
+        try do
+            if Driver.get_order_button_state(floor, type) == 1 do
+                order = struct(Order, [order_id: Timer.get_utc_time(), order_type: type, order_floor: floor])
+            else
+                order = []
+            end
+
+        catch
+            :exit, reason ->
+                #IO.inspect("EXIT: #{inspect reason}\n Check if panel is connected to elevator HW.", label: "HW Order Checker")
+                order = []
         end
+
     end
 
-    defp check_order(orderType, table \\ Enum.to_list(0..@num_floors-1)) do
+    def check_order(orderType, table \\ Enum.to_list(0..@num_floors-1)) do
         sendor_states = Enum.map(table, fn x -> hardware_order_checker(x, orderType) end)
-        orders = Enum.filter(sendor_states, fn x -> x == [] end)
+        orders = Enum.reject(sendor_states, fn x -> x == [] end)
     end
 
-    defp check_4_orders(table \\ Enum.to_list(0..@num_floors-1)) do
+    def check_4_orders(table \\ Enum.to_list(0..@num_floors-1)) do
         orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
     end
 
+    ### TEST CODE ###
 
-    def start_link(init_arg \\ [])
-    do
-        server_opts = [name: :panel_module]
-        GenServer.start_link(__MODULE__, init_arg, server_opts)
+    def annihilate() do
+        checkerID = Process.whereis(:order_checker)
+        senderID = Process.whereis(:panel)
+
+        if checkerID != nil do
+            Process.exit(checkerID, :kill)
+        end
+        if senderID != nil do
+            Process.exit(senderID, :kill)
+        end
     end
+
+    def dummy_master() do
+        Process.sleep(1000)
+        receive do
+            {sender_id, {_message_id, {orders, sendID}}} ->
+                send(sender_id, {:ack, sendID})
+                Lights.set_order_lights(orders)
+                after
+                    0 -> :ok
+        end
+        dummy_master()
+    end
+
+
+
+
 
 end

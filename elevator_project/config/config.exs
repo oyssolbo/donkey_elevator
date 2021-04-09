@@ -7,9 +7,10 @@ config :elevator_project,
   project_num_floors:             4,
   project_cookie_name:            :ttk4145_30,
 
-  # Sending
-  ack_timeout_time_ms:            200,
-  resend_max_counter:             10,
+  # Network
+  network_node_tick_time_ms:      50,
+  network_ack_timeout_time_ms:    200,
+  network_resend_max_counter:     10,
 
   # Master
   master_update_active_time_ms:   100,

@@ -36,4 +36,15 @@ defmodule ProjectTest do
     Logger.info("Orders sent to master")
   end
 
+
+  def test_multiple_masters()
+  do
+    Network.init_node_network()
+
+    spawn(fn -> Master.start_link([]) end)
+    Process.sleep(150)
+    spawn(fn -> Master.start_link([]) end)
+
+  end
+
 end

@@ -2,34 +2,29 @@ defmodule SystemNode do
   @moduledoc """
   Module for initializing, discovering and connecting all nodes on the network
 
+  If the error "econnrefused" occurs, run epmd -daemon before iex
 
   Dependencies:
-    -GetIP
+    -Network
   """
-
-  #epmd -daemon if you get the error econ refused
 
   require Logger
 
-  @default_tick_time 500 #Interval between pings (Testing needed to find optimum)
-  @default_cookie :TTK4115
+  @node_tick_time Application.fetch_env!(:elevator_project, :network_node_tick_time_ms)
+  @node_cookie    Application.fetch_env!(:elevator_project, :project_cookie_name)
 
   @doc """
-  Initializing a node
+  Initializing a node with name 'name' and cookie 'cookie'
 
-  name       Start of the node's name. Concatinated with the node's IP-address
-  cookie     The cookie of the network the node should listen to
-
-  RETURNS:              IF:
-  :pid                  If started in distributed mode
-  self()                If not possible to start in distributed mode
+  The function returns the :pid if it is started in distributed mode, or
+  self() if unable to start in distirbuted mode
   """
   def start_node(
         name,
-        cookie \\ @default_cookie)
+        cookie \\ @node_cookie)
   when cookie |> is_atom
   do
-    case Node.start(name, :longnames, @default_tick_time) do
+    case Node.start(name, :longnames, @node_tick_time) do
       {:ok, _pid} ->
         Node.set_cookie(Node.self(), cookie)
         Node.self()
@@ -41,7 +36,7 @@ defmodule SystemNode do
 
 
   @doc """
-  Connecting a node to a function
+  Connecting a node to a spawned function
 
   pid        Process ID of the node to be spawned
   module     The module of the corresponding @p function
@@ -58,16 +53,18 @@ defmodule SystemNode do
         args \\ [],
         opts \\ [])
   do
-    # Spawning desired function
     pid = Node.spawn(pid, module, function, args, opts)
     Logger.info("Link established")
     pid
   end
 
 
-
-
-  def node_spawn_function_linked(pid, module, function, args \\ []) do
+  def node_spawn_function_linked(
+        pid,
+        module,
+        function,
+        args \\ [])
+  do
     # Spawning desired function as a process
     #pid = Node.spawn_link(node, module, fun, args)
     Logger.info("Link established")
@@ -78,15 +75,10 @@ defmodule SystemNode do
 
   @doc """
   Closing a given node. The other nodes on the distributed system will
-    assume the node as down
+  assume the node as down
 
   Requires the node to be started with Node.start/3. Otherwise returns
-    {:error, :not_allowed}
-
-  RETURNS:                  IF:
-  :ok                       If allowed
-  {:error, :not_allowed}    If not allowed
-  {:error, :not_found}      If the node is dead
+  {:error, :not_allowed}
   """
   def close_node()
   do
@@ -96,7 +88,8 @@ defmodule SystemNode do
 
 
   @doc """
-  Connects the nodes on the network, this is unfinished, Node.detect_nodes() does not seem to exist.
+  Connects the nodes on the network, this is unfinished, Node.detect_nodes()
+  does not seem to exist.
   """
   def connect_nodes(node)
   do
@@ -113,12 +106,13 @@ defmodule SystemNode do
   @doc """
   @brief Connects the node to node-network
   """
-  def connect_node_network(node) do
+  def connect_node_network(node)
+  do
     case Node.ping(node) do
     {:pong} ->
       Logger.info("Succesfully connected to #{node}")
     {:pang} ->
-      Logger.info("Unable to conenct to #{node}")
+      Logger.info("Unable to connect to #{node}")
     end
   end
 
@@ -132,14 +126,7 @@ defmodule SystemNode do
 
 
   @doc """
-  Disconnect the node from the network
-
-  node   Node to disconnect from the network
-
-  RETURNS:                  IF:
-  :true                       Disconnect succeded
-  :false                      Disconnect fail
-  :ignored                    Node not alive
+  Disconnect the node 'node' from the network
   """
   def disconnect_node(node)
   do
@@ -147,10 +134,12 @@ defmodule SystemNode do
     Logger.info("Node disconnected from the network")
   end
 
+
   @doc """
-  @brief Registrer the process as a atom on the following node
+  Registrer the process as a atom on the following node
   """
-  def register_process(id) when id |> is_atom()
+  def register_process(id)
+  when id |> is_atom()
   do
     Process.register(self(), id)
   end

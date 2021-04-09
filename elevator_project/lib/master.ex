@@ -38,8 +38,8 @@ defmodule Master do
   @timeout_active_master_time Application.fetch_env!(:elevator_project, :master_timeout_active_ms)
   @timeout_elevator_time      Application.fetch_env!(:elevator_project, :master_timeout_elevator_ms)
 
-  @ack_timeout_time           Application.fetch_env!(:elevator_project, :ack_timeout_time_ms)
-  @max_resends                Application.fetch_env!(:elevator_project, :resend_max_counter)
+  @ack_timeout_time           Application.fetch_env!(:elevator_project, :network_ack_timeout_time_ms)
+  @max_resends                Application.fetch_env!(:elevator_project, :network_resend_max_counter)
 
   @node_name                  :master
 
@@ -224,7 +224,7 @@ defmodule Master do
         :backup_state,
         master_data)
   do
-    Logger.info("Backup has connection to active. Activating")
+    Logger.info("Backup has lost connection to active. Activating")
 
     Timer.interrupt_after(self(), :master_update_timer, @update_active_time)
 
@@ -261,6 +261,9 @@ defmodule Master do
         :backup_state,
         intern_master_data)
   do
+    Logger.info("Backup recieved data from active")
+    IO.inspect(extern_master_data)
+
     extern_message_id = Map.get(extern_master_data, :master_message_id, 0)
     intern_message_id = Map.get(intern_master_data, :master_message_id, 0)
 

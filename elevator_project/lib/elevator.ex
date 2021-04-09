@@ -1,7 +1,14 @@
 
 defmodule Elevator do
   @moduledoc """
-  Elevator-module
+  Module implementing the Elevator for the project
+    States:               Transitions to:
+      - :init_state         :idle_state, :restart_state
+      - :idle_state         :moving_state
+      - :moving_state       :door_state, :restart_state
+      - :door_state         :idle_state
+      - :restart_state      :restart_state
+
   Requirements:
     - Driver
     - Network

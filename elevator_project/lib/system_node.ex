@@ -118,7 +118,7 @@ defmodule SystemNode do
     {:pong} ->
       Logger.info("Succesfully connected to #{node}")
     {:pang} ->
-      Logger.info("Unable to conenct to #{node}")
+      Logger.info("Unable to connect to #{node}")
     end
   end
 

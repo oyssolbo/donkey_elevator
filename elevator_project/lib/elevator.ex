@@ -130,6 +130,7 @@ defmodule Elevator do
 
       {:panel, _node, message_id, data} ->
         Logger.info("Elevator received order from panel")
+        IO.inspect(data)
         Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:received_order, data})
     end
@@ -191,16 +192,18 @@ defmodule Elevator do
         {:received_order, new_order_list},
         state,
         %Elevator{orders: prev_orders} = elevator_data)
-  when state in [:init_state, :active_state, :door_state, :moving_state]
+  when state in [:init_state, :idle_state, :door_state, :moving_state]
   do
     Logger.info("Elevator received order")
 
     new_elevator_data =
       case Order.check_valid_order(new_order_list) do
         :true->
+          Logger.info("valid order")
           # Checking if order already exists - if not, add to list and calculate next direction
           updated_order_list = Order.add_orders(new_order_list, prev_orders)
           new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
+          IO.inspect(new_elevator_data)
 
           Storage.write(updated_order_list)
           Lights.set_order_lights(updated_order_list)
@@ -208,6 +211,7 @@ defmodule Elevator do
           new_elevator_data
 
         :false->
+          Logger.info("invalid order")
           elevator_data
       end
 
@@ -319,7 +323,7 @@ defmodule Elevator do
     {new_state, new_data} =
       case new_dir do
         :nil->
-          # Logger.info("Continuing in idle")
+          Logger.info("Continuing in idle")
           {:idle_state, elevator_data}
 
         _->

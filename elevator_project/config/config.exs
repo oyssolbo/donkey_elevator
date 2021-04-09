@@ -22,7 +22,6 @@ config :elevator_project,
   elevator_timeout_door_ms:       3000,
   elevator_timeout_moving_ms:     5000,
   elevator_update_status_time_ms: 250,
-  #elevator_timeout_init_ms:       3000,
   elevator_timeout_init_ms:       5000,
 
   # Panel

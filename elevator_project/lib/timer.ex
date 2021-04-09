@@ -4,6 +4,7 @@ defmodule Timer do
   """
 
   require Time
+  require Logger
 
 
   @doc """
@@ -11,7 +12,7 @@ defmodule Timer do
 
   Assuming that the given struct 'data_struct' contains a
   timer_instance which could be reset
-
+s
   Returns a new instance of the given struct, with updated timer. It
   will then call the process 'process_name' if the timer has not been
   canceled within 'timeout_time', by using the name 'interrupt_atom_name'
@@ -23,8 +24,10 @@ defmodule Timer do
         interrupt_atom_name,
         timeout_time)
   do
+    Logger.info("starting timer")
     timer = Map.get(data_struct, timer_atom_name)
     Process.cancel_timer(timer)
+
     new_timer = Process.send_after(process_name, interrupt_atom_name, timeout_time)
     Map.put(data_struct, timer_atom_name, new_timer)
   end

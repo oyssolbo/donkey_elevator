@@ -17,6 +17,7 @@ defmodule Panel do
     require Driver
     require Network
     require Order
+    require Logger
 
     # use GenServer
 
@@ -108,12 +109,12 @@ defmodule Panel do
 
         # Check for request from sender. If there is, send order list and recurse with reset list
         receive do
-            {:panel, {_message_ID, :gibOrdersPls}} ->
+            {:panel, _node, _message_ID, :gibOrdersPls} ->
                 Network.send_data_inside_node(:order_checker, :panel, orders)
 
                 order_checker([], floor_table)
 
-            {_sender, {_messageID, {:special_delivery, special_orders}}} ->
+            {_sender, _node, _messageID, {:special_delivery, special_orders}} ->
                 order_checker(orders++special_orders, floor_table)
             after
                 0 -> :ok
@@ -130,23 +131,25 @@ defmodule Panel do
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
             # ... send orders to all masters on network, and send cab orders to local elevator
-            Network.send_data_all_nodes(:panel, :master, {outgoing_orders, send_ID})
-            Network.send_data_inside_node(:panel, :master, Order.extract_orders(:cab, outgoing_orders))
+            Logger.info("sending data")
+            ack_message_id_master = Network.send_data_all_nodes(:panel, :master_receive, {outgoing_orders, send_ID})
+            ack_message_id_elevator = Network.send_data_inside_node(:panel, :elevator_receive, Order.extract_orders(:cab, outgoing_orders))
 
             # ... and wait for an ack
             receive do
-                {:ack, sentID} ->
+                {_sender_id, _node, _messageID, {ack_message_id_elevator, :ack}} ->
                     # When ack is recieved for current send_ID, send request to checker for latest order matrix
-                    if sentID == send_ID do
-                        Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
-                        IO.inspect("Received ack on SendID #{sentID}", label: "orderSender")   # TEST CODE
-                    end
+                    Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
+                    IO.inspect("Received ack from elevator")   # TEST CODE
+
                     receive do
                         # When latest order matrix is received, recurse with new orders and iterated send_ID
-                        {:order_checker, {_messageID, updated_orders}} ->
+                        {:order_checker, _node, _messageID, updated_orders} ->
                             order_sender(floor_table, send_ID+1, updated_orders)
                             after
-                                checkerTimeout -> #IO.inspect("OrderSender timed out waiting for orders from orderChecker[1]", label: "Error")# Send some kind of error, "no response from order_checker" # TEST CODE
+                                checkerTimeout ->
+                                Logger.info("Timeout from order checker")
+                                 #IO.inspect("OrderSender timed out waiting for orders from orderChecker[1]", label: "Error")# Send some kind of error, "no response from order_checker" # TEST CODE
                                 order_sender(floor_table, send_ID, outgoing_orders)
                     end
                 # If no ack is received after 'ackTimeout' number of milliseconds: Recurse and repeat
@@ -157,13 +160,15 @@ defmodule Panel do
 
         else
             # If no orders, send request to checker for latest orders. Recurse with those (but same sender ID)
+
             Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
             receive do
-                {:order_checker, {_messageID, updated_orders}} ->
+                {:order_checker, _node, _messageID, updated_orders} ->
                     order_sender(floor_table, send_ID, updated_orders)
-                    after
-                        checkerTimeout -> #IO.inspect("OrderSender timed out waiting for orders from orderChecker [2]", label: "Error")# Send some kind of error, "no response from order_checker"
-                        order_sender(floor_table, send_ID, outgoing_orders)
+                after
+                    checkerTimeout -> #IO.inspect("OrderSender timed out waiting for orders from orderChecker [2]", label: "Error")# Send some kind of error, "no response from order_checker"
+                    Logger.info("Did not get reply from order checker")
+                    order_sender(floor_table, send_ID, outgoing_orders)
             end
         end
 

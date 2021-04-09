@@ -48,7 +48,7 @@ defmodule Master do
     :master_timer,            # Time of last connection with active master
     :master_message_id,       # ID of last message received from active_master
     :activation_time,         # Time the master became active
-    :connected_elevator_list # List of connection-id the master has with each elevator
+    :connected_elevator_list  # List of connection-id the master has with each elevator
   ]
 
   defstruct [
@@ -133,10 +133,17 @@ defmodule Master do
         Logger.info("Got message from other master")
         GenStateMachine.cast(@node_name, {event_name, from_node, data})
 
+      {:elevator, from_node, message_id, :elevator_init} ->
+        GenStateMachine.cast(@node_name, {:elevator_init, from_node})
+
       {:elevator, from_node, message_id, {event_name, data}} ->
         Logger.info("Got message from elevator")
-        GenStateMachine.cast(@node_name, {event_name, data})
-        Network.send_data_spesific_node(:master, :elevator, from_node, {message_id, :ack})
+
+        case event_name do
+          :elevator_served_order ->
+            Network.send_data_spesific_node(:master, :elevator, from_node, {message_id, :ack})
+        end
+        GenStateMachine.cast(@node_name, {event_name, from_node, data})
 
       {:panel, from_node, message_id, order_list} ->
         Logger.info("Got message from panel")
@@ -159,10 +166,9 @@ defmodule Master do
 
   Will continue to try until it receives an ack or a certain amount of
   time has passed. It is assumed that the master receives a timeout/timer-interrupt,
-  which removes the elevator from the list if network-communication is lost. Therefore
-  it should not be required for the function to throw a message to the GenStateMachine
-  to indicate that the process has died. The function could send a message if it is a
-  problem
+  which removes the elevator from the list if network-communication is lost. To safeguard
+  this event, the master sends a message to the GenStateMachine-server indicating that the
+  elevator is gone
   """
   defp send_order_to_elevator(
         order,
@@ -186,7 +192,9 @@ defmodule Master do
   do
     Logger.info("Master is unable to send order to elevator")
     IO.inspect(elevator_id)
-    :ok
+
+    # We can assume that the elevator has received a timeout
+    GenStateMachine.cast(@node_name, :elevator_timeout, elevator_id)
   end
 
 
@@ -232,14 +240,14 @@ defmodule Master do
   backup-master while the current state is in backup-state. This could occur if the current
   process was demoted from active to backup because two active master simultaneously
   """
-  def handle_event(
-        :info,
-        :master_update_timer,
-        :backup_state,
-        master_data)
-  do
-    {:next_state, :backup_state, master_data}
-  end
+  # def handle_event(
+  #       :info,
+  #       :master_update_timer,
+  #       :backup_state,
+  #       master_data)
+  # do
+  #   {:next_state, :backup_state, master_data}
+  # end
 
 
   @doc """
@@ -282,42 +290,43 @@ defmodule Master do
   is in backup-mode. The backup-master does nothing, as it is assumed that these updates
   comes often enough for the system to handle if the backup master must be activated again
   """
-  def handle_event(
-        :cast,
-        {:elevator_status_update, {_elevator_id, _dir, _last_floor}},
-        :backup_state,
-        master_data)
-  do
-    {:next_state, :backup_state, master_data}
-  end
+  # def handle_event(
+  #       :cast,
+  #       {:elevator_status_update, {_elevator_id, {_dir, _last_floor}}},
+  #       :backup_state,
+  #       master_data)
+  # do
+  #   {:next_state, :backup_state, master_data}
+  # end
 
   @doc """
   Handles if the server receives a message that an elevator has served an order,
   while the master serves as backup. It is assumed that the active master will
   handle it, such that the backup-master will be updated from the active
   """
-  def handle_event(
-      :info,
-      {:elevator_served_order, {_elevator_id, _served_order_id}},
-      :backup_state,
-      master_data)
-  do
-    {:next_state, :backup_state, master_data}
-  end
+  # def handle_event(
+  #       :cast,
+  #       {:elevator_served_order, {_elevator_id, _served_order_id}},
+  #       :backup_state,
+  #       master_data)
+  # do
+  #   {:next_state, :backup_state, master_data}
+  # end
 
 
   @doc """
   Function to handle if a timeout has occured for an elevator while the system is in
   backup-state. No action is performed here, as the backup does not care if this happens
   """
-  def handle_event(
-        :info,
-        {:elevator_timeout, _elevator_id},
-        :backup_state,
-        master_data)
-  do
-    {:next_state, :backup_state, master_data}
-  end
+  # def handle_event(
+  #       _,
+  #       {timeout_atom, _elevator_id},
+  #       :backup_state,
+  #       master_data)
+  # when timeout_atom in [:elevator_timeout, :elevator_init]
+  # do
+  #   {:next_state, :backup_state, master_data}
+  # end
 
 
   @doc """
@@ -326,9 +335,32 @@ defmodule Master do
   to the active master. If the active master is unable to respond, the sender will repeat
   the order, until the backup has activated itself
   """
+  # def handle_event(
+  #       :cast,
+  #       {:panel_received_order, _order_list},
+  #       :backup_state,
+  #       master_data)
+  # do
+  #   {:next_state, :backup_state, master_data}
+  # end
+
+
+  @doc """
+  Function to handle if the GenStateMachine-server received other messages while in :backup_state.
+
+  These messages are considered not important, and results in no change of operation / state for the
+  backup-master. The messages / message-types are:
+    - :master_update_timer
+    - :elevator_status_update
+    - :elevator_served_order
+    - :elevator_timeout or :elevator_init
+    - :panel_received_order
+
+  It is assumed that active master will handle these events, and indirectly update backup-master
+  """
   def handle_event(
-        :cast,
-        {:panel_received_order, _order_list},
+        _,
+        _,
         :backup_state,
         master_data)
   do
@@ -400,7 +432,7 @@ defmodule Master do
   """
   def handle_event(
         :cast,
-        {:elevator_status_update, {elevator_id, dir, last_floor}},
+        {:elevator_status_update, elevator_id, {dir, last_floor}},
         :active_state,
         master_data)
   do
@@ -444,11 +476,11 @@ defmodule Master do
 
   @doc """
   Function that handles if an elevator sends an important status-message; that it has
-  served an order. The order can then be removed from the list of orders
+  served order(s). The order(s) can then be removed from the list of orders
   """
   def handle_event(
         :info,
-        {:elevator_served_order, {_elevator_id, served_order_id}},
+        {:elevator_served_order, _elevator_id, served_order_id},
         :active_state,
         master_data)
   do
@@ -463,18 +495,19 @@ defmodule Master do
 
 
   @doc """
-  Function to handle if an elevator gets a timeout / is disconnected
-  The function detects which external orders are affected by the disconnect, and
+  Function to handle if an elevator gets a timeout / is disconnected / is inited.
+  The function detects which external orders are affected, and
   redelegates them to the other elevators.
   If there are no connected elevators, the orders' delegated field are set to :nil.
   When one elevator becomes active again, it will receive all orders with field set
   to :nil
   """
   def handle_event(
-        :info,
-        {:elevator_timeout, elevator_id},
-        :active_state,
+        _,
+        {timeout_atom, elevator_id},
+        :backup_state,
         master_data)
+  when timeout_atom in [:elevator_timeout, :elevator_init]
   do
     # Find and remove the connection
     elevator_list = Map.get(master_data, :connected_elevator_list)

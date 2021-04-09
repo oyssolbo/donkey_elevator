@@ -12,7 +12,7 @@ defmodule Timer do
 
   Assuming that the given struct 'data_struct' contains a
   timer_instance which could be reset
-s
+
   Returns a new instance of the given struct, with updated timer. It
   will then call the process 'process_name' if the timer has not been
   canceled within 'timeout_time', by using the name 'interrupt_atom_name'

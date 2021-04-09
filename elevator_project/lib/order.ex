@@ -92,6 +92,20 @@ defmodule Order do
 
 
 ## Extract orders(s) ##
+
+  @doc """
+  Function that extract a list order corresponding to a list of ids 'order_id_list'. Returns
+  an empty list if not found, or if the list did not contain only orders
+  """
+  def extract_order(
+        [first_order_id | rest_order_id] = order_id_list,
+        order_list)
+  when order_list |> is_list() and order_id_list |> is_list()
+  do
+    [extract_order(first_order_id, order_list) | extract_order(rest_order_id, order_list)]
+  end
+
+
   @doc """
   Function that extract a single order with id 'order_id' from a list of orders. Returns
   an empty list if not found, or if the list did not contain only orders

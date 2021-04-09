@@ -12,7 +12,8 @@ defmodule Network do
 
   @doc """
   Init the node nettork on the machine
-  Remember to run "epmd -daemon" in terminal befrore running program for the first time
+  Remember to run "epmd -daemon" in terminal befrore running program for the first time after a reboot
+  Otherwise the error "econrefused" might apear and the network will not work
   """
   def init_node_network()
   do

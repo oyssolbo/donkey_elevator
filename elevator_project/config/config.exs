@@ -17,6 +17,10 @@ config :elevator_project,
   master_timeout_elevator_ms:     2000,
 
   # Elevator
+<<<<<<< HEAD
+  
+=======
+>>>>>>> a6d8e88962173c0386b4abffc73a2bb200c23fb4
   elevator_restart_time_ms:       2000,
   elevator_timeout_door_ms:       3000,
   elevator_timeout_moving_ms:     5000,

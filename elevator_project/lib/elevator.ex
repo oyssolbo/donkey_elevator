@@ -147,7 +147,7 @@ defmodule Elevator do
   @doc """
   Functions for broadcasting different information to other nodes:
 
-    broadcast_elevator_init: broadcasts to all nodes that the elevator is just initialized
+    broadcast_elevator_timedout: broadcasts to all nodes that the elevator is just initialized
 
     broadcast_served_orders: broadcasts a list of orders that the elevator has served
 
@@ -170,7 +170,7 @@ defmodule Elevator do
         last_dir,
         last_floor)
   do
-    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master, {:elevator_status_update, last_dir, last_floor}) end)
+    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master, {:elevator_status_update, {last_dir, last_floor}}) end)
   end
 
 
@@ -191,7 +191,7 @@ defmodule Elevator do
         {:received_order, new_order_list},
         state,
         %Elevator{orders: prev_orders} = elevator_data)
-  when state in [:init_state, :active_state, :door_state, :moving_state]
+  when state in [:init_state, :idle_state, :door_state, :moving_state]
   do
     Logger.info("Elevator received order")
 
@@ -214,15 +214,15 @@ defmodule Elevator do
     {:next_state, state, new_elevator_data}
   end
 
-  # def handle_event(
-  #       :cast,
-  #       {:received_order, _new_order_list},
-  #       :restart_state,
-  #       elevator_data)
-  # do
-  #   Logger.info("Elevator received order while in restart_state")
-  #   {:next_state, :restart_state, elevator_data}
-  # end
+  def handle_event(
+        :cast,
+        {:received_order, _new_order_list},
+        :restart_state,
+        elevator_data)
+  do
+    Logger.info("Elevator received order(s) while in restart_state. Order(s) not accepted!")
+    {:next_state, :restart_state, elevator_data}
+  end
 
 
 # udp_timer #

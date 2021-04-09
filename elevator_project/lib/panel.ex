@@ -20,10 +20,10 @@ defmodule Panel do
     require Logger
 
 
-    @num_floors Application.fetch_env!(:elevator_project, :project_num_floors)
-    @ack_timeout Application.fetch_env!(:elevator_project, :ack_timeout_time_ms)
+    @num_floors      Application.fetch_env!(:elevator_project, :project_num_floors)
+    @ack_timeout     Application.fetch_env!(:elevator_project, :network_ack_timeout_time_ms)
     @checker_timeout Application.fetch_env!(:elevator_project, :panel_checker_timeout_ms)
-    @checker_sleep Application.fetch_env!(:elevator_project, :panel_checker_sleep_ms)
+    @checker_sleep   Application.fetch_env!(:elevator_project, :panel_checker_sleep_ms)
 
 ##### INITIALIZATION FUNTIONS #####
 

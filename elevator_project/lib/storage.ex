@@ -8,21 +8,17 @@ defmodule Storage do
     Rudamentary file storage module. Allows sent data to be written to file, or read from it.
     Use atoms :write or :read to tell it what you want. Be sure to include MasterID and versionID
     as arguments.
-
     For write, returns IDs of attempted write, as well as whether it succeeded (as message).
-
     Work in progress; currently overwrites previous data upon write. Does not format data before
     returning a read request. Also doesnt do any sort of duplication or error checking, cuz holy
     shit is data manipulation in Elixir asinine.
     """
     @doc """
     Writes to or reads from file.
-
     ## Example
         Write:
       iex> strg = Storage.init
       send(strg, {self(), :write, "This shall be written.", <masterID>, <versionID>})
-
         Read:
       send(strg, {self(), :read})
     """
@@ -49,9 +45,9 @@ defmodule Storage do
 
     def write(data, fileName \\ "save_data.txt") do
         # TODO: Format order struct into string
-        dataMap = Map.from_struct(data)
-        textData = Poison.encode!(dataMap)#Map
-        result = File.write(fileName, textData)
+        # dataMap = Map.from_struct(data)
+        # textData = Poison.encode!(dataMap)#Map
+        # result = File.write(fileName, textData)
     end
 
     def read(fileName \\ "save_data.txt") do

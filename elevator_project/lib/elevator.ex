@@ -315,8 +315,6 @@ defmodule Elevator do
         :idle_state,
         elevator_data)
   do
-    # Logger.info("Elevator in idle_state")
-
     last_floor = Map.get(elevator_data, :last_floor)
     last_dir = Map.get(elevator_data, :dir)
     orders = Map.get(elevator_data, :orders)
@@ -326,11 +324,10 @@ defmodule Elevator do
     {new_state, new_data} =
       case new_dir do
         :nil->
-          # Logger.info("Continuing in idle")
           {:idle_state, elevator_data}
 
         _->
-          Logger.info("New direction calculated")
+          Logger.info("Elevator in idle, calculated new direction")
           temp_elevator_data = Map.put(elevator_data, :dir, new_dir)
 
           new_elevator_data = Timer.start_timer(self(), temp_elevator_data, :timer, :moving_timer, @moving_time)
@@ -363,9 +360,7 @@ defmodule Elevator do
     {order_at_floor, floor_orders} = Order.check_orders_at_floor(all_orders, floor, direction)
 
     # Updating moving-timer and last_floor
-    IO.inspect(elevator_data)
     temp_elevator_data = check_at_new_floor(elevator_data, floor)
-    IO.inspect(temp_elevator_data)
 
     # Checking if at target floor and if there is a valid order to stop on
     {new_state, new_data} =
@@ -565,13 +560,11 @@ defmodule Elevator do
 
     # Remove old orders and calculate new target_order
     updated_orders = Order.remove_orders(floor_orders, order_list)
-    orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
 
     Storage.write(updated_orders)
     Lights.set_order_lights(updated_orders)
 
-    dir_opt = calculate_optimal_direction(updated_orders, dir, floor)
-    Map.put(orders_elevator_data, :dir, dir_opt)
+    Map.put(timer_elevator_data, :orders, updated_orders)
   end
 
 

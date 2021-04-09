@@ -166,10 +166,9 @@ defmodule Master do
 
   Will continue to try until it receives an ack or a certain amount of
   time has passed. It is assumed that the master receives a timeout/timer-interrupt,
-  which removes the elevator from the list if network-communication is lost. Therefore
-  it should not be required for the function to throw a message to the GenStateMachine
-  to indicate that the process has died. The function could send a message if it is a
-  problem
+  which removes the elevator from the list if network-communication is lost. To safeguard
+  this event, the master sends a message to the GenStateMachine-server indicating that the
+  elevator is gone
   """
   defp send_order_to_elevator(
         order,
@@ -194,6 +193,7 @@ defmodule Master do
     Logger.info("Master is unable to send order to elevator")
     IO.inspect(elevator_id)
 
+    # We can assume that the elevator has received a timeout
     GenStateMachine.cast(@node_name, :elevator_timeout, elevator_id)
   end
 

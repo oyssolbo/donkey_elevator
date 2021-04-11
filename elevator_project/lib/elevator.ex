@@ -210,17 +210,11 @@ defmodule Elevator do
           IO.inspect(new_order_list)
           # Checking if order already exists - if not, add to list and calculate next direction
           updated_order_list = Order.add_orders(new_order_list, prev_orders)
-          new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
-          IO.inspect(new_elevator_data)
-
-
-          IO.inspect(updated_order_list)
 
           Storage.write(updated_order_list)
-          
           Lights.set_order_lights(updated_order_list)
 
-          new_elevator_data
+          Map.put(elevator_data, :orders, updated_order_list)
 
         :false->
           Logger.info("invalid order")
@@ -465,7 +459,7 @@ defmodule Elevator do
   do
     {:next_state, :door_state, elevator_data}
   end
-  
+
 
 ##### restart_state #####
 

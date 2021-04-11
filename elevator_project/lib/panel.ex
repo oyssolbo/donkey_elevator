@@ -1,14 +1,8 @@
-"""
-Syntax
-    @Order{order_ID, order_type, order_floor}
-"""
-
-
 defmodule Panel do
     @moduledoc """
     Module for detecting button inputs on the elevator panel, and passing the information on to relevant modules.
 
-    Dependancies:
+    Dependencies:
     - Driver
     - Network
     - UDP

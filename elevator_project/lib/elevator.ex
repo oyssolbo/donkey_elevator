@@ -73,7 +73,7 @@ defmodule Elevator do
       last_floor:   :nil,
       dir:          :down,
       timer:        make_ref(),
-      elevator_id:  Node.self()
+      elevator_id:  Network.get_node_id()
     }
 
     # Messaging master that elevator is inited

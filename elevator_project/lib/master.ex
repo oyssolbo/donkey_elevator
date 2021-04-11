@@ -390,10 +390,16 @@ defmodule Master do
 
 
   @doc """
-  Handler event that triggers whenever there are two active master simultaneously
+  Handler event that triggers whenever there are two active master simultaneously. The
+  function differentiates with 'internal_master_data' and 'external_master_data'. Since
+  both of these could have valid data, they are combined to 'combined_master_data'. The
+  orders are OR-ed, while all of timers are reset. The state is determined on the times
+  of activation; the oldest master is kept active, while the youngest is set to backup.
+  If both have the same time - unlikely as it is - both are set to sleep for a random
+  amount of time, before being set as backup.
   """
   def handle_event(
-        :info,
+        :cast,
         {:master_update_active, extern_master_data},
         :active_state,
         intern_master_data)
@@ -413,6 +419,8 @@ defmodule Master do
         :eq->
           Logger.info("Equal time detected. Transition into backup state")
           reset_timer_master_data = Timer.start_timer(self(), combined_master_data, :master_timer, :master_active_timeout, @timeout_active_master_time)
+          :rand.uniform(200) |>
+            Process.sleep()
           {:backup_state, reset_timer_master_data}
         :gt->
           Logger.info("Transition into backup state")

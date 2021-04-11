@@ -15,6 +15,12 @@ defmodule MasterTest do
     - Communication between an elevator and a master (send status etc.)
   """
 
+  require Master
+  require Logger
+  require Order
+  require Client
+  require Elevator
+
   def test_master_backup_to_active()
   do
     # Test passed
@@ -164,5 +170,31 @@ defmodule MasterTest do
 
     Order.remove_orders([order1], [order1, order2, order3])
   end
+
+
+  def send_master_struct()
+  do
+    # Test passed
+
+    Master.start_link([])
+    Process.sleep(500)
+
+    opts = [
+      active_order_list:        [Order.create_rnd_order()],
+      master_message_id:        69,
+      activation_time:          Timer.get_utc_time()
+    ]
+
+    master_struct = struct(Master, opts)
+    Process.sleep(500)
+
+    Logger.info("Sending master struct")
+    Master.send_master_struct(master_struct)
+    Logger.info("Master struct sent")
+    Process.sleep(1000)
+  end
+
+
+
 
 end

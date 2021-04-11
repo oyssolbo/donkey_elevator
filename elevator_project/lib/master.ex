@@ -357,11 +357,12 @@ defmodule Master do
   """
   def handle_event(
         _,
-        _,
+        something,
         :backup_state,
         master_data)
   do
     Logger.info("General handler in backup-master acquired something")
+    IO.inspect(something)
     {:next_state, :backup_state, master_data}
   end
 

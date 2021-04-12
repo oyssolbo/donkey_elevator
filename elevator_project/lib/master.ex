@@ -467,7 +467,7 @@ defmodule Master do
       end
 
     updated_elevator_list =
-      Timer.start_timer(self(), elevator_client, :client_timer, :elevator_timeout, @timeout_elevator_time) |>
+      Timer.start_timer(self(), elevator_client, :client_timer, {:elevator_timeout, elevator_id}, @timeout_elevator_time) |>
       Client.add_clients(old_elevator_client_list)
 
     # Delegate any undelegated orders
@@ -522,13 +522,10 @@ defmodule Master do
   def handle_event(
         _,
         {timeout_atom, elevator_id},
-        :backup_state,
+        :active_state,
         master_data)
   when timeout_atom in [:elevator_timeout, :elevator_init]
   do
-    Logger.info("Master recieved timeout or init from")
-    IO.inspect(elevator_id)
-
     # Find and remove the connection
     elevator_list = Map.get(master_data, :connected_elevator_list)
     updated_elevator_list =

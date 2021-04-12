@@ -16,7 +16,8 @@ defmodule ElevatorProject.Supervisor do
     children = [
       {Elevator.Supervisor, []},
       {Master.Supervisor, []},
-      {Panel.Supervisor, []}
+      {Panel.Supervisor, []},
+      {Lights.Supervisor, []}
     ]
 
     opts = [strategy: :one_for_one]

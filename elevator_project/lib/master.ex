@@ -59,6 +59,16 @@ defmodule Master do
     connected_elevator_list:  []
   ]
 
+
+  def connect_elevator(
+        elevator_id,
+        dir,
+        last_floor)
+  do
+    GenStateMachine.cast(@node_name, {:elevator_status_update, elevator_id, {dir, last_floor}})
+  end
+
+
 ###################################### External functions ######################################
 
 ##### Client to GenStateMachine-server #####
@@ -133,7 +143,7 @@ defmodule Master do
         Logger.info("Got message from other master")
         GenStateMachine.cast(@node_name, {event_name, data})
 
-      {:elevator, from_node, message_id, :elevator_init} ->
+      {:elevator, from_node, _message_id, :elevator_init} ->
         GenStateMachine.cast(@node_name, {:elevator_init, from_node})
 
       {:elevator, from_node, message_id, {event_name, data}} ->
@@ -141,7 +151,7 @@ defmodule Master do
 
         case event_name do
           :elevator_served_order ->
-            Network.send_data_spesific_node(:master, :elevator, from_node, {message_id, :ack})
+            Network.send_data_spesific_node(:master, :elevator_receive, from_node, {message_id, :ack})
         end
         GenStateMachine.cast(@node_name, {event_name, from_node, data})
 
@@ -176,7 +186,7 @@ defmodule Master do
         counter \\ 0)
   when counter < @max_resends
   do
-    message_id = Network.send_data_spesific_node(:master, :elevator, elevator_id, order)
+    message_id = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, order)
     case Network.receive_ack(message_id) do
       {:ok, _receiver_id}->
         :ok
@@ -206,6 +216,18 @@ defmodule Master do
   defp send_data_to_master(%Master{} = master_data)
   do
     Network.send_data_all_other_nodes(:master, :master_receive, {:master_update_active, master_data})
+  end
+
+
+  @doc """
+  Function for broadcasting the lights that should be set or cleared
+  """
+  defp broadcast_lights(
+        event_atom,
+        event_data)
+  when event_atom |> is_atom()
+  do
+    Network.send_data_all_nodes(:master, :lights_receive, {event_atom, event_data})
   end
 
 
@@ -452,12 +474,12 @@ defmodule Master do
               client_data: %{dir: dir, last_floor: last_floor},
               client_timer: make_ref()
             ])
-        old_client ->
-          Map.put(old_client, :client_data, %{dir: dir, last_floor: last_floor})
+        [old_client] ->
+          Client.modify_client_field(old_client, :client_data, %{dir: dir, last_floor: last_floor})
       end
 
     updated_elevator_list =
-      Timer.start_timer(self(), elevator_client, :client_timer, :elevator_timeout, @timeout_elevator_time) |>
+      Timer.start_timer(self(), elevator_client, :client_timer, {:elevator_timeout, elevator_id}, @timeout_elevator_time) |>
       Client.add_clients(old_elevator_client_list)
 
     # Delegate any undelegated orders
@@ -473,7 +495,9 @@ defmodule Master do
 
     # Since we have connection to at least one elevator, we can assume that all orders are delegated
     new_order_list = Order.add_orders(delegated_orders, other_orders)
-    new_master_data = Map.put(master_data, :active_orders, new_order_list)
+    new_master_data =
+      Map.put(master_data, :connected_elevator_list, updated_elevator_list) |>
+      Map.put(:active_orders, new_order_list)
 
     {:next_state, :active_state, new_master_data}
   end
@@ -485,14 +509,14 @@ defmodule Master do
   """
   def handle_event(
         :info,
-        {:elevator_served_order, _elevator_id, served_order_id},
+        {:elevator_served_order, _elevator_id, served_order_list},
         :active_state,
         master_data)
   do
+    broadcast_lights(:clear_lights, served_order_list)
+
     order_list = Map.get(master_data, :active_order_list)
-    updated_order_list =
-      Order.extract_order(served_order_id, order_list) |>
-      Order.remove_orders(order_list)
+    updated_order_list = Order.remove_orders(served_order_list, order_list)
 
     new_master_data = Map.put(master_data, :active_order_list, updated_order_list)
     {:next_state, :active_state, new_master_data}
@@ -510,7 +534,7 @@ defmodule Master do
   def handle_event(
         _,
         {timeout_atom, elevator_id},
-        :backup_state,
+        :active_state,
         master_data)
   when timeout_atom in [:elevator_timeout, :elevator_init]
   do
@@ -547,6 +571,8 @@ defmodule Master do
         master_data)
   when order_list |> is_list()
   do
+    broadcast_lights(:set_lights, order_list)
+
     Logger.info("Active master received orders")
     IO.inspect(order_list)
 

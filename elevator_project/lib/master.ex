@@ -133,7 +133,7 @@ defmodule Master do
         Logger.info("Got message from other master")
         GenStateMachine.cast(@node_name, {event_name, from_node, data})
 
-      {:elevator, from_node, message_id, :elevator_init} ->
+      {:elevator, from_node, _message_id, :elevator_init} ->
         GenStateMachine.cast(@node_name, {:elevator_init, from_node})
 
       {:elevator, from_node, message_id, {event_name, data}} ->
@@ -141,7 +141,7 @@ defmodule Master do
 
         case event_name do
           :elevator_served_order ->
-            Network.send_data_spesific_node(:master, :elevator, from_node, {message_id, :ack})
+            Network.send_data_spesific_node(:master, :elevator_receive, from_node, {message_id, :ack})
         end
         GenStateMachine.cast(@node_name, {event_name, from_node, data})
 
@@ -176,7 +176,7 @@ defmodule Master do
         counter \\ 0)
   when counter < @max_resends
   do
-    message_id = Network.send_data_spesific_node(:master, :elevator, elevator_id, order)
+    message_id = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, order)
     case Network.receive_ack(message_id) do
       {:ok, _receiver_id}->
         :ok
@@ -206,6 +206,18 @@ defmodule Master do
   defp send_data_to_master(%Master{} = master_data)
   do
     Network.send_data_all_nodes(:master, :master_receive, {:master_update, master_data})
+  end
+
+
+  @doc """
+  Function for broadcasting the lights that should be set or cleared
+  """
+  defp broadcast_lights(
+        event_atom,
+        event_data)
+  when event_atom |> is_atom()
+  do
+    Network.send_data_all_nodes(:master, :lights_receive, {event_atom, event_data})
   end
 
 
@@ -483,14 +495,14 @@ defmodule Master do
   """
   def handle_event(
         :info,
-        {:elevator_served_order, _elevator_id, served_order_id},
+        {:elevator_served_order, _elevator_id, served_order_list},
         :active_state,
         master_data)
   do
+    broadcast_lights(:clear_lights, served_order_list)
+
     order_list = Map.get(master_data, :active_order_list)
-    updated_order_list =
-      Order.extract_order(served_order_id, order_list) |>
-      Order.remove_orders(order_list)
+    updated_order_list = Order.remove_orders(served_order_list, order_list)
 
     new_master_data = Map.put(master_data, :active_order_list, updated_order_list)
     {:next_state, :active_state, new_master_data}
@@ -545,6 +557,8 @@ defmodule Master do
         master_data)
   when order_list |> is_list()
   do
+    broadcast_lights(:set_lights, order_list)
+
     Logger.info("Active master received orders")
     IO.inspect(order_list)
 

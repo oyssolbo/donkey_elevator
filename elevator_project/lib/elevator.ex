@@ -217,8 +217,8 @@ defmodule Elevator do
           IO.inspect(updated_order_list)
 
           Storage.write(updated_order_list)
-          
-          Lights.set_order_lights(updated_order_list)
+
+          #Lights.set_order_lights(updated_order_list)
 
           new_elevator_data
 
@@ -465,7 +465,7 @@ defmodule Elevator do
   do
     {:next_state, :door_state, elevator_data}
   end
-  
+
 
 ##### restart_state #####
 

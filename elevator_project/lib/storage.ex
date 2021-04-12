@@ -22,44 +22,24 @@ defmodule Storage do
         Read:
       send(strg, {self(), :read})
     """
-    def init() do
-        spawn(fn -> storage_module() end)
-    end
-
-    defp storage_module do
-        receive do
-            {from,:write, data, masterID, versID} ->
-                data_tag = Enum.join(["\nMasterID: ", masterID, ", Version ID: ", versID])
-                write_data = Enum.join([data, data_tag])
-                result = File.write("save_data.txt", write_data)
-                send(from, {:Storage, data_tag, result})
-                storage_module()
-
-            {from, :read} ->
-                send(from, {:Storage, File.read("save_data.txt")})
-                storage_module()
-
-        end
-
-    end
 
     def write(data, fileName \\ "save_data.txt") do
         # TODO: Format order struct into string
-        # dataMap = Map.from_struct(data)
-        # textData = Poison.encode!(dataMap)#Map
-        # result = File.write(fileName, textData)
+        dataMap = Enum.map(data, fn x -> Map.from_struct(x) end)
+        textData = Poison.encode!(dataMap)
+        result = File.write(fileName, textData)
     end
 
     def read(fileName \\ "save_data.txt") do
         result = File.read!(fileName)   #Beware! read! embeds errors into results, without error messages
-        ordr = struct(Order, Poison.decode!(result))
+        ordrs = Enum.map(Poison.decode!(result), fn x -> Kernel.struct(Order, x) end)
     end
 
 @doc """
 Notes:
 File.write accepts only(?) _a_ string as argument, so process all data before passing.
 As far as I know, only Enum.join can consistently combine various elements of a _list_ together as a string
-without giving you errors and bad_args up the ass. If you wanna write a tuple, conver tto list first; tuple.to_list()
+without giving you errors and bad_args up the ass. If you wanna write a tuple, convert to list first; tuple.to_list()
 Also, the '<>' operator for combining strings doesnt like working with numbers. To avoid enforcing 'Master ID' etc
 be converted to strings before sending, I just pass the whole damn thing through Enum.join() (it seems to eat everything).
 Bigbrain syntax for converting to string: "#/{inspect <var>}", without the /

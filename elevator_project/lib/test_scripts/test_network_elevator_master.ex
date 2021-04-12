@@ -7,7 +7,7 @@ defmodule NetworkTest do
     Network.init_node_network()
     #Elevator.start_link([])
     Master.start_link([])
-    spawn( fn -> Panel.init() end)
+    Panel.init()
   end
 
 

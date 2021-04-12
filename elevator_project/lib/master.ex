@@ -59,6 +59,16 @@ defmodule Master do
     connected_elevator_list:  []
   ]
 
+
+  def connect_elevator(
+        elevator_id,
+        dir,
+        last_floor)
+  do
+    GenStateMachine.cast(@node_name, {:elevator_status_update, elevator_id, {dir, last_floor}})
+  end
+
+
 ###################################### External functions ######################################
 
 ##### Client to GenStateMachine-server #####
@@ -131,7 +141,7 @@ defmodule Master do
     receive do
       {:master, from_node, _message_id, {event_name, data}} ->
         Logger.info("Got message from other master")
-        GenStateMachine.cast(@node_name, {event_name, from_node, data})
+        GenStateMachine.cast(@node_name, {event_name, data})
 
       {:elevator, from_node, _message_id, :elevator_init} ->
         GenStateMachine.cast(@node_name, {:elevator_init, from_node})
@@ -205,7 +215,7 @@ defmodule Master do
   """
   defp send_data_to_master(%Master{} = master_data)
   do
-    Network.send_data_all_nodes(:master, :master_receive, {:master_update, master_data})
+    Network.send_data_all_other_nodes(:master, :master_receive, {:master_update_active, master_data})
   end
 
 
@@ -269,13 +279,10 @@ defmodule Master do
   """
   def handle_event(
         :cast,
-        {:master_update, extern_master_data},
+        {:master_update_active, extern_master_data},
         :backup_state,
         intern_master_data)
   do
-    Logger.info("Backup recieved data from active")
-    IO.inspect(extern_master_data)
-
     extern_message_id = Map.get(extern_master_data, :master_message_id, 0)
     intern_message_id = Map.get(intern_master_data, :master_message_id, 0)
 
@@ -285,10 +292,6 @@ defmodule Master do
           active_order_list = Map.get(extern_master_data, :active_order_list)
           connected_elevator_list = Map.get(extern_master_data, :connected_elevator_list)
 
-          # updated_timer_master_data = Timer.start_timer(self(), intern_master_data, :master_timer, :active_master_timeout, @timeout_active_master_time)
-          # updated_order_master_data = Map.put(updated_timer_master_data, :active_order_list, active_order_list)
-          # updated_connection_master_data = Map.put(updated_order_master_data, :connected_elevator_list, connected_elevator_list)
-          # Map.put(updated_connection_master_data, :master_message_id, extern_message_id)
           Timer.start_timer(self(), intern_master_data, :master_timer, :master_active_timeout, @timeout_active_master_time) |>
             Map.put(:active_order_list, active_order_list) |>
             Map.put(:connected_elevator_list, connected_elevator_list) |>
@@ -297,6 +300,7 @@ defmodule Master do
         intern_message_id >= extern_message_id ->
           intern_master_data
       end
+
     {:next_state, :backup_state, new_master_data}
   end
 
@@ -375,10 +379,12 @@ defmodule Master do
   """
   def handle_event(
         _,
-        _,
+        something,
         :backup_state,
         master_data)
   do
+    Logger.info("General handler in backup-master acquired something")
+    IO.inspect(something)
     {:next_state, :backup_state, master_data}
   end
 
@@ -406,12 +412,16 @@ defmodule Master do
 
 
   @doc """
-  Function that updates the backup-master about the current active orders
-  This update functions as a heartbeat, such that the backup can take over if something
-  occurs with the active master
+  Handler event that triggers whenever there are two active master simultaneously. The
+  function differentiates with 'internal_master_data' and 'external_master_data'. Since
+  both of these could have valid data, they are combined to 'combined_master_data'. The
+  orders are OR-ed, while all of timers are reset. The state is determined on the times
+  of activation; the oldest master is kept active, while the youngest is set to backup.
+  If both have the same time - unlikely as it is - both are set to sleep for a random
+  amount of time, before being set as backup.
   """
   def handle_event(
-        :info,
+        :cast,
         {:master_update_active, extern_master_data},
         :active_state,
         intern_master_data)
@@ -431,6 +441,8 @@ defmodule Master do
         :eq->
           Logger.info("Equal time detected. Transition into backup state")
           reset_timer_master_data = Timer.start_timer(self(), combined_master_data, :master_timer, :master_active_timeout, @timeout_active_master_time)
+          :rand.uniform(200) |>
+            Process.sleep()
           {:backup_state, reset_timer_master_data}
         :gt->
           Logger.info("Transition into backup state")
@@ -462,12 +474,12 @@ defmodule Master do
               client_data: %{dir: dir, last_floor: last_floor},
               client_timer: make_ref()
             ])
-        old_client ->
-          Map.put(old_client, :client_data, %{dir: dir, last_floor: last_floor})
+        [old_client] ->
+          Client.modify_client_field(old_client, :client_data, %{dir: dir, last_floor: last_floor})
       end
 
     updated_elevator_list =
-      Timer.start_timer(self(), elevator_client, :client_timer, :elevator_timeout, @timeout_elevator_time) |>
+      Timer.start_timer(self(), elevator_client, :client_timer, {:elevator_timeout, elevator_id}, @timeout_elevator_time) |>
       Client.add_clients(old_elevator_client_list)
 
     # Delegate any undelegated orders
@@ -483,7 +495,9 @@ defmodule Master do
 
     # Since we have connection to at least one elevator, we can assume that all orders are delegated
     new_order_list = Order.add_orders(delegated_orders, other_orders)
-    new_master_data = Map.put(master_data, :active_orders, new_order_list)
+    new_master_data =
+      Map.put(master_data, :connected_elevator_list, updated_elevator_list) |>
+      Map.put(:active_orders, new_order_list)
 
     {:next_state, :active_state, new_master_data}
   end
@@ -520,7 +534,7 @@ defmodule Master do
   def handle_event(
         _,
         {timeout_atom, elevator_id},
-        :backup_state,
+        :active_state,
         master_data)
   when timeout_atom in [:elevator_timeout, :elevator_init]
   do

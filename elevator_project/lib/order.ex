@@ -151,7 +151,7 @@ defmodule Order do
   def extract_orders(
         type,
         order_list)
-  when order_list |> is_list() and type in [:hall_up, :up, :hall_down, :down, :cab]
+  when order_list |> is_list() and type in [:hall_up, :hall_down, :cab]
   do
     if is_order_list(order_list) do
       Enum.filter(order_list, fn x -> x.order_type == type end)

@@ -1,1 +1,1 @@
-{"order_type":null,"order_id":null,"order_floor":null,"delegated_elevator":null}
+[{"order_type":"cab","order_id":"12:18:20.509062","order_floor":1,"delegated_elevator":null},{"order_type":"cab","order_id":"12:18:20.511930","order_floor":2,"delegated_elevator":null}]

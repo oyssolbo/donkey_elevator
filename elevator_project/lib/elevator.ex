@@ -1,7 +1,14 @@
 
 defmodule Elevator do
   @moduledoc """
-  Elevator-module
+  Module implementing the Elevator for the project
+    States:               Transitions to:
+      - :init_state         :idle_state, :restart_state
+      - :idle_state         :moving_state
+      - :moving_state       :door_state, :restart_state
+      - :door_state         :idle_state
+      - :restart_state      :restart_state
+
   Requirements:
     - Driver
     - Network
@@ -10,9 +17,6 @@ defmodule Elevator do
     - Lights
     - Timer
     - Storage
-  TODO:
-    More testing
-    Writing code for combining with Master and Panel
   """
 
 ##### Module definitions #####
@@ -72,13 +76,24 @@ defmodule Elevator do
       elevator_id:  Node.self()
     }
 
+    # Messaging master that elevator is inited
+    broadcast_elevator_init()
+
     # Close door and set direction down
     close_door()
     Driver.set_motor_direction(:down)
 
     # Starting process for error-handling
     elevator_data = Timer.start_timer(self(), data, :timer, :init_timer, @init_time)
-    spawn(fn-> read_current_floor() end)
+    spawn_link(fn-> read_current_floor() end)
+
+    case Process.whereis(:elevator_receive) do
+      :nil->
+        Logger.info("Starting receive-process for elevator")
+        init_receive()
+      _->
+        Logger.info("Receive-process for elevator already active")
+    end
 
     Logger.info("Elevator initialized")
     {:ok, :init_state, elevator_data}
@@ -106,26 +121,66 @@ defmodule Elevator do
   end
 
 
-##### Interface to external modules #####
+##### Networking and interface to external modules #####
+
+  @doc """
+  Process for receiving data from master and panel, and calls the respective
+  handlers in the GenStateMachine-server
+  """
+  defp receive_thread()
+  do
+    receive do
+      {:master, _node, message_id, data} ->
+        Logger.info("Elevator received order from master")
+        Network.send_data_all_nodes(:elevator, :master, {message_id, :ack})
+        GenStateMachine.cast(@node_name, {:received_order, data})
+
+      {:panel, _node, message_id, data} ->
+        Logger.info("Elevator received order from panel")
+        IO.inspect(data)
+        Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
+        GenStateMachine.cast(@node_name, {:received_order, data})
+    end
+
+    receive_thread()
+  end
+
+  defp init_receive()
+  do
+    spawn_link(fn -> receive_thread() end) |>
+      Process.register(:elevator_receive)
+  end
 
 
   @doc """
-  Function for external modules (either Panel or Master) to call when a new order is detected
+  Functions for broadcasting different information to other nodes:
+
+    broadcast_elevator_init: broadcasts to all nodes that the elevator is just initialized
+
+    broadcast_served_orders: broadcasts a list of orders that the elevator has served
+
+    broadcast_elevator_status: broadcast the status (dir, last_floor) to all other nodes
   """
-  def delegate_order(order)
+  defp broadcast_elevator_init()
   do
-    #GenStateMachine.call(@node_name, {:received_order, order})
-    IO.inspect(order)
-    GenStateMachine.cast(@node_name, {:received_order, order})
+    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master, :elevator_init) end)
   end
 
-  @doc """
-  Work in progress - must be decided alongside the interface of Panel and Master
-  """
-  def wip()
+
+  defp broadcast_served_orders(orders)
+  when orders |> is_list()
   do
-    :okhorizon
+    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master, {:elevator_served_order, orders}) end)
   end
+
+
+  defp broadcast_elevator_status(
+        last_dir,
+        last_floor)
+  do
+    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master, {:elevator_status_update, {last_dir, last_floor}}) end)
+  end
+
 
 
 ###################################### Events and transitions ######################################
@@ -144,23 +199,31 @@ defmodule Elevator do
         {:received_order, new_order_list},
         state,
         %Elevator{orders: prev_orders} = elevator_data)
-  when state in [:init_state, :active_state, :door_state, :moving_state]
+  when state in [:init_state, :idle_state, :door_state, :moving_state]
   do
     Logger.info("Elevator received order")
 
     new_elevator_data =
       case Order.check_valid_order(new_order_list) do
         :true->
+          Logger.info("valid order")
+          IO.inspect(new_order_list)
           # Checking if order already exists - if not, add to list and calculate next direction
           updated_order_list = Order.add_orders(new_order_list, prev_orders)
           new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
+          IO.inspect(new_elevator_data)
+
+
+          IO.inspect(updated_order_list)
 
           Storage.write(updated_order_list)
+          
           Lights.set_order_lights(updated_order_list)
 
           new_elevator_data
 
         :false->
+          Logger.info("invalid order")
           elevator_data
       end
 
@@ -173,7 +236,7 @@ defmodule Elevator do
         :restart_state,
         elevator_data)
   do
-    Logger.info("Elevator received order while in restart_state")
+    Logger.info("Elevator received order(s) while in restart_state. Order(s) not accepted!")
     {:next_state, :restart_state, elevator_data}
   end
 
@@ -190,10 +253,11 @@ defmodule Elevator do
         %Elevator{dir: dir, last_floor: last_floor} = elevator_data)
   do
     Timer.interrupt_after(self(), :udp_timer, @status_update_time)
-    Network.send_data_all_nodes(:elevator, :master,  {Map.get(elevator_data, :elevator_id), Map.get(elevator_data, :dir), Map.get(elevator_data, :last_floor)})
+    broadcast_elevator_status(dir, last_floor)
 
     {:next_state, state, elevator_data}
   end
+
 
 ##### init_state #####
 # at_floor #
@@ -214,7 +278,7 @@ defmodule Elevator do
     Process.cancel_timer(timer)
 
     # Reading previously saved orders, and starting timer
-    stored_orders = Storage.read()
+    stored_orders = [] #Storage.read()
     prev_orders =
       case Order.check_valid_order(stored_orders) do
         :true->
@@ -243,12 +307,12 @@ defmodule Elevator do
         elevator_data)
   do
     Logger.info("Elevator did not get to a defined floor before timeout. Restarting")
+    kill_process()
     {:next_state, :restart_state, elevator_data}
   end
 
 
-
-  ##### idle_state #####
+##### idle_state #####
 
   @doc """
   Function to handle when the elevator is in idle
@@ -260,8 +324,6 @@ defmodule Elevator do
         :idle_state,
         elevator_data)
   do
-    Logger.info("Elevator in idle_state")
-
     last_floor = Map.get(elevator_data, :last_floor)
     last_dir = Map.get(elevator_data, :dir)
     orders = Map.get(elevator_data, :orders)
@@ -271,11 +333,11 @@ defmodule Elevator do
     {new_state, new_data} =
       case new_dir do
         :nil->
-          Logger.info("Continuing in idle")
+
           {:idle_state, elevator_data}
 
         _->
-          Logger.info("New direction calculated")
+          Logger.info("Elevator in idle, calculated new direction")
           temp_elevator_data = Map.put(elevator_data, :dir, new_dir)
 
           new_elevator_data = Timer.start_timer(self(), temp_elevator_data, :timer, :moving_timer, @moving_time)
@@ -305,19 +367,17 @@ defmodule Elevator do
     all_orders = Map.get(elevator_data, :orders)
     direction = Map.get(elevator_data, :dir)
 
-    {order_at_floor, _valid_orders} = Order.check_orders_at_floor(all_orders, floor, direction)
+    {order_at_floor, floor_orders} = Order.check_orders_at_floor(all_orders, floor, direction)
 
     # Updating moving-timer and last_floor
-    IO.inspect(elevator_data)
     temp_elevator_data = check_at_new_floor(elevator_data, floor)
-    IO.inspect(temp_elevator_data)
 
     # Checking if at target floor and if there is a valid order to stop on
     {new_state, new_data} =
       case order_at_floor do
         :true->
           # The floor has an order. Stop and serve
-          new_elevator_data = reached_order_floor(temp_elevator_data, floor)
+          new_elevator_data = reached_order_floor(temp_elevator_data, floor, floor_orders)
           {:door_state, new_elevator_data}
 
         :false->
@@ -369,12 +429,14 @@ defmodule Elevator do
         elevator_data)
   do
     Logger.info("Elevator spent too long time moving. Engine failure - restarting.")
+    kill_process()
     {:next_state, :restart_state, elevator_data}
   end
 
 
 ##### door_state #####
 
+# Door timer #
   @doc """
   Closes the door and transitions into idle
   """
@@ -389,6 +451,21 @@ defmodule Elevator do
     {:next_state, :idle_state, elevator_data}
   end
 
+# at_floor #
+  @doc """
+  Handler that acknowledges messages from the floor-sensor that the
+  elevator is at a floor. Made only to prevent the elevator from
+  crashing
+  """
+  def handle_event(
+        :cast,
+        {:at_floor, floor},
+        :door_state,
+        elevator_data)
+  do
+    {:next_state, :door_state, elevator_data}
+  end
+  
 
 ##### restart_state #####
 
@@ -396,15 +473,28 @@ defmodule Elevator do
   Function to handle if the elevator enters a restart
   """
   def handle_event(
-        :cast,
-         _,
+        _,
+        _,
         :restart_state,
         elevator_data)
   do
-    Logger.info("Elevator restarts")
-    restart_process()
-    {:next_state, :init_state, elevator_data}
+    kill_process()
+    {:next_state, :restart_state, elevator_data}
   end
+
+  ##### Evrything else #####
+  @doc """
+  Function to handle if the GenStateMachine receives an unexpected event
+  """
+  def handle_event(
+      _,
+      _,
+      state,
+      elevator_data)
+  do
+    {:next_state, state, elevator_data}
+  end
+
 
 
 ###################################### Actions ######################################
@@ -420,7 +510,7 @@ defmodule Elevator do
   """
   defp read_current_floor()
   do
-    Stream.iterate(0, &(&1+1)) |> Enum.reduce_while(0, fn i, acc ->
+    Stream.iterate(0, &(&1+1)) |> Enum.reduce_while(0, fn _i, acc ->
       Process.sleep(5)
       Driver.get_floor_sensor_state() |> check_at_floor()
       {:cont, acc + 1}
@@ -496,26 +586,25 @@ defmodule Elevator do
   """
   defp reached_order_floor(
         %Elevator{orders: order_list, dir: dir} = elevator_data,
-        floor)
+        floor,
+        floor_orders)
+  when is_list(floor_orders)
   do
     Driver.set_motor_direction(:stop)
     Logger.info("Reached target floor at floor #{floor}")
 
-    # Open door and start timer
+    # Open door, start timer and message master
     open_door()
     timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
+    broadcast_served_orders(floor_orders)
 
     # Remove old orders and calculate new target_order
-    updated_orders =
-      Order.extract_orders(floor, dir, order_list) |>
-      Order.remove_orders(order_list)
-    orders_elevator_data = Map.put(timer_elevator_data, :orders, updated_orders)
+    updated_orders = Order.remove_orders(floor_orders, order_list)
 
-    Storage.write(updated_orders)
+    #Storage.write(updated_orders)
     Lights.set_order_lights(updated_orders)
 
-    dir_opt = calculate_optimal_direction(updated_orders, dir, floor)
-    Map.put(orders_elevator_data, :dir, dir_opt)
+    Map.put(timer_elevator_data, :orders, updated_orders)
   end
 
 
@@ -628,47 +717,14 @@ defmodule Elevator do
 
 
   @doc """
-  Function to kill the module in case of an error
-  The function puts the process to sleep for @restart_time. This should trigger a
-  timeout in master and redistribute any external orders to other elevators
+  Function to kill the module in case of an error. Orders are NOT stored via this function.
+  Otherwise, one may risk that old orders are overwritten, if this function is invoked during
+  init. It is therefore assumed that all orders are handled when they are recieved / removed
   """
-  defp restart_process()
+  defp kill_process()
   do
+    Logger.info("Killing elevator")
     Driver.set_motor_direction(:stop)
-    Process.sleep(@restart_time)
     Process.exit(self(), :shutdown)
-  end
-
-##### Networking #####
-
-  #sending data, should be copy pased into suitable loccation
-  #send_data_to_all_nodes(:elevator, :master, elevator_data)
-
-
-  def receive_thread()
-  do
-    receive do
-      {:master, _node, message_id, data} ->
-        IO.puts("Got the following data from master #{data}")
-        Network.send_data_all_nodes(:elevator, :master, {message_id, :ack})
-        GenStateMachine.cast(@node_name, {:received_order, data}) # will this work?
-
-      {:panel, _node, message_id, data} ->
-        IO.puts("Got the following data from panel #{data}")
-        Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
-        GenStateMachine.cast(@node_name, {:received_order, data}) # will this work?
-
-    #after
-    #  10_000 -> IO.puts("Connection timeout")
-
-    end
-
-    receive_thread()
-  end
-
-  def init_receive()
-  do
-    pid = spawn(fn -> receive_thread() end)
-    Process.register(pid, :elevator)
   end
 end

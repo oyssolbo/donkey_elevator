@@ -4,6 +4,7 @@ defmodule Timer do
   """
 
   require Time
+  require Logger
 
 
   @doc """
@@ -25,6 +26,7 @@ defmodule Timer do
   do
     timer = Map.get(data_struct, timer_atom_name)
     Process.cancel_timer(timer)
+
     new_timer = Process.send_after(process_name, interrupt_atom_name, timeout_time)
     Map.put(data_struct, timer_atom_name, new_timer)
   end

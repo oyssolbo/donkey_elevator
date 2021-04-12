@@ -117,6 +117,8 @@ defmodule OrderTest do
 
   def test_find_and_remove_empty()
   do
+    # Test passed
+
     order1 = Order.create_rnd_order(0, :up)
     order2 = Order.create_rnd_order(1, :down)
     order3 = Order.create_rnd_order(1, :cab)
@@ -125,8 +127,61 @@ defmodule OrderTest do
 
     order = Order.extract_orders(test_order_id, [order1, order2, order3])
     Order.remove_orders(order, [order1, order2, order3])
-    
+
     #Enum.map([order], fn o -> Order.remove_orders(o, [order1, order2, order3]) end) |> IO.inspect()
+  end
+
+
+  def test_extract_list()
+  do
+    # Test passed
+
+    order1 = Order.create_rnd_order(0, :up)
+    order2 = Order.create_rnd_order(1, :down)
+    order3 = Order.create_rnd_order(1, :cab)
+
+    Order.extract_order([order1.order_id, order2.order_id], [order1, order2, order3])
+
+    Order.extract_order([], [order1, order2, order3])
+  end
+
+
+  def test_remove_orders()
+  do
+    # Test passed
+
+    order1 = Order.create_rnd_order(0, :up)
+    order2 = Order.create_rnd_order(1, :down)
+    order3 = Order.create_rnd_order(1, :cab)
+
+    order_list = [order1, order2, order3]
+
+    IO.puts("Test 1")
+    {_order_at_floor1, floor_orders1} = Order.check_orders_at_floor(order_list, 1, :up)
+
+    IO.inspect(floor_orders1)
+
+    Order.remove_orders(floor_orders1, order_list) |> IO.inspect()
+
+    IO.puts("Test 2")
+    {_order_at_floor2, floor_orders2} = Order.check_orders_at_floor(order_list, 1, :down)
+
+    Order.remove_orders(floor_orders2, order_list) |> IO.inspect()
+
+    IO.puts("Test 3")
+    order4 = Order.create_rnd_order(4, :cab)
+
+    {_bool_, floor_orders3} = Order.check_orders_at_floor(order_list, 4, :up)
+
+    IO.inspect(floor_orders3)
+      |> Order.remove_orders(order_list)
+      |> IO.inspect()
+
+    IO.puts("Test 4")
+    Order.remove_orders(order4, [])
+    |> IO.inspect()
+
+    :ok
   end
 
 end

@@ -78,12 +78,14 @@ defmodule Order do
   end
 
   def remove_orders(
-        orders,
+        [first_order | rest_orders] = _orders,
         order_list)
-  when is_list(orders) and is_list(order_list)
+  when is_list(order_list)
   do
-    if is_order_list(order_list) and is_order_list(orders) do
-      Enum.map(orders, fn order -> remove_orders(order, order_list) end)
+    if is_order_list(order_list) do
+      # Enum.map(orders, fn order -> remove_orders(order, order_list) end)
+      new_order_list = remove_orders(first_order, order_list)
+      remove_orders(rest_orders, new_order_list)
     else
       Logger.info("Not an order-list")
       []
@@ -92,6 +94,20 @@ defmodule Order do
 
 
 ## Extract orders(s) ##
+
+  @doc """
+  Function that extract a list order corresponding to a list of ids 'order_id_list'. Returns
+  an empty list if not found, or if the list did not contain only orders
+  """
+  def extract_order(
+        [first_order_id | rest_order_id] = order_id_list,
+        order_list)
+  when order_list |> is_list() and order_id_list |> is_list()
+  do
+    [extract_order(first_order_id, order_list) | extract_order(rest_order_id, order_list)]
+  end
+
+
   @doc """
   Function that extract a single order with id 'order_id' from a list of orders. Returns
   an empty list if not found, or if the list did not contain only orders
@@ -209,7 +225,7 @@ defmodule Order do
         floor,
         dir)
   do
-    case extract_orders(orders, floor, dir) do
+    case extract_orders(floor, dir, orders) do
       [] ->
         {:false, []}
       orders ->

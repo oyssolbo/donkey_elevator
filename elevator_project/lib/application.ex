@@ -17,7 +17,7 @@ defmodule ElevatorProject.Application do
 
     opts = [
       strategy: :one_for_one,
-      name: ElevatorProject.Supervisor
+      name: :elevator_project_supervisor
     ]
     Supervisor.start_link(children, opts)
   end

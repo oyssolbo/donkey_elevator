@@ -14,7 +14,7 @@ defmodule Panel.Supervisor do
 
 
   @doc """
-  Function for initializing the supervisor and 'children' (child = master)
+  Function for initializing the supervisor and 'children'
   """
   @impl true
   def init(_init_arg)

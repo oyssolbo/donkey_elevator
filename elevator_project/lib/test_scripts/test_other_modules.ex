@@ -104,7 +104,7 @@ defmodule ClientTest do
     end
 
   updated_elevator_list1 =
-    Timer.start_timer(self(), elevator_client1, :client_timer, :elevator_timeout, 100000000) |>
+    Timer.start_timer(self(), elevator_client1, :client_timer, :elevator_timeout, 100) |>
     Client.add_clients(old_elevator_client_list)
 
   Logger.info("Client-list after adding 1")
@@ -129,7 +129,7 @@ defmodule ClientTest do
     end
 
   updated_elevator_list2 =
-    Timer.start_timer(self(), elevator_client2, :client_timer, :elevator_timeout, 100000000) |>
+    Timer.start_timer(self(), elevator_client2, :client_timer, :elevator_timeout, 1000) |>
     Client.add_clients(updated_elevator_list1)
 
   Logger.info("Client-list after adding 2")
@@ -154,7 +154,7 @@ defmodule ClientTest do
     end
 
   updated_elevator_list3 =
-    Timer.start_timer(self(), elevator_client3, :client_timer, :elevator_timeout, 100000000) |>
+    Timer.start_timer(self(), elevator_client3, :client_timer, :elevator_timeout, 1000) |>
     Client.add_clients(updated_elevator_list2)
 
   Logger.info("Client-list after adding 1 again")

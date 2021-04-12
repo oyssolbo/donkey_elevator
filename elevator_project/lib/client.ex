@@ -27,7 +27,6 @@ defmodule Client do
   when is_list(client_list)
   do
     old_client = extract_client(new_client.client_id, client_list)
-    IO.inspect(old_client)
 
     case client_list do
       []->

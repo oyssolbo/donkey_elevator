@@ -109,7 +109,7 @@ defmodule Panel do
             IO.inspect(outgoing_orders)
             orders_to_masters = Order.extract_orders(:hall_up, outgoing_orders)++Order.extract_orders(:hall_down, outgoing_orders)
             if orders_to_masters != [] do
-                Network.send_data_to_all_nodes(:panel, :master, {orders_to_masters, send_ID})
+                Network.send_data_all_nodes(:panel, :master, {orders_to_masters, send_ID})
             end
 
             orders_to_elevator = Order.extract_orders(:cab, outgoing_orders)
@@ -150,7 +150,7 @@ defmodule Panel do
                     order_sender(floor_table, send_ID, updated_orders)
                 after
                     checkerTimeout -> #IO.inspect("OrderSender timed out waiting for orders from orderChecker [2]", label: "Error")# Send some kind of error, "no response from order_checker"
-                    Logger.info("Did not get reply from order checker")
+                    Logger.info("Order sender got no reply from order checker")
                     order_sender(floor_table, send_ID, outgoing_orders)
             end
         end

@@ -135,7 +135,7 @@ defmodule Order do
         floor,
         dir,
         order_list)
-  when is_list(order_list) and is_integer(floor) and dir in [:down, :up]
+  when is_list(order_list) and is_integer(floor) and dir in [:hall_down, :hall_up]
   do
     Enum.filter(order_list, fn x ->
       x.order_floor == floor and
@@ -152,7 +152,7 @@ defmodule Order do
   def extract_orders(
         type,
         order_list)
-  when order_list |> is_list() and type in [:up, :down, :cab]
+  when order_list |> is_list() and type in [:hall_up, :hall_down, :cab]
   do
     if is_order_list(order_list) do
       Enum.filter(order_list, fn x -> x.order_type == type end)
@@ -189,7 +189,7 @@ defmodule Order do
 
   For the order to be valid, we require that:
     - order_floor is between min and max
-    - order_type is either :cab, :up, :down
+    - order_type is either :cab, :hall_up, :hall_down
   """
   def check_valid_order(%Order{order_floor: floor, order_type: type} = _order)
   do
@@ -200,7 +200,7 @@ defmodule Order do
       floor > @max_floor->
         Logger.info("Invalid floor. Greater than max-floor")
         :false
-      type not in [:cab, :up, :down]->
+      type not in [:cab, :hall_up, :hall_down]->
         Logger.info("Invalid type")
         :false
       :true->

@@ -21,7 +21,7 @@ defmodule Panel do
 
 
     @num_floors      Application.fetch_env!(:elevator_project, :project_num_floors)
-    @ack_timeout     Application.fetch_env!(:elevator_project, :network_ack_timeout_time_ms)
+    @ack_timeout     Application.fetch_env!(:elevator_project, :panel_ack_timeout_ms)
     @checker_timeout Application.fetch_env!(:elevator_project, :panel_checker_timeout_ms)
     @checker_sleep   Application.fetch_env!(:elevator_project, :panel_checker_sleep_ms)
 
@@ -81,6 +81,16 @@ defmodule Panel do
         new_orders = check_4_orders(floor_table)
         orders = old_orders++new_orders
 
+        #### TEST CODE ####
+        if new_orders != [] do
+            orders_to_masters = Order.extract_orders(:hall_up, new_orders)++Order.extract_orders(:hall_down, new_orders)
+            orders_to_elevator = Order.extract_orders(:cab, new_orders)
+            Logger.info("Checker: HW registered #{length orders} new order(s); #{length orders_to_masters} hall and #{length orders_to_elevator} cab orders.")
+        end
+        ###            ####
+
+        Process.sleep(@checker_sleep)
+
         # Check for request from sender. If there is, send order list and recurse with reset list
         receive do
             {:panel, _node, _message_ID, :gibOrdersPls} ->
@@ -105,41 +115,59 @@ defmodule Panel do
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
             # ... send orders to all masters on network, and send cab orders to local elevator
-            Logger.info("sending data")
-            IO.inspect(outgoing_orders)
+            
             orders_to_masters = Order.extract_orders(:hall_up, outgoing_orders)++Order.extract_orders(:hall_down, outgoing_orders)
+            orders_to_elevator = Order.extract_orders(:cab, outgoing_orders)
+
             if orders_to_masters != [] do
                 ack_message_id_master = Network.send_data_all_nodes(:panel, :master_receive, orders_to_masters)
+                Logger.info("Order sender: Sending orders to master ...")
+                IO.inspect(outgoing_orders)
             end
 
-            orders_to_elevator = Order.extract_orders(:cab, outgoing_orders)
             if orders_to_elevator != [] do
                 ack_message_id_elevator = Network.send_data_inside_node(:panel, :elevator_receive, orders_to_elevator)
+                Logger.info("Order sender: Sent order(s) to elevator.")
             end
 
             # ... and wait for an ack
-            receive do
+            if orders_to_masters != [] do
+                receive do
                 {_sender_id, _node, _messageID, {ack_message_id_master, :ack}} ->
                     # When ack is recieved for current send_ID, send request to checker for latest order matrix
                     Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
                     IO.inspect("Received ack from master")   # TEST CODE
 
                     receive do
-                        # When latest order matrix is received, recurse with new orders and iterated send_ID
+                        # When latest order matrix is received, recurse with new orders
                         {:order_checker, _node, _messageID, updated_orders} ->
                             order_sender(floor_table, updated_orders)
                             after
                                 checkerTimeout ->
                                 Logger.info("Timeout from order checker")
                                  #IO.inspect("OrderSender timed out waiting for orders from orderChecker[1]", label: "Error")# Send some kind of error, "no response from order_checker" # TEST CODE
-                                order_sender(floor_table, outgoing_orders)
+                                order_sender(floor_table, orders_to_masters)
                     end
-                # If no ack is received after 'ackTimeout' number of milliseconds: Recurse and repeat
-                after
-                    ackTimeout ->
-                        IO.inspect("OrderSender timed out waiting for ack", label: "Warning")
-                        order_sender(floor_table, outgoing_orders)
+                    # If no ack is received after 'ackTimeout' number of milliseconds: Recurse and repeat
+                    after
+                        ackTimeout ->
+                            IO.inspect("OrderSender timed out waiting for ack", label: "Warning")
+                            order_sender(floor_table, orders_to_masters)
+                end
+
+            else
+                # Don't care about ack from elevator. Send request to checker for latest orders
+                Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
+                receive do
+                    {:order_checker, _node, _messageID, new_orders} ->
+                        order_sender(floor_table, new_orders)
+                    after
+                        checkerTimeout -> #IO.inspect("OrderSender timed out waiting for orders from orderChecker [2]", label: "Error")# Send some kind of error, "no response from order_checker"
+                        Logger.info("Order sender got no reply from order checker [1]")
+                        order_sender(floor_table, [])
+                end
             end
+            
 
         else
             # If no orders, send request to checker for latest orders. Recurse with those (but same sender ID)
@@ -150,7 +178,7 @@ defmodule Panel do
                     order_sender(floor_table, updated_orders)
                 after
                     checkerTimeout -> #IO.inspect("OrderSender timed out waiting for orders from orderChecker [2]", label: "Error")# Send some kind of error, "no response from order_checker"
-                    Logger.info("Order sender got no reply from order checker")
+                    Logger.info("Order sender got no reply from order checker [2]")
                     order_sender(floor_table, outgoing_orders)
             end
         end

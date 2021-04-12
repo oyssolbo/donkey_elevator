@@ -34,6 +34,8 @@ defmodule Network do
   Send data to all other known nodes  on the network to the process receiver_id, iteration should be left blank
   """
   def send_data_all_other_nodes(sender_id, receiver_id, data)
+  when sender_id |> is_atom()
+  and receive_id |> is_atom()
   do
     message_id = make_ref()
     network_list = Node.list()
@@ -48,6 +50,8 @@ defmodule Network do
   Send data to all known nodes on the network (including itself) to the process receiver_id, iteration should be left blank
   """
   def send_data_all_nodes(sender_id, receiver_id, data)
+  when sender_id |> is_atom()
+  and receive_id |> is_atom()
   do
     message_id = make_ref()
     network_list = SystemNode.nodes_in_network()
@@ -76,6 +80,8 @@ defmodule Network do
   Send data locally (on the same node) to the process receiver_id
   """
   def send_data_inside_node(sender_id, receiver_id, data)
+  when sender_id |> is_atom()
+  and receive_id |> is_atom()
   do
     message_id = make_ref()
 
@@ -87,6 +93,9 @@ defmodule Network do
   Send data to the spesific process "receiver_id" on the spesific node "receiver_node"
   """
   def send_data_spesific_node(sender_id, receiver_id, receiver_node, data)
+  when sender_id |> is_atom()
+  and receive_id |> is_atom()
+  and receiver_node |> is_atom()
     do
       message_id = make_ref()
       send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})

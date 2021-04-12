@@ -218,7 +218,7 @@ defmodule Elevator do
 
           Storage.write(updated_order_list)
 
-          #Lights.set_order_lights(updated_order_list)
+          Lights.set_order_lights(updated_order_list)
 
           new_elevator_data
 

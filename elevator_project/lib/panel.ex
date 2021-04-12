@@ -19,6 +19,7 @@ defmodule Panel do
     require Order
     require Logger
 
+    @type_map %{:hall_up => :up, :hall_down => :down}
 
     @num_floors      Application.fetch_env!(:elevator_project, :project_num_floors)
     @ack_timeout     Application.fetch_env!(:elevator_project, :panel_ack_timeout_ms)
@@ -83,9 +84,9 @@ defmodule Panel do
 
         #### TEST CODE ####
         if new_orders != [] do
-            orders_to_masters = Order.extract_orders(:hall_up, new_orders)++Order.extract_orders(:hall_down, new_orders)
-            orders_to_elevator = Order.extract_orders(:cab, new_orders)
-            Logger.info("Checker: HW registered #{length orders} new order(s); #{length orders_to_masters} hall and #{length orders_to_elevator} cab orders.")
+            ordrs_to_masters = Order.extract_orders(:hall_up, new_orders)++Order.extract_orders(:hall_down, new_orders)
+            ordrs_to_elevator = Order.extract_orders(:cab, new_orders)
+            Logger.info("Checker: HW registered #{length orders} new order(s); #{length ordrs_to_masters} hall and #{length ordrs_to_elevator} cab orders.")
         end
         ###            ####
 

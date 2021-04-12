@@ -135,7 +135,7 @@ defmodule Order do
         floor,
         dir,
         order_list)
-  when is_list(order_list) and is_integer(floor) and dir in [:hall_down, :hall_up]
+  when is_list(order_list) and is_integer(floor) and dir in [:down, :up]
   do
     Enum.filter(order_list, fn x ->
       x.order_floor == floor and
@@ -152,7 +152,7 @@ defmodule Order do
   def extract_orders(
         type,
         order_list)
-  when order_list |> is_list() and type in [:hall_up, :hall_down, :cab]
+  when order_list |> is_list() and type in [:hall_up, :up, :hall_down, :down, :cab]
   do
     if is_order_list(order_list) do
       Enum.filter(order_list, fn x -> x.order_type == type end)
@@ -189,7 +189,7 @@ defmodule Order do
 
   For the order to be valid, we require that:
     - order_floor is between min and max
-    - order_type is either :cab, :hall_up, :hall_down
+    - order_type is either :cab, :up, :down
   """
   def check_valid_order(%Order{order_floor: floor, order_type: type} = _order)
   do
@@ -236,7 +236,7 @@ defmodule Order do
   @doc """
   Function to check whether list contains only orders or not
   """
-  defp is_order_list(list)
+  def is_order_list(list)
   when is_list(list)
   do
     Enum.all?(list, fn
@@ -279,7 +279,7 @@ defmodule Order do
   def create_rnd_order()
   do
     rnd_id = Time.utc_now()
-    rnd_type = Enum.random([:hall_up, :hall_down, :cab])
+    rnd_type = Enum.random([:up, :down, :cab])
     rnd_floor = Enum.random(0..@max_floor)
     struct(Order, [order_id: rnd_id, order_type: rnd_type, order_floor: rnd_floor])
   end

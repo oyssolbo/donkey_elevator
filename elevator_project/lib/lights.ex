@@ -122,9 +122,6 @@ defmodule Lights do
         order_list)
   do
     Driver.set_floor_indicator(floor)
-    if order_list = [] do
-      order_list = ["no orders"]
-    end
 
     {:ok, order_list}
   end
@@ -139,9 +136,6 @@ defmodule Lights do
   when state |> is_atom()
   do
     Driver.set_door_open_light(state)
-    if order_list = [] do
-      order_list = ["no orders"]
-    end
 
     {:ok, order_list}
   end

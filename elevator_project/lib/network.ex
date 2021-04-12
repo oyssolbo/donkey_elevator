@@ -7,7 +7,7 @@ defmodule Network do
 
   require Logger
 
-  @ack_timeout #Application.fetch_env!(:elevator_project, :ack_timeout_time_ms)
+  @ack_timeout Application.fetch_env!(:elevator_project, :network_ack_timeout_time_ms)
 
   @doc """
   Init the node nettork on the machine

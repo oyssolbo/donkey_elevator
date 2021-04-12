@@ -29,6 +29,7 @@ elevator_project-*.tar
 *.beam
 *.app
 *.app_tracer
+*.txt
 
 
 

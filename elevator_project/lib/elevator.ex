@@ -131,7 +131,7 @@ defmodule Elevator do
     receive do
       {:master, _node, message_id, data} ->
         Logger.info("Elevator received order from master")
-        Network.send_data_all_nodes(:elevator, :master, {message_id, :ack})
+        Network.send_data_all_nodes(:elevator, :master_receive, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:received_order, data})
 
       {:panel, _node, message_id, data} ->
@@ -532,7 +532,8 @@ defmodule Elevator do
   def check_at_floor(floor)
   when floor |> is_integer
   do
-    Lights.set_floorlight(floor)
+    #Lights.set_floorlight(floor)
+    modify_elevator_lights(:set_floor_light, floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
 

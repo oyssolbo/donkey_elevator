@@ -7,7 +7,7 @@ defmodule Network do
 
   require Logger
 
-  @ack_timeout #Application.fetch_env!(:elevator_project, :ack_timeout_time_ms)
+  @ack_timeout Application.fetch_env!(:elevator_project, :network_ack_timeout_time_ms)
 
   @doc """
   Init the node nettork on the machine
@@ -34,6 +34,8 @@ defmodule Network do
   Send data to all other known nodes  on the network to the process receiver_id, iteration should be left blank
   """
   def send_data_all_other_nodes(sender_id, receiver_id, data)
+  when sender_id |> is_atom()
+  and receiver_id |> is_atom()
   do
     message_id = make_ref()
     network_list = Node.list()
@@ -48,6 +50,8 @@ defmodule Network do
   Send data to all known nodes on the network (including itself) to the process receiver_id, iteration should be left blank
   """
   def send_data_all_nodes(sender_id, receiver_id, data)
+  when sender_id |> is_atom()
+  and receiver_id |> is_atom()
   do
     message_id = make_ref()
     network_list = SystemNode.nodes_in_network()
@@ -65,7 +69,7 @@ defmodule Network do
   do
     receiver_node = Enum.at(network_list, iteration)
 
-    if receiver_node not in [:nil, :nonode@nohost] do
+    if receiver_node not in [:nil] do
       send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})
       send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id, iteration + 1)
     end
@@ -76,6 +80,8 @@ defmodule Network do
   Send data locally (on the same node) to the process receiver_id
   """
   def send_data_inside_node(sender_id, receiver_id, data)
+  when sender_id |> is_atom()
+  and receiver_id |> is_atom()
   do
     message_id = make_ref()
 
@@ -87,6 +93,9 @@ defmodule Network do
   Send data to the spesific process "receiver_id" on the spesific node "receiver_node"
   """
   def send_data_spesific_node(sender_id, receiver_id, receiver_node, data)
+  when sender_id |> is_atom()
+  and receiver_id |> is_atom()
+  and receiver_node |> is_atom()
     do
       message_id = make_ref()
       send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})
@@ -118,6 +127,7 @@ defmodule Network do
       {receiver_id, _from_node, _ack_message_id, {message_id, :ack}} ->
         {:ok, receiver_id}
       after @ack_timeout ->
+        Logger.info("Ack not received")
         {:no_ack, :no_id}
     end
   end

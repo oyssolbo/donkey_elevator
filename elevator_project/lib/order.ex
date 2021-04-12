@@ -1,3 +1,5 @@
+
+
 defmodule Order do
   @moduledoc """
   Module that implements the struct 'Order' with different functions for operating
@@ -43,7 +45,6 @@ defmodule Order do
 ## Remove order(s) ##
   @doc """
   Function that removes a single or a list of orders from another list of orders
-
   The function searches through the entire list, such that if a duplicated
   order has occured, all duplicates are removed
   """
@@ -66,7 +67,6 @@ defmodule Order do
 
   @doc """
   Function to remove a list of orders from another list of orders
-
   It is assumed that there is only one copy of each order in the list
   """
   def remove_orders(
@@ -146,13 +146,12 @@ defmodule Order do
 
   @doc """
   Function that extracts all orders that have the type 'type'
-
   Example; extracts all orders with type ':cab' from a list of orders
   """
   def extract_orders(
         type,
         order_list)
-  when order_list |> is_list() and type in [:up, :down, :cab]
+  when order_list |> is_list() and type in [:hall_up, :hall_down, :cab]
   do
     if is_order_list(order_list) do
       Enum.filter(order_list, fn x -> x.order_type == type end)
@@ -183,10 +182,8 @@ defmodule Order do
 ## Check order(s) ##
   @doc """
   Function to check if an order is valid. Invalid orders should not occur!
-
   If this function causes a crash, it is likely that an order is set to
   default (:nil)
-
   For the order to be valid, we require that:
     - order_floor is between min and max
     - order_type is either :cab, :up, :down
@@ -200,7 +197,7 @@ defmodule Order do
       floor > @max_floor->
         Logger.info("Invalid floor. Greater than max-floor")
         :false
-      type not in [:cab, :up, :down]->
+      type not in [:cab, :hall_up, :hall_down]->
         Logger.info("Invalid type")
         :false
       :true->
@@ -279,7 +276,7 @@ defmodule Order do
   def create_rnd_order()
   do
     rnd_id = Time.utc_now()
-    rnd_type = Enum.random([:hall_up, :hall_down, :cab])
+    rnd_type = Enum.random([:up, :down, :cab])
     rnd_floor = Enum.random(0..@max_floor)
     struct(Order, [order_id: rnd_id, order_type: rnd_type, order_floor: rnd_floor])
   end

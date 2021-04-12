@@ -99,15 +99,17 @@ defmodule Panel do
         # If the order matrix isnt empty ...
         if outgoing_orders != [] do
             # ... send orders to all masters on network, and send cab orders to local elevator
-            Logger.info("sending data")
+
             IO.inspect(outgoing_orders)
             orders_to_masters = Order.extract_orders(:hall_up, outgoing_orders)++Order.extract_orders(:hall_down, outgoing_orders)
             if orders_to_masters != [] do
+                Logger.info("sending orders to master")
                 ack_message_id_master = Network.send_data_all_nodes(:panel, :master_receive, orders_to_masters)
             end
 
             orders_to_elevator = Order.extract_orders(:cab, outgoing_orders)
             if orders_to_elevator != [] do
+                Logger.info("sending orders to elevator")
                 ack_message_id_elevator = Network.send_data_inside_node(:panel, :elevator_receive, orders_to_elevator)
             end
 

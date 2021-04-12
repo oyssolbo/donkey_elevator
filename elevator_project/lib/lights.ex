@@ -60,9 +60,11 @@ defmodule Lights do
   do
     receive do
       {:master, _from_node, _message_id, {event_name, data}} ->
+        Logger.info("received light update from master")
         GenServer.cast(@node_name, {event_name, data})
 
       {:elevator, _from_node, _message_id, {event_name, data}} ->
+        Logger.info("received light update from elevator")
         GenServer.cast(@node_name, {event_name, data})
     end
 
@@ -120,7 +122,7 @@ defmodule Lights do
         order_list)
   do
     Driver.set_floor_indicator(floor)
-    
+
     {:ok, order_list}
   end
 

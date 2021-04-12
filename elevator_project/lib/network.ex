@@ -31,7 +31,7 @@ defmodule Network do
 
 
   @doc """
-  Send data to all known nodes on the network to the process receiver_id, iteration should be left blank
+  Send data to all other known nodes  on the network to the process receiver_id, iteration should be left blank
   """
   def send_data_all_other_nodes(sender_id, receiver_id, data)
   do
@@ -45,7 +45,7 @@ defmodule Network do
 
 
   @doc """
-  Send data to all known nodes on the network to the process receiver_id, iteration should be left blank
+  Send data to all known nodes on the network (including itself) to the process receiver_id, iteration should be left blank
   """
   def send_data_all_nodes(sender_id, receiver_id, data)
   do

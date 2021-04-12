@@ -35,7 +35,7 @@ defmodule Network do
   """
   def send_data_all_other_nodes(sender_id, receiver_id, data)
   when sender_id |> is_atom()
-  and receive_id |> is_atom()
+  and receiver_id |> is_atom()
   do
     message_id = make_ref()
     network_list = Node.list()
@@ -51,7 +51,7 @@ defmodule Network do
   """
   def send_data_all_nodes(sender_id, receiver_id, data)
   when sender_id |> is_atom()
-  and receive_id |> is_atom()
+  and receiver_id |> is_atom()
   do
     message_id = make_ref()
     network_list = SystemNode.nodes_in_network()
@@ -69,10 +69,8 @@ defmodule Network do
   do
     receiver_node = Enum.at(network_list, iteration)
 
-    if receiver_node not in [:nil, :nonode@nohost] do
-      send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})
-      send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id, iteration + 1)
-    end
+    send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})
+    send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id, iteration + 1)
 
   end
 
@@ -81,7 +79,7 @@ defmodule Network do
   """
   def send_data_inside_node(sender_id, receiver_id, data)
   when sender_id |> is_atom()
-  and receive_id |> is_atom()
+  and receiver_id |> is_atom()
   do
     message_id = make_ref()
 
@@ -94,7 +92,7 @@ defmodule Network do
   """
   def send_data_spesific_node(sender_id, receiver_id, receiver_node, data)
   when sender_id |> is_atom()
-  and receive_id |> is_atom()
+  and receiver_id |> is_atom()
   and receiver_node |> is_atom()
     do
       message_id = make_ref()

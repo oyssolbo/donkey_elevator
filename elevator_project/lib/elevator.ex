@@ -532,7 +532,8 @@ defmodule Elevator do
   def check_at_floor(floor)
   when floor |> is_integer
   do
-    Lights.set_floorlight(floor)
+    #Lights.set_floorlight(floor)
+    modify_elevator_lights(:set_floor_light, floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
 

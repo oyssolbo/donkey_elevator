@@ -120,7 +120,7 @@ defmodule Lights do
         order_list)
   do
     Driver.set_floor_indicator(floor)
-    
+
     {:ok, order_list}
   end
 

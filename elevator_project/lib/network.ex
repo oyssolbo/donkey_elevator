@@ -69,8 +69,10 @@ defmodule Network do
   do
     receiver_node = Enum.at(network_list, iteration)
 
-    send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})
-    send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id, iteration + 1)
+    if receiver_node not in [:nil] do
+      send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})
+      send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id, iteration + 1)
+    end
 
   end
 

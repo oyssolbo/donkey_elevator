@@ -46,8 +46,8 @@ defmodule Elevator do
 
   @node_name            :elevator
 
-  @enforce_keys         [:orders, :last_floor, :dir, :timer, :elevator_id]
-  defstruct             [:orders, :last_floor, :dir, :timer, :elevator_id]
+  @enforce_keys         [:orders, :last_floor, :dir, :timer]
+  defstruct             [:orders, :last_floor, :dir, :timer]
 
 
 ###################################### External functions ######################################
@@ -72,8 +72,7 @@ defmodule Elevator do
       orders:       [],
       last_floor:   :nil,
       dir:          :down,
-      timer:        make_ref(),
-      elevator_id:  Network.get_node_id()
+      timer:        make_ref()
     }
 
     # Messaging master that elevator is inited

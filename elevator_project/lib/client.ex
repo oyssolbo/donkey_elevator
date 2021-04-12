@@ -24,28 +24,32 @@ defmodule Client do
   def add_clients(
         %Client{} = new_client,
         client_list)
-  when is_list(client_list)
+  when client_list |> is_list()
   do
-    old_client = extract_client(new_client.client_id, client_list)
-
     case client_list do
       []->
         [new_client]
       _->
-        case old_client do
-          []->
-            client_list ++ [new_client]
-          _->
-            temp_client_list = remove_clients(old_client, client_list)
-            temp_client_list ++ [new_client]
-        end
+        old_client_list =
+          Map.get(new_client, :client_id) |>
+          extract_client(client_list)
+
+        updated_client_list =
+          case old_client_list do
+            []->
+              client_list
+            _->
+              remove_clients(old_client_list, client_list)
+          end
+
+        updated_client_list ++ [new_client]
     end
   end
 
   def add_clients(
         [client | rest_clients],
         client_list)
-  when is_list(client_list)
+  when client_list |> is_list()
   do
     temp_client_list = add_clients(client, client_list)
     add_clients(rest_clients, temp_client_list)
@@ -54,7 +58,7 @@ defmodule Client do
   def add_clients(
         [],
         client_list)
-  when is_list(client_list)
+  when client_list |> is_list()
   do
     client_list
   end
@@ -70,7 +74,7 @@ defmodule Client do
   def remove_clients(
         %Client{} = client,
         client_list)
-  when is_list(client_list)
+  when client_list |> is_list()
   do
     original_length = length(client_list)
     new_list = List.delete(client_list, client)
@@ -92,7 +96,7 @@ defmodule Client do
   def remove_clients(
         [],
         client_list)
-  when is_list(client_list)
+  when client_list |> is_list()
   do
     client_list
   end
@@ -100,14 +104,10 @@ defmodule Client do
   def remove_clients(
         clients,
         client_list)
-  when is_list(clients) and is_list(client_list)
+  when clients |> is_list() and client_list |> is_list()
   do
-    if is_client_list(client_list) and is_client_list(clients) do
-      Enum.map(clients, fn client -> remove_clients(client, client_list) end)
-    else
-      Logger.info("Not a client-list")
-      []
-    end
+    Enum.map(clients, fn client -> remove_clients(client, client_list) end) |>
+      List.flatten()
   end
 
 
@@ -123,27 +123,7 @@ defmodule Client do
         client_list)
   when client_list |> is_list()
   do
-    if is_client_list(client_list) do
-      Enum.filter(client_list, fn x -> x.client_id == client_id end)
-    else
-      Logger.info("Not a client-list")
-      []
-    end
-  end
-
-
-## Check client(s) ##
-  @doc """
-  Function to check whether list contains only clients. Returns :false if
-  at least one element is not of struct %Client{}
-  """
-  defp is_client_list(list)
-  when is_list(list)
-  do
-    Enum.all?(list, fn
-      %Client{} -> :true
-      _ -> :false
-    end)
+    Enum.filter(client_list, fn x -> x.client_id == client_id end)
   end
 
 ## Modify client ##
@@ -167,12 +147,7 @@ defmodule Client do
         value)
   when clients |> is_list()
   do
-    if is_client_list(clients) do
-      Enum.map(clients, fn client -> Map.put(client, field, value) end)
-    else
-      Logger.info("Not a client-list")
-      clients
-    end
+    Enum.map(clients, fn client -> Map.put(client, field, value) end)
   end
 
 
@@ -182,14 +157,9 @@ defmodule Client do
   The function assumes that the parameter 'clients' is a list
   """
   def cancel_all_client_timers(clients)
-  when is_list(clients)
+  when clients |> is_list()
   do
-    if is_client_list(clients) do
-      Enum.map(clients, fn client -> Timer.stop_timer(client, :last_message_time) end)
-    else
-      Logger.info("Not a client-list")
-      clients
-    end
+    Enum.map(clients, fn client -> Timer.stop_timer(client, :last_message_time) end)
   end
 
 end

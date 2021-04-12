@@ -27,53 +27,51 @@ defmodule Lights do
 
 
 ##### Initialization #####
+
   @doc """
-  Initializes lights to store and set any old orders
+  Initializes receiver-function, and stores an empty list as
+  active lights
   """
-  def init(old_orders \\ [])
+  def init(_init_arg \\ [])
   do
     init_receive()
-
-    set_lights(old_orders)
-    {:ok, old_orders}
+    {:ok, []}
   end
 
 
   @doc """
-  Initializes the link with GenServer
+  Starts the link to GenServer
   """
   def start_link(args \\ [])
   do
     opts = [name: @node_name]
-    GenServer.start_link(__MODULE__, args, opts])
+    GenServer.start_link(__MODULE__, args, opts)
   end
 
 
 ##### External network #####
-  defp receive_thread(%{master_msg_id: master_msg_id, elevator_msg_id: elevator_msg_id} = msg_id)
+
+  @doc """
+  Function that receives orders from master and elevator on which
+  orders to be set/cleared. The entire system communicates with the
+  lights through this function
+  """
+  defp receive_thread()
   do
-    updated_msg_id_map =
-      receive do
-        {:master, from_node, message_id, {event_name, data}} ->
-          # Ugly logic preventing old messages to overwrite newer messages
-          # But this is invalid when the master/elevator is restarted...
+    receive do
+      {:master, _from_node, _message_id, {event_name, data}} ->
+        GenServer.cast(@node_name, {event_name, data})
 
-          if message_id > master_msg_id do
-            GenServer.cast(@node_name, {event_name, data})
-            message_id
-          end
-          Network.send_data_all_nodes(:master, :lights, {message_id, :ack})
-
-        {:elevator, _from_node, message_id, {event_name, data}} ->
-
-          GenServer.cast(@node_name, {event_name, data})
-          Network.send_data_inside_node(:elevator, :lights, {message_id, :ack})
-      end
+      {:elevator, _from_node, _message_id, {event_name, data}} ->
+        GenServer.cast(@node_name, {event_name, data})
+    end
 
     receive_thread()
   end
 
-
+  @doc """
+  Initialization for the receive-thread
+  """
   defp init_receive()
   do
     spawn_link(fn -> receive_thread() end) |>
@@ -81,61 +79,77 @@ defmodule Lights do
   end
 
 
-##### Implementing global (external) lights #####
+##### Implementing lights #####
+
+  @doc """
+  Handler that recieves a list of orders from either the master or elevator, and
+  sets the corresponding lights high
+  """
   def handle_cast(
         {:set_lights, set_order_list},
         order_list)
   do
-    updated_order_list = Order.add_overs(set_order_list, order_list)
+    updated_order_list = Order.add_orders(set_order_list, order_list)
     set_order_lights(updated_order_list)
 
     {:ok, updated_order_list}
   end
 
 
+  @doc """
+  Handler that recieves a list of orders from master or elevator that is served.
+  It removes the orders, and sets the remaining corresponding lights high
+  """
   def handle_cast(
-      {:clear_lights, clear_order_list},
-      order_list}
+        {:clear_lights, clear_order_list},
+        order_list)
   do
     clear_all_lights()
 
-    updated_order_list = Order.remove_overs(clear_order_list, order_list)
+    updated_order_list = Order.remove_orders(clear_order_list, order_list)
     set_order_lights(updated_order_list)
 
     {:ok, updated_order_list}
   end
 
-
-##### Old functions #####
-
   @doc """
-  Set floorlight at the given 'floor'
+  Handler that sets the floor-light on a given floor 'floor' high
   """
-  def set_floorlight(floor)
+  def handle_cast(
+        {:set_floor_light, floor},
+        order_list)
   do
     Driver.set_floor_indicator(floor)
+    
+    {:ok, order_list}
   end
 
 
   @doc """
-  Set the doorlight to the state 'state'
+  Handler that sets the door as 'state'
   """
-  def set_door_light(state)
+  def handle_cast(
+        {:set_door_light, state},
+        order_list)
+  when state |> is_atom()
   do
     Driver.set_door_open_light(state)
+
+    {:ok, order_list}
   end
 
+
+##### Workhorse-functions #####
 
   @doc """
   Set order-lights. The function first turns off all other lights, before setting
   the lights corresponding to a list of orders 'order_list'
   """
-  def set_order_lights(order_list)
+  defp set_order_lights(order_list)
   do
     clear_all_lights()
     set_all_order_lights(order_list)
   end
-
 
 
   @doc """
@@ -143,7 +157,7 @@ defmodule Lights do
 
   Clears all hall_down, hall_up, cab at each floor
   """
-  def clear_all_lights(floor \\ @min_floor)
+  defp clear_all_lights(floor \\ @min_floor)
   when floor <= @max_floor
   do
     Driver.set_order_button_light(:hall_down, floor, :off)
@@ -151,10 +165,9 @@ defmodule Lights do
     Driver.set_order_button_light(:cab, floor, :off)
 
     clear_all_lights(floor + 1)
-    :ok
   end
 
-  def clear_all_lights(_floor)
+  defp clear_all_lights(_floor)
   do
     :ok
   end
@@ -164,25 +177,20 @@ defmodule Lights do
   Function to iterate through a list of orders, and set the corresponding
   light on
   """
-  defp set_all_order_lights([first_order | rest_orders] = order_list)
+  defp set_all_order_lights(order_list)
   do
     if Order.is_order_list(order_list) do
-      case Map.get(first_order, :order_type) do
-        :hall_up ->
-          Driver.set_order_button_light(:hall_up, Map.get(first_order, :order_floor), :on)
-        :hall_down ->
-          Driver.set_order_button_light(:hall_down, Map.get(first_order, :order_floor), :on)
-        :cab ->
-          Driver.set_order_button_light(:cab, Map.get(first_order, :order_floor), :on)
-      end
+      Enum.each(order_list, fn order ->
+        case Map.get(order, :order_type) do
+          :hall_up ->
+            Driver.set_order_button_light(:hall_up, Map.get(order, :order_floor), :on)
+          :hall_down ->
+            Driver.set_order_button_light(:hall_down, Map.get(order, :order_floor), :on)
+          :cab ->
+            Driver.set_order_button_light(:cab, Map.get(order, :order_floor), :on)
+        end
+      end)
     end
-    set_all_order_lights(rest_orders)
   end
-
-  defp set_all_order_lights([])
-  do
-    :ok
-  end
-
 
 end

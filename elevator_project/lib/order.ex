@@ -236,7 +236,7 @@ defmodule Order do
   @doc """
   Function to check whether list contains only orders or not
   """
-  defp is_order_list(list)
+  def is_order_list(list)
   when is_list(list)
   do
     Enum.all?(list, fn
@@ -283,10 +283,10 @@ defmodule Order do
     rnd_floor = Enum.random(0..@max_floor)
     struct(Order, [order_id: rnd_id, order_type: rnd_type, order_floor: rnd_floor])
   end
-  
+
   def create_rnd_order(
-        floor, 
-        type) 
+        floor,
+        type)
   do
     rnd_id = Time.utc_now()
     struct(Order, [order_id: rnd_id, order_type: type, order_floor: floor])

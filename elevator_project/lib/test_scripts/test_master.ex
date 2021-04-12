@@ -243,6 +243,63 @@ defmodule MasterTest do
   end
 
 
+  def update_elevator()
+  do
+    # Test passed
+
+    Master.start_link([])
+
+    Process.sleep(1500)
+
+    elevator_id1 = Timer.get_utc_time()
+    dir1 = :up
+    last_floor1 = 1
+
+    Logger.info("1 sending status-update to master")
+    Master.connect_elevator(elevator_id1, dir1, last_floor1)
+    Process.sleep(200)
+
+    elevator_id2 = Timer.get_utc_time()
+    dir2 = :down
+    last_floor2 = 3
+
+    Logger.info("2 sending status-update to master")
+    Master.connect_elevator(elevator_id2, dir2, last_floor2)
+    Process.sleep(200)
+
+    Logger.info("1 sending status-update to master")
+    Master.connect_elevator(elevator_id1, dir1, last_floor1)
+    Process.sleep(200)
+
+    Logger.info("Elevator 2 stopping to send status-update")
+    Master.connect_elevator(elevator_id1, dir1, last_floor1)
+    Process.sleep(200)
+
+    Master.connect_elevator(elevator_id1, :down, 69)
+    Process.sleep(200)
+
+    Logger.info("Elevator 1 stopping to send status-update")
+
+  end
+
+
+  def client_timeout()
+  do
+    Master.start_link([])
+
+    Process.sleep(1500)
+
+    elevator_id1 = Timer.get_utc_time()
+    dir1 = :up
+    last_floor1 = 1
+
+    Logger.info("1 sending status-update to master")
+    Master.connect_elevator(elevator_id1, dir1, last_floor1)
+
+  end
+
+
+
   ##### Debugging functions originally inside master.ex #####
 
   def test_backup_receive(extern_master_data)

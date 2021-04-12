@@ -72,6 +72,99 @@ defmodule ClientTest do
     Client.extract_client(1, client_list) |> IO.inspect()
   end
 
+
+  def test_clients()
+  do
+
+  elevator_id1 = Timer.get_utc_time()
+  dir1 = :up
+  last_floor1 = 1
+
+  elevator_id2 = Timer.get_utc_time()
+  dir2 = :down
+  last_floor2 = 3
+
+
+  Logger.info("Adding client 1")
+
+  old_elevator_client_list = []
+  elevator_client1 =
+    case Client.extract_client(elevator_id1, old_elevator_client_list) do
+      [] ->
+        Logger.info("Client 1 does not exist")
+        struct(Client,
+          [
+            client_id: elevator_id1,
+            client_data: %{dir: dir1, last_floor: last_floor1},
+            client_timer: make_ref()
+          ])
+      [old_client] ->
+        Logger.info("Client 1 exists")
+        Map.put(old_client, :client_data, %{dir: dir1, last_floor: last_floor1})
+    end
+
+  updated_elevator_list1 =
+    Timer.start_timer(self(), elevator_client1, :client_timer, :elevator_timeout, 100000000) |>
+    Client.add_clients(old_elevator_client_list)
+
+  Logger.info("Client-list after adding 1")
+  IO.inspect(updated_elevator_list1)
+
+
+  Logger.info("Adding client 2")
+
+  elevator_client2 =
+    case Client.extract_client(elevator_id2, updated_elevator_list1) do
+      [] ->
+        Logger.info("Client 2 does not exist")
+        struct(Client,
+          [
+            client_id: elevator_id2,
+            client_data: %{dir: dir2, last_floor: last_floor2},
+            client_timer: make_ref()
+          ])
+      [old_client] ->
+        Logger.info("Client 2 exists")
+        Map.put(old_client, :client_data, %{dir: dir2, last_floor: last_floor2})
+    end
+
+  updated_elevator_list2 =
+    Timer.start_timer(self(), elevator_client2, :client_timer, :elevator_timeout, 100000000) |>
+    Client.add_clients(updated_elevator_list1)
+
+  Logger.info("Client-list after adding 2")
+  IO.inspect(updated_elevator_list2)
+
+
+  Logger.info("Testing to add client 1 again")
+
+  elevator_client3 =
+    case Client.extract_client(elevator_id1, updated_elevator_list2) do
+      [] ->
+        Logger.info("Client 1 does not exist")
+        struct(Client,
+          [
+            client_id: elevator_id1,
+            client_data: %{dir: dir1, last_floor: last_floor1},
+            client_timer: make_ref()
+          ])
+      [old_client] ->
+        Logger.info("Client 1 exists")
+        Map.put(old_client, :client_data, %{dir: dir1, last_floor: last_floor1})
+    end
+
+  updated_elevator_list3 =
+    Timer.start_timer(self(), elevator_client3, :client_timer, :elevator_timeout, 100000000) |>
+    Client.add_clients(updated_elevator_list2)
+
+  Logger.info("Client-list after adding 1 again")
+  IO.inspect(updated_elevator_list3)
+
+
+  end
+
+
+
 end
 
 
@@ -183,5 +276,6 @@ defmodule OrderTest do
 
     :ok
   end
+
 
 end

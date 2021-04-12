@@ -59,6 +59,16 @@ defmodule Master do
     connected_elevator_list:  []
   ]
 
+
+  def connect_elevator(
+        elevator_id,
+        dir,
+        last_floor)
+  do
+    GenStateMachine.cast(@node_name, {:elevator_status_update, elevator_id, {dir, last_floor}})
+  end
+
+
 ###################################### External functions ######################################
 
 ##### Client to GenStateMachine-server #####
@@ -452,8 +462,8 @@ defmodule Master do
               client_data: %{dir: dir, last_floor: last_floor},
               client_timer: make_ref()
             ])
-        old_client ->
-          Map.put(old_client, :client_data, %{dir: dir, last_floor: last_floor})
+        [old_client] ->
+          Client.modify_client_field(old_client, :client_data, %{dir: dir, last_floor: last_floor})
       end
 
     updated_elevator_list =
@@ -473,7 +483,9 @@ defmodule Master do
 
     # Since we have connection to at least one elevator, we can assume that all orders are delegated
     new_order_list = Order.add_orders(delegated_orders, other_orders)
-    new_master_data = Map.put(master_data, :active_orders, new_order_list)
+    new_master_data =
+      Map.put(master_data, :connected_elevator_list, updated_elevator_list) |>
+      Map.put(:active_orders, new_order_list)
 
     {:next_state, :active_state, new_master_data}
   end
@@ -514,6 +526,9 @@ defmodule Master do
         master_data)
   when timeout_atom in [:elevator_timeout, :elevator_init]
   do
+    Logger.info("Master recieved timeout or init from")
+    IO.inspect(elevator_id)
+
     # Find and remove the connection
     elevator_list = Map.get(master_data, :connected_elevator_list)
     updated_elevator_list =

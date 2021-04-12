@@ -159,9 +159,6 @@ defmodule Elevator do
     broadcast_served_orders: broadcasts a list of orders that the elevator has served
 
     broadcast_elevator_status: broadcast the status (dir, last_floor) to all other nodes
-
-    broadcast_internal_lights: broadcasts to all processes on the internal node, on which
-      lights should be set or cleared
   """
   defp broadcast_elevator_init()
   do
@@ -184,7 +181,13 @@ defmodule Elevator do
   end
 
 
-  defp broadcast_internal_lights(
+  @doc """
+    Sends a message to the light-process on which lights must be modified. These cahnges
+    are controlled via 'event_atom' and 'event_data'. If 'event_atom' is set to :set_lights,
+    the elevator will set lights corresponding to 'event_data' (could be floor, door or orders)
+    high
+  """
+  defp modify_elevator_lights(
         event_atom,
         event_data)
   when event_atom |> is_atom()
@@ -222,7 +225,7 @@ defmodule Elevator do
           updated_order_list = Order.add_orders(new_order_list, prev_orders)
 
           Storage.write(updated_order_list)
-          broadcast_internal_lights(:set_lights, updated_order_list)
+          modify_elevator_lights(:set_lights, updated_order_list)
 
           Map.put(elevator_data, :orders, updated_order_list)
 
@@ -597,7 +600,7 @@ defmodule Elevator do
     open_door()
     timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
     broadcast_served_orders(floor_orders)
-    broadcast_internal_lights(:clear_lights, floor_orders)
+    modify_elevator_lights(:clear_lights, floor_orders)
 
     # Remove old orders and calculate new target_order
     updated_orders = Order.remove_orders(floor_orders, order_list)
@@ -701,11 +704,11 @@ defmodule Elevator do
   """
   defp open_door()
   do
-    broadcast_internal_lights(:set_door_light, :on)
+    modify_elevator_lights(:set_door_light, :on)
   end
   defp close_door()
   do
-    broadcast_internal_lights(:set_door_light, :off)
+    modify_elevator_lights(:set_door_light, :off)
   end
 
 

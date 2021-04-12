@@ -29,6 +29,21 @@ defmodule Network do
     #:ets.insert(:buckets_registry, {Node.self(), make_ref()}) #Note, make_ref() can be swapped with ip if we know ip's will be unique
   end
 
+
+  @doc """
+  Send data to all known nodes on the network to the process receiver_id, iteration should be left blank
+  """
+  def send_data_all_other_nodes(sender_id, receiver_id, data)
+  do
+    message_id = make_ref()
+    network_list = Node.list()
+
+    send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id)
+
+    {:ok, message_id}
+  end
+
+
   @doc """
   Send data to all known nodes on the network to the process receiver_id, iteration should be left blank
   """

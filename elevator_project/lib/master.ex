@@ -205,7 +205,7 @@ defmodule Master do
   """
   defp send_data_to_master(%Master{} = master_data)
   do
-    Network.send_data_all_nodes(:master, :master_receive, {:master_update_active, master_data})
+    Network.send_data_all_other_nodes(:master, :master_receive, {:master_update_active, master_data})
   end
 
 

@@ -147,11 +147,12 @@ defmodule Master do
         GenStateMachine.cast(@node_name, {:elevator_init, from_node})
 
       {:elevator, from_node, message_id, {event_name, data}} ->
-        Logger.info("Got message from elevator")
+        #Logger.info("Got message from elevator")
 
         case event_name do
           :elevator_served_order ->
             Network.send_data_spesific_node(:master, :elevator_receive, from_node, {message_id, :ack})
+           _ ->
         end
         GenStateMachine.cast(@node_name, {event_name, from_node, data})
 

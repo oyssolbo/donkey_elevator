@@ -60,9 +60,11 @@ defmodule Lights do
   do
     receive do
       {:master, _from_node, _message_id, {event_name, data}} ->
+        Logger.info("received light update from master")
         GenServer.cast(@node_name, {event_name, data})
 
       {:elevator, _from_node, _message_id, {event_name, data}} ->
+        Logger.info("received light update from elevator")
         GenServer.cast(@node_name, {event_name, data})
     end
 
@@ -120,6 +122,9 @@ defmodule Lights do
         order_list)
   do
     Driver.set_floor_indicator(floor)
+    if order_list = [] do
+      order_list = ["no orders"]
+    end
 
     {:ok, order_list}
   end
@@ -134,6 +139,9 @@ defmodule Lights do
   when state |> is_atom()
   do
     Driver.set_door_open_light(state)
+    if order_list = [] do
+      order_list = ["no orders"]
+    end
 
     {:ok, order_list}
   end

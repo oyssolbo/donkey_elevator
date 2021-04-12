@@ -109,12 +109,12 @@ defmodule Panel do
             IO.inspect(outgoing_orders)
             orders_to_masters = Order.extract_orders(:hall_up, outgoing_orders)++Order.extract_orders(:hall_down, outgoing_orders)
             if orders_to_masters != [] do
-                Network.send_data_all_nodes(:panel, :master, {orders_to_masters, send_ID})
+                Network.send_data_all_nodes(:panel, :master_receive, {orders_to_masters, send_ID})
             end
 
             orders_to_elevator = Order.extract_orders(:cab, outgoing_orders)
             if orders_to_elevator != [] do
-                Network.send_data_inside_node(:panel, :master, orders_to_elevator)
+                Network.send_data_inside_node(:panel, :elevator_receive, orders_to_elevator)
             end
 
             # ... and wait for an ack

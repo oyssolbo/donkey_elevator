@@ -1,6 +1,7 @@
 defmodule Panel do
     @moduledoc """
-    Module for detecting button inputs on the elevator panel, and passing the information on to relevant modules.
+    Module for detecting button inputs on the elevator panel, and passing the information on
+    to relevant modules.
 
     Dependencies:
     - Driver
@@ -96,12 +97,14 @@ defmodule Panel do
         ackTimeout = @ack_timeout
         checkerTimeout = @checker_timeout
 
-        # If the order matrix isnt empty ...
+        # If the order list isn't empty ...
         if outgoing_orders != [] do
             # ... send orders to all masters on network, and send cab orders to local elevator
 
             IO.inspect(outgoing_orders)
-            orders_to_masters = Order.extract_orders(:hall_up, outgoing_orders)++Order.extract_orders(:hall_down, outgoing_orders)
+            orders_to_masters =
+                Order.extract_orders(:hall_up, outgoing_orders) ++
+                Order.extract_orders(:hall_down, outgoing_orders)
             if orders_to_masters != [] do
                 Logger.info("sending orders to master")
                 ack_message_id_master = Network.send_data_all_nodes(:panel, :master_receive, orders_to_masters)
@@ -110,7 +113,7 @@ defmodule Panel do
             orders_to_elevator = Order.extract_orders(:cab, outgoing_orders)
             if orders_to_elevator != [] do
                 Logger.info("sending orders to elevator")
-                ack_message_id_elevator = Network.send_data_inside_node(:panel, :elevator_receive, orders_to_elevator)
+                ack_message_id_elevator = Network.send_data_inside_node(:panel, :elevator_receive, {:delegated_orders, orders_to_elevator})
             end
 
             # ... and wait for an ack
@@ -158,26 +161,28 @@ defmodule Panel do
     def hardware_order_checker(floor, type) do
         try do
             if Driver.get_order_button_state(floor, type) == 1 do
-                order = struct(Order, [order_id: Timer.get_utc_time(), order_type: type, order_floor: floor])
+                struct(Order, [order_id: Timer.get_utc_time(), order_type: type, order_floor: floor])
             else
-                order = []
+                []
             end
 
         catch
-            :exit, reason ->
+            :exit, _reason ->
                 # IO.inspect("EXIT: #{inspect reason}\n Check if panel is connected to elevator HW.", label: "HW Order Checker")
-                order = []
+                []
         end
 
     end
 
     def check_order(orderType, table \\ Enum.to_list(0..@num_floors-1)) do
-        sendor_states = Enum.map(table, fn x -> hardware_order_checker(x, orderType) end)
-        orders = Enum.reject(sendor_states, fn x -> x == [] end)
+        Enum.map(table, fn x -> hardware_order_checker(x, orderType) end) |>
+            Enum.reject(fn x -> x == [] end)
     end
 
     def check_4_orders(table \\ Enum.to_list(0..@num_floors-1)) do
-        orders = check_order(:hall_up, table)++check_order(:hall_down, table)++check_order(:cab, table)
+        check_order(:hall_up, table) ++
+            check_order(:hall_down, table) ++
+            check_order(:cab, table)
     end
 
 end

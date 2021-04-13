@@ -291,4 +291,17 @@ defmodule Order do
     rnd_id = Time.utc_now()
     struct(Order, [order_id: rnd_id, order_type: type, order_floor: floor])
   end
+
+  @doc """
+  Creates a list of random orders, of given length.
+  """
+  def create_rnd_order_list(len) do
+    if len > 0 do
+      ordr_lst = [create_rnd_order()]++create_rnd_order_list(len-1)
+    else
+      []
+    end
+  end
 end
+
+

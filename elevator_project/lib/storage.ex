@@ -24,15 +24,41 @@ defmodule Storage do
     """
 
     def write(data, fileName \\ "save_data.txt") do
-        # TODO: Format order struct into string
-        dataMap = Enum.map(data, fn x -> Map.from_struct(x) end)
-        textData = Poison.encode!(dataMap)
+        textData = Poison.encode!(data)
         result = File.write(fileName, textData)
     end
 
     def read(fileName \\ "save_data.txt") do
         result = File.read!(fileName)   #Beware! read! embeds errors into results, without error messages
-        ordrs = Enum.map(Poison.decode!(result), fn x -> Kernel.struct(Order, x) end)
+        map_list = Poison.decode!(result)
+        orders = structify_maplist(map_list)
+    end
+
+    @doc """
+    Creates an order from a list of values, corrected for the mistakes made by Poison decode.
+    """
+    defp order_from_value_list(lst) when is_list(lst) do
+        elev = Enum.at(lst, 0)
+        floor = Enum.at(lst, 1)
+        id = Time.from_iso8601!(Enum.at(lst, 2))
+        type = String.to_atom(Enum.at(lst, 3))
+        
+        order = struct(Order, [order_id: id, order_type: type, order_floor: floor, delegated_elevator: elev])
+    end
+
+    @doc """
+    Turns list of order maps into list of order structs.
+    """
+    defp structify_maplist([head | tail]) do
+
+        vals = Map.values(head)
+
+        orders = [order_from_value_list(vals)] ++ structify_maplist(tail)
+        
+    end
+
+    defp structify_maplist([]) do
+        []
     end
 
 @doc """
@@ -50,17 +76,19 @@ Bigbrain syntax for converting to string: "#/{inspect <var>}", without the /
 # Map.values(<map>) >> List of values
 # Map.from_struct(<struct>)
 # String.split()
+# dataMap = Enum.map(data, fn x -> Map.from_struct(x) end)
+
 
 # order |> Map.from_struct() |> Map.values() |> valueList
 
     # Data structure, in:   {ext_orders, int_orders, masterID, versID}
     #   Extern order:       {bool_orderMatrix}
     #   Intern order:       {maskinID, boolOrderVector}
-    #   Intern orders:      {maskinID_vec, boolOrderMatrix}
+    #   Intern order_map:      {maskinID_vec, boolOrderMatrix}
 
     # Data structure, out:  {ext_orders, int_orders, masterID, versID}
-    #   Extern orders:      {bool_orderMatrix, directionParity, floorParity}
+    #   Extern order_map:      {bool_orderMatrix, directionParity, floorParity}
     #   Intern order:       {maskinID, boolOrderVector}
-    #   Intern orders:      {maskinID_vec, maskinID_checksum, boolOrderMatrix, intVec_directionParity, intVec_floorParity}
+    #   Intern order_map:      {maskinID_vec, maskinID_checksum, boolOrderMatrix, intVec_directionParity, intVec_floorParity}
 
 end

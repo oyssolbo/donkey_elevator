@@ -135,16 +135,9 @@ defmodule Order do
         floor,
         dir,
         order_list)
-  when is_list(order_list) and is_integer(floor)
+  when is_list(order_list) and is_integer(floor) and dir in [:up, :down]
   do
-    hall_dir =
-      cond do
-        dir in [:up, :down]->
-          convertion_dir_hall_dir(dir)
-        dir in [:hall_up, :hall_down]->
-          dir
-      end
-      
+    hall_dir = convertion_dir_hall_dir(dir)
     Enum.filter(order_list, fn x ->
       x.order_floor == floor and
       x.order_type in [hall_dir, :cab]

@@ -60,11 +60,11 @@ defmodule Lights do
   do
     receive do
       {:master, _from_node, _message_id, {event_name, data}} ->
-        Logger.info("received light update from master")
+        Logger.info("Received light update from master")
         GenServer.cast(@node_name, {event_name, data})
 
       {:elevator, _from_node, _message_id, {event_name, data}} ->
-        Logger.info("received light update from elevator")
+        Logger.info("Received light update from elevator")
         GenServer.cast(@node_name, {event_name, data})
     end
 
@@ -94,7 +94,7 @@ defmodule Lights do
     updated_order_list = Order.add_orders(set_order_list, order_list)
     set_order_lights(updated_order_list)
 
-    {:ok, updated_order_list}
+    {:noreply, updated_order_list}
   end
 
 
@@ -111,7 +111,7 @@ defmodule Lights do
     updated_order_list = Order.remove_orders(clear_order_list, order_list)
     set_order_lights(updated_order_list)
 
-    {:ok, updated_order_list}
+    {:noreply, updated_order_list}
   end
 
   @doc """
@@ -120,10 +120,11 @@ defmodule Lights do
   def handle_cast(
         {:set_floor_light, floor},
         order_list)
+  when floor >= @min_floor and floor <= @max_floor
   do
     Driver.set_floor_indicator(floor)
 
-    {:ok, order_list}
+    {:noreply, order_list}
   end
 
 
@@ -133,11 +134,11 @@ defmodule Lights do
   def handle_cast(
         {:set_door_light, state},
         order_list)
-  when state |> is_atom()
+  when state in [:on, :off]
   do
     Driver.set_door_open_light(state)
 
-    {:ok, order_list}
+    {:noreply, order_list}
   end
 
 
@@ -169,7 +170,8 @@ defmodule Lights do
     clear_all_lights(floor + 1)
   end
 
-  defp clear_all_lights(_floor)
+  defp clear_all_lights(floor)
+  when floor > @max_floor
   do
     :ok
   end
@@ -194,5 +196,4 @@ defmodule Lights do
       end)
     end
   end
-
 end

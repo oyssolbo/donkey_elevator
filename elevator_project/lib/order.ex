@@ -1,3 +1,5 @@
+
+
 defmodule Order do
   @moduledoc """
   Module that implements the struct 'Order' with different functions for operating
@@ -43,7 +45,6 @@ defmodule Order do
 ## Remove order(s) ##
   @doc """
   Function that removes a single or a list of orders from another list of orders
-
   The function searches through the entire list, such that if a duplicated
   order has occured, all duplicates are removed
   """
@@ -66,7 +67,6 @@ defmodule Order do
 
   @doc """
   Function to remove a list of orders from another list of orders
-
   It is assumed that there is only one copy of each order in the list
   """
   def remove_orders(
@@ -135,24 +135,28 @@ defmodule Order do
         floor,
         dir,
         order_list)
-  when is_list(order_list) and is_integer(floor) and dir in [:down, :up]
+  when is_list(order_list) and is_integer(floor) and dir in [:up, :down]
   do
+    hall_dir = convertion_dir_hall_dir(dir)
     Enum.filter(order_list, fn x ->
       x.order_floor == floor and
-      x.order_type in [dir, :cab]
+      x.order_type in [hall_dir, :cab]
     end)
   end
 
 
   @doc """
   Function that extracts all orders that have the type 'type'
-
   Example; extracts all orders with type ':cab' from a list of orders
   """
   def extract_orders(
         type,
         order_list)
+<<<<<<< HEAD
   when order_list |> is_list() and type in [:hall_up, :up, :hall_down, :down, :cab]
+=======
+  when order_list |> is_list() and type in [:hall_up, :hall_down, :cab]
+>>>>>>> master
   do
     if is_order_list(order_list) do
       Enum.filter(order_list, fn x -> x.order_type == type end)
@@ -183,13 +187,11 @@ defmodule Order do
 ## Check order(s) ##
   @doc """
   Function to check if an order is valid. Invalid orders should not occur!
-
   If this function causes a crash, it is likely that an order is set to
   default (:nil)
-
   For the order to be valid, we require that:
     - order_floor is between min and max
-    - order_type is either :cab, :up, :down
+    - order_type is either :cab, :hall_up, :hall_down
   """
   def check_valid_order(%Order{order_floor: floor, order_type: type} = _order)
   do
@@ -283,10 +285,10 @@ defmodule Order do
     rnd_floor = Enum.random(0..@max_floor)
     struct(Order, [order_id: rnd_id, order_type: rnd_type, order_floor: rnd_floor])
   end
-  
+
   def create_rnd_order(
-        floor, 
-        type) 
+        floor,
+        type)
   do
     rnd_id = Time.utc_now()
     struct(Order, [order_id: rnd_id, order_type: type, order_floor: floor])
@@ -302,6 +304,26 @@ defmodule Order do
       []
     end
   end
+
+## Conversion between dir and hall_dir ##
+
+  @doc """
+  Function that convertes between elevator's dir [:up, :down] and
+  [:hall_up, :hall_down]. If the given parameter is something else, and error
+  is returned
+  """
+  defp convertion_dir_hall_dir(convert_dir)
+  do
+    case convert_dir do
+      :down -> :hall_down
+      :hall_down -> :down
+      :up -> :hall_up
+      :hall_up -> :up
+      _ -> :error
+    end
+  end
+
+
 end
 
 

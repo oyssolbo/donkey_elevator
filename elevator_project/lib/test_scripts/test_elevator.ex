@@ -204,4 +204,47 @@ defmodule ElevatorTest do
   end
 
 
+  def debug_optimal_floor()
+  do
+    # Test passed
+
+    elevator_orders =
+    [
+      %Order{
+      delegated_elevator: nil,
+      order_floor: 0,
+      order_id: make_ref(),
+      order_type: :hall_up
+      },
+      %Order{
+      delegated_elevator: nil,
+      order_floor: 2,
+      order_id: make_ref(),
+      order_type: :hall_up
+      },
+      %Order{
+      delegated_elevator: nil,
+      order_floor: 2,
+      order_id: make_ref(),
+      order_type: :hall_up
+      },
+      %Order{
+      delegated_elevator: nil,
+      order_floor: 0,
+      order_id: make_ref(),
+      order_type: :hall_down
+      } # ,
+      # %Order{
+      # delegated_elevator: nil,
+      # order_floor: 1,
+      # order_id: make_ref(),
+      # order_type: :hall_down
+      # }
+    ]
+
+    elevator_dir = :down
+    elevator_floor = 1
+
+    Elevator.calculate_optimal_floor(elevator_orders, elevator_dir, elevator_floor)
+  end
 end

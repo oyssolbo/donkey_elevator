@@ -1,6 +1,6 @@
-defmodule Panel.Supervisor do
+defmodule Lights.Supervisor do
   @moduledoc """
-  Supervisor supervising the Panel.
+  Supervisor supervising the Lights.
   """
 
   use Supervisor
@@ -20,7 +20,7 @@ defmodule Panel.Supervisor do
   def init(_init_arg)
   do
     children = [
-      {Panel, []}
+      {Lights, []}
     ]
 
     # one_for_one: Only one module will be spawned at crash
@@ -31,7 +31,7 @@ defmodule Panel.Supervisor do
     opts = [
       strategy: :one_for_one,
       max_seconds: 2,
-      name: :panel_supervisor
+      name: :lights_supervisor
     ]
     Supervisor.init(children, opts)
   end

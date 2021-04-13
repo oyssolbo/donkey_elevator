@@ -12,7 +12,7 @@ defmodule UDP_discover do
   @broadcast_port 9876
   @init_port 6789
   @num_tries 5
-  @default_timeout 45000 #increased for testing purposes (easier to debug)
+  @default_timeout 15000
 
   @doc """
   @brief        Function that hopefully returns the IP-address of the system
@@ -113,7 +113,7 @@ defmodule UDP_discover do
         {:ok, recv_packet} ->
           node_atom = Kernel.elem(recv_packet, 2) |> to_string() |> String.to_atom()
 
-        if (node_atom != Node.self()) do
+        if (node_atom not in SystemNode.nodes_in_network()) do
           SystemNode.connect_node_network(node_atom)
         end
 

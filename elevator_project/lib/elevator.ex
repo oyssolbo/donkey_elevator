@@ -35,19 +35,16 @@ defmodule Elevator do
 
   @min_floor            Application.fetch_env!(:elevator_project, :project_min_floor)
   @max_floor            Application.fetch_env!(:elevator_project, :project_num_floors) + @min_floor - 1
-  @cookie               Application.fetch_env!(:elevator_project, :project_cookie_name)
 
   @init_time            Application.fetch_env!(:elevator_project, :elevator_timeout_init_ms)
   @door_time            Application.fetch_env!(:elevator_project, :elevator_timeout_door_ms)
   @moving_time          Application.fetch_env!(:elevator_project, :elevator_timeout_moving_ms)
   @status_update_time   Application.fetch_env!(:elevator_project, :elevator_update_status_time_ms)
 
-  @restart_time         Application.fetch_env!(:elevator_project, :elevator_restart_time_ms)
-
   @node_name            :elevator
 
-  @enforce_keys         [:orders, :last_floor, :dir, :timer, :elevator_id]
-  defstruct             [:orders, :last_floor, :dir, :timer, :elevator_id]
+  @enforce_keys         [:orders, :last_floor, :dir, :timer]
+  defstruct             [:orders, :last_floor, :dir, :timer]
 
 
 ###################################### External functions ######################################
@@ -72,8 +69,7 @@ defmodule Elevator do
       orders:       [],
       last_floor:   :nil,
       dir:          :down,
-      timer:        make_ref(),
-      elevator_id:  Node.self()
+      timer:        make_ref()
     }
 
     # Messaging master that elevator is inited
@@ -90,7 +86,7 @@ defmodule Elevator do
     case Process.whereis(:elevator_receive) do
       :nil->
         Logger.info("Starting receive-process for elevator")
-        init_receive()
+        # init_receive()
       _->
         Logger.info("Receive-process for elevator already active")
     end
@@ -120,6 +116,16 @@ defmodule Elevator do
     Process.exit(self(), :normal)
   end
 
+##### DEBUGGING ######
+
+  def send_order_to_elevator(%Order{} = order)
+  do
+    Logger.info("Casting order to elevator")
+
+    GenStateMachine.cast(@node_name, {:delegated_order, [order]})
+  end
+
+
 
 ##### Networking and interface to external modules #####
 
@@ -130,17 +136,17 @@ defmodule Elevator do
   defp receive_thread()
   do
     receive do
-      {:master, _node, message_id, data} ->
+      {:master, _node, message_id, {:delegated_order, order_list}} ->
         Logger.info("Elevator received order from master")
-        Network.send_data_all_nodes(:elevator, :master, {message_id, :ack})
-        GenStateMachine.cast(@node_name, {:received_order, data})
+        Network.send_data_all_nodes(:elevator, :master_receive, {message_id, :ack})
+        GenStateMachine.cast(@node_name, {:delegated_order, order_list})
 
-      {:panel, _node, message_id, data} ->
+      {:panel, _node, message_id, {:delegated_order, order_list}} ->
         Logger.info("Elevator received order from panel")
-        IO.inspect(data)
         Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
-        GenStateMachine.cast(@node_name, {:received_order, data})
+        GenStateMachine.cast(@node_name, {:delegated_order, order_list})
     end
+
 
     receive_thread()
   end
@@ -159,18 +165,19 @@ defmodule Elevator do
 
     broadcast_served_orders: broadcasts a list of orders that the elevator has served
 
-    broadcast_elevator_status: broadcast the status (dir, last_floor) to all other nodes
+    broadcast_elevator_status: broadcast the status (dir, last_floor) to all other nodes, such
+      that active master will receive the update
   """
   defp broadcast_elevator_init()
   do
-    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master, :elevator_init) end)
+    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master_receive, :elevator_init) end)
   end
 
 
   defp broadcast_served_orders(orders)
   when orders |> is_list()
   do
-    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master, {:elevator_served_order, orders}) end)
+    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders}) end)
   end
 
 
@@ -178,15 +185,29 @@ defmodule Elevator do
         last_dir,
         last_floor)
   do
-    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master, {:elevator_status_update, {last_dir, last_floor}}) end)
+    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_status_update, {last_dir, last_floor}}) end)
   end
 
+
+  @doc """
+    Sends a message to the light-process on which lights must be modified. These cahnges
+    are controlled via 'event_atom' and 'event_data'. If 'event_atom' is set to :set_lights,
+    the elevator will set lights corresponding to 'event_data' (could be floor, door or orders)
+    high
+  """
+  defp modify_elevator_lights(
+        event_atom,
+        event_data)
+  when event_atom |> is_atom()
+  do
+    spawn_link(fn -> Network.send_data_inside_node(:elevator, :lights_receive, {event_atom, event_data}) end)
+  end
 
 
 ###################################### Events and transitions ######################################
 
 ##### all_states #####
-# received_order #
+# delegated_order #
   @doc """
   Function to handle if a new order is received
   This event should be handled if the elevator is in idle, moving or door-state and NOT when
@@ -196,43 +217,34 @@ defmodule Elevator do
   """
   def handle_event(
         :cast,
-        {:received_order, new_order_list},
+        {:delegated_order, new_order_list},
         state,
         %Elevator{orders: prev_orders} = elevator_data)
   when state in [:init_state, :idle_state, :door_state, :moving_state]
   do
-    Logger.info("Elevator received order")
+    Logger.info("Elevator received order in state '#{state}'")
 
     new_elevator_data =
       case Order.check_valid_order(new_order_list) do
         :true->
-          Logger.info("valid order")
-          IO.inspect(new_order_list)
-          # Checking if order already exists - if not, add to list and calculate next direction
           updated_order_list = Order.add_orders(new_order_list, prev_orders)
-          new_elevator_data = Map.put(elevator_data, :orders, updated_order_list)
-          IO.inspect(new_elevator_data)
-
-
-          IO.inspect(updated_order_list)
 
           Storage.write(updated_order_list)
-          
-          Lights.set_order_lights(updated_order_list)
+          modify_elevator_lights(:set_lights, updated_order_list)
 
-          new_elevator_data
+          Map.put(elevator_data, :orders, updated_order_list)
 
         :false->
-          Logger.info("invalid order")
           elevator_data
       end
+    IO.inspect(new_elevator_data)
 
     {:next_state, state, new_elevator_data}
   end
 
   def handle_event(
         :cast,
-        {:received_order, _new_order_list},
+        {:delegated_order, _new_order_list},
         :restart_state,
         elevator_data)
   do
@@ -333,7 +345,6 @@ defmodule Elevator do
     {new_state, new_data} =
       case new_dir do
         :nil->
-
           {:idle_state, elevator_data}
 
         _->
@@ -362,8 +373,6 @@ defmodule Elevator do
         :moving_state,
         elevator_data)
   do
-    Logger.info("Elevator reached a floor while in moving_state")
-
     all_orders = Map.get(elevator_data, :orders)
     direction = Map.get(elevator_data, :dir)
 
@@ -465,7 +474,7 @@ defmodule Elevator do
   do
     {:next_state, :door_state, elevator_data}
   end
-  
+
 
 ##### restart_state #####
 
@@ -525,7 +534,8 @@ defmodule Elevator do
   def check_at_floor(floor)
   when floor |> is_integer
   do
-    Lights.set_floorlight(floor)
+    #Lights.set_floorlight(floor)
+    modify_elevator_lights(:set_floor_light, floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
 
@@ -579,13 +589,9 @@ defmodule Elevator do
   Handles what to do when a floor containing an order with type in [:cab, dir] is reached
   The function serves the order(s), updates the order-list and saves the result to Lights
   and Storage
-  orders Current active orders
-  dir Current elevator-direction
-  floor Current elevator floor
-  timer Current active timer for elevator (moving)
   """
   defp reached_order_floor(
-        %Elevator{orders: order_list, dir: dir} = elevator_data,
+        %Elevator{orders: order_list} = elevator_data,
         floor,
         floor_orders)
   when is_list(floor_orders)
@@ -597,12 +603,12 @@ defmodule Elevator do
     open_door()
     timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
     broadcast_served_orders(floor_orders)
+    modify_elevator_lights(:clear_lights, floor_orders)
 
     # Remove old orders and calculate new target_order
     updated_orders = Order.remove_orders(floor_orders, order_list)
 
-    #Storage.write(updated_orders)
-    Lights.set_order_lights(updated_orders)
+    Storage.write(updated_orders)
 
     Map.put(timer_elevator_data, :orders, updated_orders)
   end
@@ -614,22 +620,12 @@ defmodule Elevator do
   Function to find the next optimal order. The function uses the current floor and direction
   to return the next optimal direction for the elevator to serve the given orders.
   If orders == [] or floor == :nil, :nil is returned
-  orders  Orders to be scanned
-  dir     Current direction to check for orders
-  Floor   Current floor to check for order
   """
   defp calculate_optimal_direction(
-        [],
-        _dir,
-        _floor)
-  do
-    :nil
-  end
-
-  defp calculate_optimal_direction(
-    _orders,
+    orders,
     _dir,
-    :nil = _floor)
+    floor)
+  when orders == [] or floor == :nil
   do
     :nil
   end
@@ -659,7 +655,7 @@ defmodule Elevator do
   that is directly linked to why is it here in the first place. That bug is then related to
   calculate_optimal_direction(), as it should not invoke the function without valid orders
   """
-  defp calculate_optimal_floor(
+  def calculate_optimal_floor(
         orders,
         dir,
         floor)
@@ -668,7 +664,6 @@ defmodule Elevator do
     # Check if orders on this floor, and in correct direction
     {bool_orders_on_floor, _matching_orders} = Order.check_orders_at_floor(orders, floor, dir)
 
-    # Ugly way to recurse further
     case {bool_orders_on_floor, dir} do
       {:true, _}->
         # Orders on this floor - return the floor
@@ -705,11 +700,11 @@ defmodule Elevator do
   """
   defp open_door()
   do
-    Lights.set_door_light(:on)
+    modify_elevator_lights(:set_door_light, :on)
   end
   defp close_door()
   do
-    Lights.set_door_light(:off)
+    modify_elevator_lights(:set_door_light, :off)
   end
 
 

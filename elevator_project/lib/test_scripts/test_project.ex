@@ -9,9 +9,11 @@ defmodule ProjectTest do
   require Panel
   require Order
 
-  defp start()
+  def start()
   do
     Logger.info("Starting linking to modules")
+
+    Network.init_node_network()
 
     Driver.start_link([])
     Panel.init()
@@ -45,6 +47,34 @@ defmodule ProjectTest do
     Process.sleep(150)
     spawn(fn -> Master.start_link([]) end)
 
+  end
+
+
+  def test_order()
+  do
+    Driver.start_link([])
+    Elevator.start_link([])
+    Process.sleep(2000)
+
+    Order.create_rnd_order() |>
+      IO.inspect() |>
+      Elevator.send_order_to_elevator()
+
+    Order.create_rnd_order() |>
+    IO.inspect() |>
+    Elevator.send_order_to_elevator()
+
+    Order.create_rnd_order() |>
+    IO.inspect() |>
+    Elevator.send_order_to_elevator()
+
+    Order.create_rnd_order() |>
+      IO.inspect() |>
+      Elevator.send_order_to_elevator()
+
+    Order.create_rnd_order() |>
+    IO.inspect() |>
+    Elevator.send_order_to_elevator()
   end
 
 end

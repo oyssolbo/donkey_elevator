@@ -160,7 +160,7 @@ defmodule Lights do
 
   Clears all hall_down, hall_up, cab at each floor
   """
-  def clear_all_lights(floor \\ @min_floor)
+  defp clear_all_lights(floor \\ @min_floor)
   when floor <= @max_floor
   do
     Driver.set_order_button_light(:hall_down, floor, :off)
@@ -170,7 +170,7 @@ defmodule Lights do
     clear_all_lights(floor + 1)
   end
 
-  def clear_all_lights(floor)
+  defp clear_all_lights(floor)
   when floor > @max_floor
   do
     :ok

@@ -49,30 +49,6 @@ defmodule Lights do
   end
 
 
-##### DEBUGGING #####
-  def floorlight(floor)
-  when floor >= @min_floor and floor <= @max_floor
-  do
-    GenServer.cast(@node_name, {:set_floor_light, floor})
-  end
-
-  def doorlight(state)
-  when state in [:on, :off]
-  do
-    GenServer.cast(@node_name, {:set_door_light, state})
-  end
-
-  def order_lights_set(order_list)
-  do
-    GenServer.cast(@node_name, {:set_lights, order_list})
-  end
-
-  def order_lights_clear(order_list)
-  do
-    GenServer.cast(@node_name, {:clear_lights, order_list})
-  end
-
-
 ##### External network #####
 
   @doc """

@@ -86,7 +86,7 @@ defmodule Elevator do
     case Process.whereis(:elevator_receive) do
       :nil->
         Logger.info("Starting receive-process for elevator")
-        init_receive()
+        # init_receive()
       _->
         Logger.info("Receive-process for elevator already active")
     end
@@ -116,6 +116,16 @@ defmodule Elevator do
     Process.exit(self(), :normal)
   end
 
+##### DEBUGGING ######
+
+  def send_order_to_elevator(%Order{} = order)
+  do
+    Logger.info("Casting order to elevator")
+
+    GenStateMachine.cast(@node_name, {:delegated_order, [order]})
+  end
+
+
 
 ##### Networking and interface to external modules #####
 
@@ -136,6 +146,7 @@ defmodule Elevator do
         Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:delegated_order, order_list})
     end
+
 
     receive_thread()
   end
@@ -211,7 +222,7 @@ defmodule Elevator do
         %Elevator{orders: prev_orders} = elevator_data)
   when state in [:init_state, :idle_state, :door_state, :moving_state]
   do
-    Logger.info("Elevator received order")
+    Logger.info("Elevator received order in state '#{state}'")
 
     new_elevator_data =
       case Order.check_valid_order(new_order_list) do
@@ -226,6 +237,7 @@ defmodule Elevator do
         :false->
           elevator_data
       end
+    IO.inspect(new_elevator_data)
 
     {:next_state, state, new_elevator_data}
   end
@@ -333,7 +345,6 @@ defmodule Elevator do
     {new_state, new_data} =
       case new_dir do
         :nil->
-
           {:idle_state, elevator_data}
 
         _->
@@ -362,8 +373,6 @@ defmodule Elevator do
         :moving_state,
         elevator_data)
   do
-    Logger.info("Elevator reached a floor while in moving_state")
-
     all_orders = Map.get(elevator_data, :orders)
     direction = Map.get(elevator_data, :dir)
 
@@ -613,17 +622,10 @@ defmodule Elevator do
   If orders == [] or floor == :nil, :nil is returned
   """
   defp calculate_optimal_direction(
-        [],
-        _dir,
-        _floor)
-  do
-    :nil
-  end
-
-  defp calculate_optimal_direction(
-    _orders,
+    orders,
     _dir,
-    :nil = _floor)
+    floor)
+  when orders == [] or floor == :nil
   do
     :nil
   end
@@ -653,7 +655,7 @@ defmodule Elevator do
   that is directly linked to why is it here in the first place. That bug is then related to
   calculate_optimal_direction(), as it should not invoke the function without valid orders
   """
-  defp calculate_optimal_floor(
+  def calculate_optimal_floor(
         orders,
         dir,
         floor)

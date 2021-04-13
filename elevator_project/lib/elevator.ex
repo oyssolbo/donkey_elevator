@@ -35,14 +35,11 @@ defmodule Elevator do
 
   @min_floor            Application.fetch_env!(:elevator_project, :project_min_floor)
   @max_floor            Application.fetch_env!(:elevator_project, :project_num_floors) + @min_floor - 1
-  @cookie               Application.fetch_env!(:elevator_project, :project_cookie_name)
 
   @init_time            Application.fetch_env!(:elevator_project, :elevator_timeout_init_ms)
   @door_time            Application.fetch_env!(:elevator_project, :elevator_timeout_door_ms)
   @moving_time          Application.fetch_env!(:elevator_project, :elevator_timeout_moving_ms)
   @status_update_time   Application.fetch_env!(:elevator_project, :elevator_update_status_time_ms)
-
-  @restart_time         Application.fetch_env!(:elevator_project, :elevator_restart_time_ms)
 
   @node_name            :elevator
 
@@ -129,16 +126,15 @@ defmodule Elevator do
   defp receive_thread()
   do
     receive do
-      {:master, _node, message_id, data} ->
+      {:master, _node, message_id, {:delegated_order, order_list}} ->
         Logger.info("Elevator received order from master")
         Network.send_data_all_nodes(:elevator, :master_receive, {message_id, :ack})
-        GenStateMachine.cast(@node_name, {:received_order, data})
+        GenStateMachine.cast(@node_name, {:delegated_order, order_list})
 
-      {:panel, _node, message_id, data} ->
+      {:panel, _node, message_id, {:delegated_order, order_list}} ->
         Logger.info("Elevator received order from panel")
-        IO.inspect(data)
         Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
-        GenStateMachine.cast(@node_name, {:received_order, data})
+        GenStateMachine.cast(@node_name, {:delegated_order, order_list})
     end
 
     receive_thread()
@@ -158,7 +154,8 @@ defmodule Elevator do
 
     broadcast_served_orders: broadcasts a list of orders that the elevator has served
 
-    broadcast_elevator_status: broadcast the status (dir, last_floor) to all other nodes
+    broadcast_elevator_status: broadcast the status (dir, last_floor) to all other nodes, such
+      that active master will receive the update
   """
   defp broadcast_elevator_init()
   do
@@ -199,7 +196,7 @@ defmodule Elevator do
 ###################################### Events and transitions ######################################
 
 ##### all_states #####
-# received_order #
+# delegated_order #
   @doc """
   Function to handle if a new order is received
   This event should be handled if the elevator is in idle, moving or door-state and NOT when
@@ -209,7 +206,7 @@ defmodule Elevator do
   """
   def handle_event(
         :cast,
-        {:received_order, new_order_list},
+        {:delegated_order, new_order_list},
         state,
         %Elevator{orders: prev_orders} = elevator_data)
   when state in [:init_state, :idle_state, :door_state, :moving_state]
@@ -219,9 +216,6 @@ defmodule Elevator do
     new_elevator_data =
       case Order.check_valid_order(new_order_list) do
         :true->
-          Logger.info("valid order")
-          IO.inspect(new_order_list)
-          # Checking if order already exists - if not, add to list and calculate next direction
           updated_order_list = Order.add_orders(new_order_list, prev_orders)
 
           Storage.write(updated_order_list)
@@ -230,7 +224,6 @@ defmodule Elevator do
           Map.put(elevator_data, :orders, updated_order_list)
 
         :false->
-          Logger.info("invalid order")
           elevator_data
       end
 
@@ -239,7 +232,7 @@ defmodule Elevator do
 
   def handle_event(
         :cast,
-        {:received_order, _new_order_list},
+        {:delegated_order, _new_order_list},
         :restart_state,
         elevator_data)
   do

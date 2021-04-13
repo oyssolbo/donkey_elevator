@@ -135,11 +135,19 @@ defmodule Order do
         floor,
         dir,
         order_list)
-  when is_list(order_list) and is_integer(floor) and dir in [:down, :up]
+  when is_list(order_list) and is_integer(floor)
   do
+    hall_dir =
+      cond do
+        dir in [:up, :down]->
+          convertion_dir_hall_dir(dir)
+        dir in [:hall_up, :hall_down]->
+          dir
+      end
+      
     Enum.filter(order_list, fn x ->
       x.order_floor == floor and
-      x.order_type in [dir, :cab]
+      x.order_type in [hall_dir, :cab]
     end)
   end
 
@@ -186,7 +194,7 @@ defmodule Order do
   default (:nil)
   For the order to be valid, we require that:
     - order_floor is between min and max
-    - order_type is either :cab, :up, :down
+    - order_type is either :cab, :hall_up, :hall_down
   """
   def check_valid_order(%Order{order_floor: floor, order_type: type} = _order)
   do
@@ -276,7 +284,7 @@ defmodule Order do
   def create_rnd_order()
   do
     rnd_id = Time.utc_now()
-    rnd_type = Enum.random([:up, :down, :cab])
+    rnd_type = Enum.random([:hall_up, :hall_down, :cab])
     rnd_floor = Enum.random(0..@max_floor)
     struct(Order, [order_id: rnd_id, order_type: rnd_type, order_floor: rnd_floor])
   end
@@ -288,4 +296,25 @@ defmodule Order do
     rnd_id = Time.utc_now()
     struct(Order, [order_id: rnd_id, order_type: type, order_floor: floor])
   end
+
+
+## Conversion between dir and hall_dir ##
+
+  @doc """
+  Function that convertes between elevator's dir [:up, :down] and
+  [:hall_up, :hall_down]. If the given parameter is something else, and error
+  is returned
+  """
+  defp convertion_dir_hall_dir(convert_dir)
+  do
+    case convert_dir do
+      :down -> :hall_down
+      :hall_down -> :down
+      :up -> :hall_up
+      :hall_up -> :up
+      _ -> :error
+    end
+  end
+
+
 end

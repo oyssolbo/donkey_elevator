@@ -9,7 +9,7 @@ config :elevator_project,
 
   # Network
   network_node_tick_time_ms:      50,
-  network_ack_timeout_time_ms:    200,
+  network_ack_timeout_time_ms:    500, #increased from 200 to 500 for less spam under testing
   network_resend_max_counter:     10,
 
   # Master
@@ -25,6 +25,10 @@ config :elevator_project,
   elevator_timeout_moving_ms:     5000,
 
   # Panel
+<<<<<<< HEAD
   panel_checker_timeout_ms:       1000,
   panel_checker_sleep_ms:         200,
   panel_ack_timeout_ms:           1500
+=======
+  panel_sleep_time_ms:            25
+>>>>>>> cleanup

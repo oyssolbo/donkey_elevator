@@ -33,6 +33,15 @@ defmodule Order do
   end
 
   def add_orders(
+        [] = _new_orders,
+        order_list)
+  when is_list(order_list)
+  do
+    order_list |>
+      Enum.uniq()
+  end
+
+  def add_orders(
         new_orders,
         order_list)
   when is_list(order_list) and is_list(new_orders)
@@ -231,8 +240,9 @@ defmodule Order do
     end
   end
 
+
   @doc """
-  Function to check whether list contains only orders or not
+  Function to check whether a list contains only orders or not
   """
   def is_order_list(list)
   when is_list(list)
@@ -242,6 +252,7 @@ defmodule Order do
       _ -> :false
     end)
   end
+  
 
 ## Modify order ##
   @doc """

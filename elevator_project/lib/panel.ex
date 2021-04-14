@@ -80,14 +80,8 @@ defmodule Panel do
 
         updated_orders =
         receive do
-            {:master, _from_node, _message_id, {ack_message_id, :ack}}->
-                case master_msg_id == ack_message_id do
-                    :true->
-                        []
-
-                    :false->
-                        orders_to_masters
-                end
+            {:master, _from_node, _message_id, {master_msg_id, :ack}}->
+                []
         after @ack_timeout_time->
             orders_to_masters
         end

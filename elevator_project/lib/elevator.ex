@@ -49,12 +49,6 @@ defmodule Elevator do
 
 ###################################### External functions ######################################
 
-
-def send_order(%Order{} = order)
-do
-  GenStateMachine.cast(@node_name, {:delegated_order, [order]})
-end
-
 ##### Connection to GenStateMachine-server #####
 
 

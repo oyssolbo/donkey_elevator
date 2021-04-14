@@ -192,11 +192,12 @@ defmodule Master do
         ack_pid \\ make_ref())
   when counter < @max_resends
   do
+    ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
     if(counter == 0) do
-      ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+      #ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
       Process.register(self, ack_pid)
     end
-    ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+
     Logger.info("Master sending orders to elevator #{elevator_id}")
     message_id  = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list, ack_pid})
 

@@ -190,14 +190,13 @@ defmodule Elevator do
   defp broadcast_served_orders(orders, counter \\ 0, ack_pid \\ make_ref)
   when orders |> is_list()
   do
+    ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
 
     if (counter == 0) do
-      ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
-      IO.inspect(ack_pid)
+      #ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
       Process.register(self, ack_pid)
-      IO.inspect(is_atom(ack_pid))
     end
-    ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+
     message_id = Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders, ack_pid})
 
     case Network.receive_ack(message_id) do

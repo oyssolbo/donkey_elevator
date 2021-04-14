@@ -126,7 +126,9 @@ defmodule Master do
         GenStateMachine.cast(@node_name, {:elevator_init, from_node})
 
       {:elevator, from_node, message_id, {:elevator_served_order, served_order_list}} ->
-        Network.send_data_spesific_node(:master, :elevator_receive, from_node, {message_id, :ack})
+        process_id = message_id |> Kernel.inspect() |> String.to_atom()
+        Network.send_data_spesific_node(:master, process_id, from_node, {message_id, :ack})
+        #Network.send_data_spesific_node(:master, :elevator_receive, from_node, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:elevator_served_order, from_node, served_order_list})
 
       {:elevator, from_node, _message_id, {:elevator_status_update, {last_dir, last_floor}}} ->
@@ -137,7 +139,6 @@ defmodule Master do
         Network.send_data_spesific_node(:master, :panel, from_node, {message_id, :ack})
 
       {receiver_id, _from_node, _ack_message_id, {message_id, :ack}} ->
-        #send({ack_pid, Node.self()}, {message_id, :ack})
     end
 
     receive_thread()
@@ -166,10 +167,10 @@ defmodule Master do
     process_id = message_id |> Kernel.inspect() |> String.to_atom()
     Process.register(self, process_id)
     case Network.receive_ack(message_id) do
-      {:ok, _receiver_id}->
+      {:ok, _receiver_id} ->
         :ok
-      {:no_ack, :no_id}->
-        send_order_to_elevator(order_list, elevator_id, counter + 1)
+      {:no_ack, :no_id} ->
+        spawn_link( fn -> send_order_to_elevator(order_list, elevator_id, counter + 1) end)
     end
   end
 

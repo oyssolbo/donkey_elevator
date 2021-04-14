@@ -27,7 +27,7 @@ config :elevator_project,
   # Panel
   panel_checker_timeout_ms:       1000,
   panel_checker_sleep_ms:         200,
-  panel_ack_timeout_ms:           1500
+  panel_ack_timeout_ms:           1500,
   #Top three should probably be removed
   
   panel_sleep_time_ms:            25

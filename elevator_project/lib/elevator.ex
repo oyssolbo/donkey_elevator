@@ -185,23 +185,26 @@ defmodule Elevator do
   end
 
   @doc """
-  Must be started as a new process with spawn() or spawn_link() !!
+  Must be started as a new process with spawn() or spawn_link() !!, ack_pid and counter should be left blank
   """
-  defp broadcast_served_orders(orders, counter \\ 0, ack_pid \\ make_ref())
+  defp broadcast_served_orders(orders, counter \\ 0, ack_pid \\ make_ref)
   when orders |> is_list()
   do
+
     if (counter == 0) do
       ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+      IO.inspect(ack_pid)
       Process.register(self, ack_pid)
+      IO.inspect(is_atom(ack_pid))
     end
-
+    ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
     message_id = Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders, ack_pid})
 
     case Network.receive_ack(message_id) do
       {:ok, _receiver_id}->
         :ok
       {:no_ack, :no_id}->
-        spawn_link(fn-> broadcast_served_orders(orders, counter + 1, ack_pid) end)
+        broadcast_served_orders(orders, counter + 1, ack_pid)
     end
   end
 

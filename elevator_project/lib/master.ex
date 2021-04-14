@@ -132,6 +132,7 @@ defmodule Master do
       #   GenStateMachine.cast(@node_name, {:elevator_served_order, from_node, served_order_list})
 
       {:elevator, from_node, message_id, {:elevator_served_order, served_order_list, ack_pid}} ->
+        IO.inspect(is_atom(ack_pid))
         Network.send_data_spesific_node(:master, ack_pid, from_node, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:elevator_served_order, from_node, served_order_list})
 
@@ -195,7 +196,7 @@ defmodule Master do
       ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
       Process.register(self, ack_pid)
     end
-
+    ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
     Logger.info("Master sending orders to elevator #{elevator_id}")
     message_id  = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list, ack_pid})
 

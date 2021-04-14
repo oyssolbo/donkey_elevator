@@ -141,9 +141,8 @@ defmodule Elevator do
         Network.send_data_all_nodes(:elevator, :master_receive, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:delegated_order, order_list})
 
-      {:panel, _node, message_id, {:delegated_order, order_list}} ->
+      {:panel, _node, _message_id, {:delegated_order, order_list}} ->
         Logger.info("Elevator received order from panel")
-        Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:delegated_order, order_list})
     end
 

@@ -33,6 +33,15 @@ defmodule Order do
   end
 
   def add_orders(
+        [] = _new_orders,
+        order_list)
+  when is_list(order_list)
+  do
+    order_list |>
+      Enum.uniq()
+  end
+
+  def add_orders(
         new_orders,
         order_list)
   when is_list(order_list) and is_list(new_orders)
@@ -152,7 +161,7 @@ defmodule Order do
   def extract_orders(
         type,
         order_list)
-  when order_list |> is_list() and type in [:hall_up, :hall_down, :cab]
+  when order_list |> is_list() and type in [:hall_up, :up, :hall_down, :down, :cab]
   do
     if is_order_list(order_list) do
       Enum.filter(order_list, fn x -> x.order_type == type end)
@@ -231,8 +240,9 @@ defmodule Order do
     end
   end
 
+
   @doc """
-  Function to check whether list contains only orders or not
+  Function to check whether a list contains only orders or not
   """
   def is_order_list(list)
   when is_list(list)
@@ -242,6 +252,7 @@ defmodule Order do
       _ -> :false
     end)
   end
+  
 
 ## Modify order ##
   @doc """
@@ -290,6 +301,16 @@ defmodule Order do
     struct(Order, [order_id: rnd_id, order_type: type, order_floor: floor])
   end
 
+  @doc """
+  Creates a list of random orders, of given length.
+  """
+  def create_rnd_order_list(len) do
+    if len > 0 do
+      ordr_lst = [create_rnd_order()]++create_rnd_order_list(len-1)
+    else
+      []
+    end
+  end
 
 ## Conversion between dir and hall_dir ##
 
@@ -311,3 +332,5 @@ defmodule Order do
 
 
 end
+
+

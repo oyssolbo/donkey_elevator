@@ -9,7 +9,7 @@ defmodule Storage do
     """
 
     @doc """
-    Writes strings to a txt-file, default name "save_data.txt". Data is encoded using Poison, 
+    Writes strings to a txt-file, default name "save_data.txt". Data is encoded using Poison,
     and overwrites whatever was on the file from before.
     """
     def write(data, fileName \\ "save_data.txt") do
@@ -36,7 +36,7 @@ defmodule Storage do
         floor = Enum.at(lst, 1)
         id = Time.from_iso8601!(Enum.at(lst, 2))
         type = String.to_atom(Enum.at(lst, 3))
-        
+
         order = struct(Order, [order_id: id, order_type: type, order_floor: floor, delegated_elevator: elev])
     end
 
@@ -48,7 +48,7 @@ defmodule Storage do
         vals = Map.values(head)
 
         orders = [order_from_value_list(vals)] ++ structify_maplist(tail)
-        
+
     end
     defp structify_maplist([]) do
         []

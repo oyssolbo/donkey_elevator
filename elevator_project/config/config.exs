@@ -25,5 +25,4 @@ config :elevator_project,
   elevator_timeout_moving_ms:     5000,
 
   # Panel
-  panel_checker_timeout_ms:       1000,
-  panel_checker_sleep_ms:         200
+  panel_sleep_time_ms:            25

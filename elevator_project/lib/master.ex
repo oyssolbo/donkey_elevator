@@ -120,14 +120,15 @@ defmodule Master do
   do
     receive do
       {:master, _from_node, _message_id, {event_name, data}} ->
-        Logger.info("Got message from other master")
         GenStateMachine.cast(@node_name, {event_name, data})
 
       {:elevator, from_node, _message_id, :elevator_init} ->
         GenStateMachine.cast(@node_name, {:elevator_init, from_node})
 
       {:elevator, from_node, message_id, {:elevator_served_order, served_order_list}} ->
-        Network.send_data_spesific_node(:master, :elevator_receive, from_node, {message_id, :ack})
+        process_id = message_id |> Kernel.inspect() |> String.to_atom()
+        Network.send_data_spesific_node(:master, process_id, from_node, {message_id, :ack})
+        #Network.send_data_spesific_node(:master, :elevator_receive, from_node, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:elevator_served_order, from_node, served_order_list})
 
       {:elevator, from_node, _message_id, {:elevator_status_update, {last_dir, last_floor}}} ->
@@ -136,6 +137,8 @@ defmodule Master do
       {:panel, from_node, message_id, order_list} ->
         GenStateMachine.cast(@node_name, {:panel_received_order, order_list})
         Network.send_data_spesific_node(:master, :panel, from_node, {message_id, :ack})
+
+      {receiver_id, _from_node, _ack_message_id, {message_id, :ack}} ->
     end
 
     receive_thread()
@@ -158,14 +161,21 @@ defmodule Master do
         counter \\ 0)
   when counter < @max_resends
   do
-    message_id = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list})
+
+    Logger.info("Master sending orders to elevator #{elevator_id}")
+    message_id  = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list})
+    process_id = message_id |> Kernel.inspect() |> String.to_atom()
+    Process.register(self, process_id)
     case Network.receive_ack(message_id) do
-      {:ok, _receiver_id}->
+      {:ok, _receiver_id} ->
         :ok
-      {:no_ack, :no_id}->
-        send_order_to_elevator(order_list, elevator_id, counter + 1)
+      {:no_ack, :no_id} ->
+        spawn_link( fn -> send_order_to_elevator(order_list, elevator_id, counter + 1) end)
     end
   end
+
+
+
 
   defp send_order_to_elevator(
         _order_list,
@@ -595,6 +605,7 @@ end
     # Delegate the order to the optimal elevator
     delegated_order = Order.modify_order_field(order, :delegated_elevator, optimal_elevator_id)
     spawn(fn-> send_order_to_elevator([delegated_order], optimal_elevator_id) end)
+
 
     [delegated_order | delegate_orders(rest_orders, connected_elevators)]
   end

@@ -106,14 +106,14 @@ defmodule Panel do
                 Order.extract_orders(:hall_up, outgoing_orders) ++
                 Order.extract_orders(:hall_down, outgoing_orders)
             if orders_to_masters != [] do
-                Logger.info("sending orders to master")
+                Logger.info("Panel sending orders to master")
                 ack_message_id_master = Network.send_data_all_nodes(:panel, :master_receive, orders_to_masters)
             end
 
             orders_to_elevator = Order.extract_orders(:cab, outgoing_orders)
             if orders_to_elevator != [] do
-                Logger.info("sending orders to elevator")
-                ack_message_id_elevator = Network.send_data_inside_node(:panel, :elevator_receive, {:delegated_orders, orders_to_elevator})
+                Logger.info("Panel sending orders to elevator")
+                ack_message_id_elevator = Network.send_data_inside_node(:panel, :elevator_receive, {:delegated_order, orders_to_elevator})
             end
 
             # ... and wait for an ack
@@ -121,7 +121,12 @@ defmodule Panel do
                 {_sender_id, _node, _messageID, {ack_message_id_master, :ack}} ->
                     # When ack is recieved for current send_ID, send request to checker for latest order matrix
                     Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
-                    IO.inspect("Received ack from master")   # TEST CODE
+                    IO.inspect("Panel received ack from master")   # TEST CODE
+
+                {_sender_id, _node, _messageID, {ack_message_id_elevator, :ack}} ->
+                    # When ack is recieved for current send_ID, send request to checker for latest order matrix
+                    Network.send_data_inside_node(:panel, :order_checker, :gibOrdersPls)
+                    IO.inspect("Panel received ack from elevator")   # TEST CODE
 
                     receive do
                         # When latest order matrix is received, recurse with new orders and iterated send_ID

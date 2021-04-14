@@ -9,7 +9,7 @@ config :elevator_project,
 
   # Network
   network_node_tick_time_ms:      50,
-  network_ack_timeout_time_ms:    200,
+  network_ack_timeout_time_ms:    2000, #increased from 200 to 2000 for less spam under testing
   network_resend_max_counter:     10,
 
   # Master

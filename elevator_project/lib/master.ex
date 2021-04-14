@@ -158,9 +158,13 @@ defmodule Master do
         GenStateMachine.cast(@node_name, {:elevator_status_update, from_node, {last_dir, last_floor}})
 
       {:panel, from_node, message_id, order_list} ->
-        Logger.info("Got message from panel")
+        Logger.info("Master received message from panel")
         GenStateMachine.cast(@node_name, {:panel_received_order, order_list})
         Network.send_data_spesific_node(:master, :panel, from_node, {message_id, :ack})
+
+      {receiver_id, _from_node, _ack_message_id, {message_id, :ack}} ->
+        Logger.info("Received ack from #{receiver_id} (on receive thread)")
+        #send({ack_pid, Node.self()}, {message_id, :ack})
     end
 
     receive_thread()
@@ -188,7 +192,11 @@ defmodule Master do
         counter \\ 0)
   when counter < @max_resends
   do
-    message_id = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list})
+
+    Logger.info("Master sending orders to elevator #{elevator_id}")
+    {:ok, message_id}  = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list})
+    process_id = message_id |> Kernel.inspect() |> String.to_atom()
+    Process.register(self, process_id)
     case Network.receive_ack(message_id) do
       {:ok, _receiver_id}->
         :ok
@@ -196,6 +204,9 @@ defmodule Master do
         send_order_to_elevator(order_list, elevator_id, counter + 1)
     end
   end
+
+
+
 
   defp send_order_to_elevator(
         _order_list,
@@ -632,7 +643,8 @@ end
 
     # Delegate the order to the optimal elevator
     delegated_order = Order.modify_order_field(order, :delegated_elevator, optimal_elevator_id)
-    spawn(fn-> send_order_to_elevator([delegated_order], optimal_elevator_id) end)
+    pid = spawn(fn-> send_order_to_elevator([delegated_order], optimal_elevator_id) end)
+
 
     [delegated_order | delegate_orders(rest_orders, connected_elevators)]
   end

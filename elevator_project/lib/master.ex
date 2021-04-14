@@ -643,7 +643,7 @@ end
 
     # Delegate the order to the optimal elevator
     delegated_order = Order.modify_order_field(order, :delegated_elevator, optimal_elevator_id)
-    pid = spawn(fn-> send_order_to_elevator([delegated_order], optimal_elevator_id) end)
+    spawn(fn-> send_order_to_elevator([delegated_order], optimal_elevator_id) end)
 
 
     [delegated_order | delegate_orders(rest_orders, connected_elevators)]

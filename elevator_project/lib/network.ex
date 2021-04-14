@@ -126,7 +126,7 @@ defmodule Network do
     receive do
       {receiver_id, _from_node, _ack_message_id, {message_id, :ack}} ->
         {:ok, receiver_id}
-      after 2_000 -> #@ack_timeout ->
+      after @ack_timeout ->
         Logger.info("Ack not received")
         {:no_ack, :no_id}
     end

@@ -194,7 +194,7 @@ defmodule Master do
   do
 
     Logger.info("Master sending orders to elevator #{elevator_id}")
-    {:ok, message_id}  = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list})
+    message_id  = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list})
     process_id = message_id |> Kernel.inspect() |> String.to_atom()
     Process.register(self, process_id)
     case Network.receive_ack(message_id) do

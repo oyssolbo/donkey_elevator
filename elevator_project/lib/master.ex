@@ -29,16 +29,10 @@ defmodule Master do
   require Timer
   require Client
 
-  @min_floor                  Application.fetch_env!(:elevator_project, :project_min_floor)
-  @max_floor                  Application.fetch_env!(:elevator_project, :project_num_floors) + @min_floor - 1
-  @num_elevators              Application.fetch_env!(:elevator_project, :project_num_elevators)
-  @cookie                     Application.fetch_env!(:elevator_project, :project_cookie_name)
-
   @update_active_time         Application.fetch_env!(:elevator_project, :master_update_active_time_ms)
   @timeout_active_master_time Application.fetch_env!(:elevator_project, :master_timeout_active_ms)
   @timeout_elevator_time      Application.fetch_env!(:elevator_project, :master_timeout_elevator_ms)
 
-  @ack_timeout_time           Application.fetch_env!(:elevator_project, :network_ack_timeout_time_ms)
   @max_resends                Application.fetch_env!(:elevator_project, :network_resend_max_counter)
 
   @node_name                  :master
@@ -51,40 +45,23 @@ defmodule Master do
     :connected_elevator_list  # List of connection-id the master has with each elevator
   ]
 
-  defstruct [
-    active_order_list:        [],
-    master_timer:             :nil,
-    master_message_id:        0,
-    activation_time:          :nil,
-    connected_elevator_list:  []
-  ]
-
-
-  def connect_elevator(
-        elevator_id,
-        dir,
-        last_floor)
-  do
-    GenStateMachine.cast(@node_name, {:elevator_status_update, elevator_id, {dir, last_floor}})
-  end
+  defstruct [:active_order_list, :master_timer, :master_message_id, :activation_time, :connected_elevator_list]
 
 
 ###################################### External functions ######################################
 
-##### Client to GenStateMachine-server #####
+##### GenStateMachine-server #####
 
 
   @doc """
   Function to initialize the master, and transitions the master into backup_state
-  The function
-    - establishes connection to GenStateMachine-server
-    - stores the current data on the server
+  The function establishes connection to GenStateMachine-server and initializes the
+  data on the server
   """
   def init([])
   do
     Logger.info("Master initialing")
 
-    # Set correct master data
     data = %Master{
       active_order_list:        [],
       master_timer:             make_ref(),
@@ -93,7 +70,6 @@ defmodule Master do
       connected_elevator_list:  []
     }
 
-    # Starting process for error-handling
     master_data = Timer.start_timer(self(), data, :master_timer, :master_active_timeout, @timeout_active_master_time)
 
     case Process.whereis(:master_receive) do
@@ -101,7 +77,7 @@ defmodule Master do
         Logger.info("Starting receive-process for master")
         init_receive()
       _->
-        Logger.info("Receive-process for master already active")
+        Logger.warning("Receive-process for master already active")
     end
 
     Logger.info("Master initialized")
@@ -111,7 +87,7 @@ defmodule Master do
 
 
   @doc """
-  Function to link to the GenStateMachine-server
+  Starting link to GenStateMachine-server
   """
   def start_link(init_arg \\ [])
   do
@@ -121,7 +97,7 @@ defmodule Master do
 
 
   @doc """
-  Function to stop the elevator in case of the GenStateMachine-server crashes
+  Terminates the master in case of an emergency
   """
   def terminate(_reason, _state)
   do
@@ -134,11 +110,11 @@ defmodule Master do
 
   @doc """
   Receives messages from elevator, panel or other master. The function casts a message
-  to the GenStateMachine-server, such that all events can be handled properly. One may
-  wonder why all of the events are written out like this, but since we operate with
-  multiple receive-threads, this is to separate the events between the receive-functions.
-  Otherwise - if a general {event_name, data} was used, it would allow {message_id, :ack}
-  to interfere
+  to the GenStateMachine-server, such that all events can be handled properly. The module
+  is operating with multiple receive-threads, and the events are written out to separate
+  the events between the receive-functions. Otherwise - if a general {event_name, data}
+  is used, it would allow {message_id, :ack} to interfere. Secondly, it gives greater
+  freedom to design the interactions better
   """
   defp receive_thread()
   do
@@ -158,7 +134,6 @@ defmodule Master do
         GenStateMachine.cast(@node_name, {:elevator_status_update, from_node, {last_dir, last_floor}})
 
       {:panel, from_node, message_id, order_list} ->
-        Logger.info("Got message from panel")
         GenStateMachine.cast(@node_name, {:panel_received_order, order_list})
         Network.send_data_spesific_node(:master, :panel, from_node, {message_id, :ack})
     end
@@ -174,13 +149,8 @@ defmodule Master do
 
 
   @doc """
-  Function to send a list of orders to an elevator
-
-  Will continue to try until it receives an ack or a certain amount of
-  time has passed. It is assumed that the master receives a timeout/timer-interrupt,
-  which removes the elevator from the list if network-communication is lost. To safeguard
-  this event, the master sends a message to the GenStateMachine-server indicating that the
-  elevator is gone
+  Sends a list of orders to an elevator. Continues to try until it receives an ack or a certain amount of
+  time has passed. If no response from elevator, it is removed from the list
   """
   defp send_order_to_elevator(
         order_list,
@@ -212,9 +182,7 @@ defmodule Master do
 
 
   @doc """
-  Function for sending data to other master
-
-  No acks are used, since these messages are sent often enough
+  Sends (read: spams) data to other master
   """
   defp send_data_to_master(%Master{} = master_data)
   do
@@ -223,7 +191,7 @@ defmodule Master do
 
 
   @doc """
-  Function for broadcasting the lights that should be set or cleared
+  Broadcasts the lights that should be set or cleared
   """
   defp broadcast_lights(
         event_atom,
@@ -262,7 +230,7 @@ defmodule Master do
 
   @doc """
   Function to handle if data has been sent from the active-master to the passive master
-  The heartsbeats / messages are only considered valid if the message-id exceeds the internal /
+  The heartsbeats / messages are only considered valid if the message-id exceeds the
   previous message-id
   """
   def handle_event(
@@ -312,8 +280,6 @@ defmodule Master do
         :backup_state,
         master_data)
   do
-    Logger.info("General handler in backup-master acquired something")
-    IO.inspect(something)
     {:next_state, :backup_state, master_data}
   end
 
@@ -322,7 +288,7 @@ defmodule Master do
 ##### active_state #####
 
   @doc """
-  Function to update the backup_master with the current system-state
+  Updates the backup_master with the current system-state
   """
   def handle_event(
         :info,
@@ -434,7 +400,8 @@ defmodule Master do
 
   @doc """
   Function that handles if an elevator sends an important status-message; that it has
-  served order(s). The order(s) can then be removed from the list of orders
+  served order(s). The order(s) can then be removed from the list, and the lights can
+  be reset
   """
   def handle_event(
         :info,
@@ -458,7 +425,7 @@ defmodule Master do
   redelegates them to the other elevators.
   If there are no connected elevators, the orders' delegated field are set to :nil.
   When one elevator becomes active again, it will receive all orders with field set
-  to :nil
+  to :nil - rip that elevator (and those people waiting...)
   """
   def handle_event(
         _,
@@ -490,15 +457,14 @@ defmodule Master do
 
 
   @doc """
-  Function to handle if the GenStateMachine-server receives a list of orders
-  Important that the function get a list of orders
+  Handle if the GenStateMachine-server receives a list of orders from panel
   """
   def handle_event(
         :cast,
         {:panel_received_order, order_list},
         :active_state,
         master_data)
-  when order_list |> is_list()
+  when order_list |> is_list() and order_list != []
   do
     broadcast_lights(:set_lights, order_list)
 
@@ -548,12 +514,8 @@ end
   Function that merges two master_data-structs into one single master-data-struct
   Since we cannot know which master-data struct contains the most correct information,
   the orders are OR-ed together, with the field :delegated_order set to :nil. The
-  information about the elevators are discarded, since that is the simplest. It is
-  however possible to use the last-message time to find the updated value, however
-  that could result in hasardious code. Instead all of the timers are canceled.
-  It is assumed that the elevators spam out their information often enough, such that
-  it should not be a problem. It will not be as efficient, as one elevator may become
-  overloaded with work, but that is a consequence we are prepared to face
+  information about the elevators are discarded, since it is updated continously.
+  It will not be as efficient, as one elevator may become overloaded with work
   """
   defp combine_master_data_struct(
         intern_master_data,
@@ -616,7 +578,7 @@ end
   """
   defp delegate_orders(
         orders,
-        [])
+        [] = _connected_elevators)
   do
     Order.modify_order_field(orders, :delegated_elevator, :nil)
   end

@@ -602,7 +602,8 @@ defmodule Elevator do
     # Open door, start timer and message master
     open_door()
     timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
-    broadcast_served_orders(floor_orders)
+    Enum.filter(floor_orders, fn order -> order.order_type in [:hall_down, :hall_up] end) |>
+      broadcast_served_orders()
     modify_elevator_lights(:clear_lights, floor_orders)
 
     # Remove old orders and calculate new target_order

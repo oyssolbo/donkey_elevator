@@ -3,11 +3,12 @@ defmodule NetworkTest do
   # Should probably start init as a new process, will fix tomorrow
   def init()
   do
-    #Driver.start_link([])
-    Network.init_node_network()
-    #Elevator.start_link([])
-    #Master.start_link([])
-    #Panel.init()
+    Driver.start_link([])
+    #Network.init_node_network()
+    Elevator.start_link([])
+    Master.start_link([])
+    Panel.start_link([])
+    Lights.start_link([])
   end
 
   def receive_thread()
@@ -34,4 +35,5 @@ defmodule NetworkTest do
     message_id = Network.send_data_all_nodes(:tester, :master_receive, :test_data)
     Network.send_data_all_nodes(:test_function, :master_receive, {message_id, :ack})
   end
+
 end

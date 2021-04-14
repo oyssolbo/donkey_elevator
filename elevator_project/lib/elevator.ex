@@ -137,7 +137,6 @@ defmodule Elevator do
 
   defp receive_thread()
   do
-    Logger.info("Receive elevator is alive")
     receive do
       {:master, from_node, message_id, {:delegated_order, order_list}} ->
         Logger.info("Elevator received order from master")
@@ -399,8 +398,10 @@ defmodule Elevator do
     all_orders = Map.get(elevator_data, :orders)
     direction = Map.get(elevator_data, :dir)
 
+    Logger.info("Should elevator stop at floor?")
     {order_at_floor, floor_orders} = Order.check_orders_at_floor(all_orders, floor, direction)
-
+    IO.inspect(order_at_floor)
+    IO.inspect(floor_orders)
     # Updating moving-timer and last_floor
     temp_elevator_data = check_at_new_floor(elevator_data, floor)
 

@@ -1,12 +1,14 @@
 defmodule Elevator do
   @moduledoc """
-  Module implementing the Elevator for the project
+  Module implementing the elevator for the project
+
     States:               Transitions to:
       - :init_state         :idle_state, :restart_state
       - :idle_state         :moving_state
-      - :moving_state       :door_state, :restart_state
+      - :moving_state       :door_state, :restart_state, :idle_state
       - :door_state         :idle_state
       - :restart_state      :restart_state
+
   Requirements:
     - Driver
     - Network
@@ -46,6 +48,12 @@ defmodule Elevator do
 
 
 ###################################### External functions ######################################
+
+
+def send_order(%Order{} = order)
+do
+  GenStateMachine.cast(@node_name, {:delegated_order, [order]})
+end
 
 ##### Connection to GenStateMachine-server #####
 
@@ -176,7 +184,7 @@ defmodule Elevator do
       Kernel.inspect() |>
       String.to_atom()
 
-    Process.register(self, process_id)
+    Process.register(self(), process_id)
 
     case Network.receive_ack(message_id) do
       {:ok, _receiver_id}->
@@ -370,7 +378,10 @@ defmodule Elevator do
 # at floor #
   @doc """
   Function to handle when the elevator is at the desired floor in moving state
-  Transitions into door_state
+  The function checks if the elevator has an order, and if it has, the elevator will
+  stop and serve. If not, the elevator will check if it is on @min_floor or @max_floor
+  with a direction :down or :up (which will cause it to crash). Depending in the case,
+  the system will transition into :moving_state, :door_state or :idle_state
   """
   def handle_event(
         :cast,
@@ -386,50 +397,33 @@ defmodule Elevator do
     # Updating moving-timer and last_floor
     temp_elevator_data = check_at_new_floor(elevator_data, floor)
 
-    # Checking if at target floor and if there is a valid order to stop on
+    # Checking if order to stop on
     {new_state, new_data} =
-      case order_at_floor do
-        :true->
+      case {order_at_floor, floor, direction} do
+        {:true, _, _}->
           # The floor has an order. Stop and serve
           new_elevator_data = reached_order_floor(temp_elevator_data, floor, floor_orders)
           {:door_state, new_elevator_data}
 
-        :false->
+        {:false, @min_floor, :down}->
+          # The elevator will crash! Switch to idle
+          Logger.info("On min-floor with direction :down")
+          reached_floor_limit()
+          {:idle_state, temp_elevator_data}
+
+        {:false, @max_floor, :up}->
+          # The elevator will crash! Switch to idle
+          Logger.info("On max-floor with direction :up")
+          reached_floor_limit()
+          {:idle_state, temp_elevator_data}
+
+        {:false, _, _}->
           {:moving_state, temp_elevator_data}
       end
 
     {:next_state, new_state, new_data}
   end
 
-# min or max floor reached #
-  @doc """
-  Functions to handle if we have reached the top- or bottom-floor without an
-  order there. These functions should not be triggered if we have an order at
-  the floor, as that event should be handled above.
-  Currently the elevator is set to idle, but one could argue that the elevator
-  instead should be set to restart.
-  """
-  def handle_event(
-        :cast,
-        {:at_floor, _floor = @min_floor},
-        :moving_state,
-        %Elevator{dir: :down} = elevator_data)
-  do
-    Logger.info("Elevator reached min_floor while moving down")
-    reached_floor_limit()
-    {:next_state, :idle_state, elevator_data}
-  end
-
-  def handle_event(
-        :cast,
-        {:at_floor, _floor = @max_floor},
-        :moving_state,
-        %Elevator{dir: :up} = elevator_data)
-  do
-    Logger.info("Elevator reached max floor while moving up")
-    reached_floor_limit()
-    {:next_state, :idle_state, elevator_data}
-  end
 
 # timeout #
   @doc """
@@ -639,14 +633,13 @@ defmodule Elevator do
 
     {_, order_list_in_opposite_dir} = Order.check_orders_at_floor(order_list, floor, opposite_dir)
 
-    if optimal_floor == floor do
-      if order_list_in_dir != [] do
+    cond do
+      optimal_floor == floor and order_list_in_dir != []->
         {:true, order_list_in_dir}
-      else
+      optimal_floor == floor->
         {:true, order_list_in_opposite_dir}
-      end
-    else
-      {:false, []}
+      optimal_floor != floor->
+        {:false, []}
     end
   end
 

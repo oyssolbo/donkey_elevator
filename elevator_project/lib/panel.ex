@@ -77,14 +77,6 @@ defmodule Panel do
         new_orders = check_4_orders(floor_table)
         orders = old_orders++new_orders
 
-        #### TEST CODE ####
-        if new_orders != [] do
-            ordrs_to_masters = Order.extract_orders(:hall_up, new_orders)++Order.extract_orders(:hall_down, new_orders)
-            ordrs_to_elevator = Order.extract_orders(:cab, new_orders)
-            Logger.info("Checker: HW registered #{length orders} new order(s); #{length ordrs_to_masters} hall and #{length ordrs_to_elevator} cab orders.")
-        end
-        ###            ####
-
         Process.sleep(@checker_sleep)
 
         # Check for request from sender. If there is, send order list and recurse with reset list

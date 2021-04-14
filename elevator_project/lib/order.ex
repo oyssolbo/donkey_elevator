@@ -152,11 +152,7 @@ defmodule Order do
   def extract_orders(
         type,
         order_list)
-<<<<<<< HEAD
   when order_list |> is_list() and type in [:hall_up, :up, :hall_down, :down, :cab]
-=======
-  when order_list |> is_list() and type in [:hall_up, :hall_down, :cab]
->>>>>>> master
   do
     if is_order_list(order_list) do
       Enum.filter(order_list, fn x -> x.order_type == type end)
@@ -281,7 +277,7 @@ defmodule Order do
   def create_rnd_order()
   do
     rnd_id = Time.utc_now()
-    rnd_type = Enum.random([:up, :down, :cab])
+    rnd_type = Enum.random([:hall_up, :hall_down, :cab])
     rnd_floor = Enum.random(0..@max_floor)
     struct(Order, [order_id: rnd_id, order_type: rnd_type, order_floor: rnd_floor])
   end

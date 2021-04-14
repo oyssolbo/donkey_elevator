@@ -64,7 +64,7 @@ defmodule Lights do
         GenServer.cast(@node_name, {event_name, data})
 
       {:elevator, _from_node, _message_id, {event_name, data}} ->
-        Logger.info("Received light update from elevator")
+        #Logger.info("Received light update from elevator")
         GenServer.cast(@node_name, {event_name, data})
     end
 

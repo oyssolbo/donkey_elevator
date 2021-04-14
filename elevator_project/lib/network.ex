@@ -42,7 +42,7 @@ defmodule Network do
 
     send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id)
 
-    {:ok, message_id}
+    message_id
   end
 
 
@@ -58,7 +58,7 @@ defmodule Network do
 
     send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id)
 
-    {:ok, message_id}
+    message_id
   end
 
 
@@ -86,7 +86,7 @@ defmodule Network do
     message_id = make_ref()
 
     send({receiver_id, Node.self()}, {sender_id, Node.self(), message_id, data})
-    {:ok, message_id}
+    message_id
   end
 
  @doc """
@@ -99,7 +99,7 @@ defmodule Network do
     do
       message_id = make_ref()
       send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})
-      {:ok, message_id}
+      message_id
     end
 
    @doc """
@@ -131,6 +131,7 @@ defmodule Network do
         {:no_ack, :no_id}
     end
   end
+
 
 
 

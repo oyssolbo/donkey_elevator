@@ -86,7 +86,7 @@ defmodule Elevator do
     case Process.whereis(:elevator_receive) do
       :nil->
         Logger.info("Starting receive-process for elevator")
-        # init_receive()
+        init_receive()
       _->
         Logger.info("Receive-process for elevator already active")
     end
@@ -133,20 +133,29 @@ defmodule Elevator do
   Process for receiving data from master and panel, and calls the respective
   handlers in the GenStateMachine-server
   """
+
+
   defp receive_thread()
   do
+    Logger.info("Receive elevator is alive")
     receive do
-      {:master, _node, message_id, {:delegated_order, order_list}} ->
+      {:master, from_node, message_id, {:delegated_order, order_list}} ->
         Logger.info("Elevator received order from master")
-        Network.send_data_all_nodes(:elevator, :master_receive, {message_id, :ack})
+        #Network.send_data_spesific_node(:elevator, :master_receive, from_node, {message_id, :ack})
+        master_ack_adress = message_id |> Kernel.inspect() |> String.to_atom()
+        Network.send_data_spesific_node(:elevator, master_ack_adress, from_node, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:delegated_order, order_list})
 
       {:panel, _node, message_id, {:delegated_order, order_list}} ->
         Logger.info("Elevator received order from panel")
         Network.send_data_inside_node(:elevator, :panel, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:delegated_order, order_list})
-    end
 
+      {from, _, _, {event, data}} ->
+        Logger.info("Elevator received unknown from #{from} with event")
+        IO.inspect(event)
+        IO.inspect(data)
+    end
 
     receive_thread()
   end
@@ -173,11 +182,21 @@ defmodule Elevator do
     spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master_receive, :elevator_init) end)
   end
 
-
-  defp broadcast_served_orders(orders)
+  @doc """
+  Must be started as a new process with spawn() or spawn_link() !!
+  """
+  defp broadcast_served_orders(orders, counter \\ 0)
   when orders |> is_list()
   do
-    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders}) end)
+    message_id = Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders})
+    process_id = message_id |> Kernel.inspect() |> String.to_atom()
+    Process.register(self, process_id)
+    case Network.receive_ack(message_id) do
+      {:ok, _receiver_id}->
+        :ok
+      {:no_ack, :no_id}->
+        spawn_link( fn -> broadcast_served_orders(orders, counter + 1) end)
+    end
   end
 
 
@@ -602,7 +621,10 @@ defmodule Elevator do
     # Open door, start timer and message master
     open_door()
     timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
-    broadcast_served_orders(floor_orders)
+
+    Enum.filter(floor_orders, fn order -> order.order_type in [:hall_down, :hall_up] end) |>
+    
+      spawn_link( fn -> broadcast_served_orders(floor_orders) end)
     modify_elevator_lights(:clear_lights, floor_orders)
 
     # Remove old orders and calculate new target_order

@@ -36,4 +36,9 @@ defmodule NetworkTest do
     Network.send_data_all_nodes(:test_function, :master_receive, {message_id, :ack})
   end
 
+
+  def pack_loss_test() do
+
+  end
+
 end

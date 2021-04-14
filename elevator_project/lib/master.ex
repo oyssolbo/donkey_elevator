@@ -125,11 +125,16 @@ defmodule Master do
       {:elevator, from_node, _message_id, :elevator_init} ->
         GenStateMachine.cast(@node_name, {:elevator_init, from_node})
 
-      {:elevator, from_node, message_id, {:elevator_served_order, served_order_list}} ->
-        process_id = message_id |> Kernel.inspect() |> String.to_atom()
-        Network.send_data_spesific_node(:master, process_id, from_node, {message_id, :ack})
-        #Network.send_data_spesific_node(:master, :elevator_receive, from_node, {message_id, :ack})
+      # {:elevator, from_node, message_id, {:elevator_served_order, served_order_list}} ->
+      #   process_id = message_id |> Kernel.inspect() |> String.to_atom()
+      #   Network.send_data_spesific_node(:master, process_id, from_node, {message_id, :ack})
+      #   #Network.send_data_spesific_node(:master, :elevator_receive, from_node, {message_id, :ack})
+      #   GenStateMachine.cast(@node_name, {:elevator_served_order, from_node, served_order_list})
+
+      {:elevator, from_node, message_id, {:elevator_served_order, served_order_list, ack_pid}} ->
+        Network.send_data_spesific_node(:master, ack_pid, from_node, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:elevator_served_order, from_node, served_order_list})
+
 
       {:elevator, from_node, _message_id, {:elevator_status_update, {last_dir, last_floor}}} ->
         GenStateMachine.cast(@node_name, {:elevator_status_update, from_node, {last_dir, last_floor}})
@@ -155,22 +160,50 @@ defmodule Master do
   Sends a list of orders to an elevator. Continues to try until it receives an ack or a certain amount of
   time has passed. If no response from elevator, it is removed from the list
   """
+  # defp send_order_to_elevator(
+  #       order_list,
+  #       elevator_id,
+  #       counter \\ 0)
+  # when counter < @max_resends
+  # do
+
+  #   Logger.info("Master sending orders to elevator #{elevator_id}")
+  #   message_id  = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list})
+  #   process_id = message_id |> Kernel.inspect() |> String.to_atom()
+  #   Process.register(self, process_id)
+  #   case Network.receive_ack(message_id) do
+  #     {:ok, _receiver_id} ->
+  #       :ok
+  #     {:no_ack, :no_id} ->
+  #       spawn_link( fn -> send_order_to_elevator(order_list, elevator_id, counter + 1) end)
+  #   end
+  # end
+
+
+  @doc """
+  Sends a list of orders to an elevator. Continues to try until it receives an ack or a certain amount of
+  time has passed. If no response from elevator, it is removed from the list. Conter and ack_pid should be left blank.
+  """
   defp send_order_to_elevator(
         order_list,
         elevator_id,
-        counter \\ 0)
+        counter \\ 0,
+        ack_pid \\ make_ref())
   when counter < @max_resends
   do
+    if(counter == 0) do
+      ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+      Process.register(self, ack_pid)
+    end
 
     Logger.info("Master sending orders to elevator #{elevator_id}")
-    message_id  = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list})
-    process_id = message_id |> Kernel.inspect() |> String.to_atom()
-    Process.register(self, process_id)
+    message_id  = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list, ack_pid})
+
     case Network.receive_ack(message_id) do
       {:ok, _receiver_id} ->
         :ok
       {:no_ack, :no_id} ->
-        spawn_link( fn -> send_order_to_elevator(order_list, elevator_id, counter + 1) end)
+        send_order_to_elevator(order_list, elevator_id, counter + 1, ack_pid)
     end
   end
 
@@ -180,7 +213,8 @@ defmodule Master do
   defp send_order_to_elevator(
         _order_list,
         elevator_id,
-        counter)
+        counter,
+        _ack_pid)
   when counter == @max_resends
   do
     Logger.info("Master is unable to send order to elevator")

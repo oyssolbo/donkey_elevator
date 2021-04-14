@@ -138,11 +138,15 @@ defmodule Elevator do
   defp receive_thread()
   do
     receive do
-      {:master, from_node, message_id, {:delegated_order, order_list}} ->
+      # {:master, from_node, message_id, {:delegated_order, order_list}} ->
+      #   Logger.info("Elevator received order from master")
+      #   master_ack_adress = message_id |> Kernel.inspect() |> String.to_atom()
+      #   Network.send_data_spesific_node(:elevator, master_ack_adress, from_node, {message_id, :ack})
+      #   GenStateMachine.cast(@node_name, {:delegated_order, order_list})
+
+      {:master, from_node, message_id, {:delegated_order, order_list, ack_pid}} ->
         Logger.info("Elevator received order from master")
-        #Network.send_data_spesific_node(:elevator, :master_receive, from_node, {message_id, :ack})
-        master_ack_adress = message_id |> Kernel.inspect() |> String.to_atom()
-        Network.send_data_spesific_node(:elevator, master_ack_adress, from_node, {message_id, :ack})
+        Network.send_data_spesific_node(:elevator, ack_pid, from_node, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:delegated_order, order_list})
 
       {:panel, _node, _message_id, {:delegated_order, order_list}} ->
@@ -183,22 +187,21 @@ defmodule Elevator do
   @doc """
   Must be started as a new process with spawn() or spawn_link() !!
   """
-  defp broadcast_served_orders(orders, counter \\ 0)
+  defp broadcast_served_orders(orders, counter \\ 0, ack_pid \\ make_ref())
   when orders |> is_list()
   do
-    message_id = Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders})
-    process_id =
-      message_id |>
-      Kernel.inspect() |>
-      String.to_atom()
+    if (counter == 0) do
+      ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+      Process.register(self, ack_pid)
+    end
 
-    Process.register(self, process_id)
+    message_id = Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders, ack_pid})
 
     case Network.receive_ack(message_id) do
       {:ok, _receiver_id}->
         :ok
       {:no_ack, :no_id}->
-        spawn_link(fn-> broadcast_served_orders(orders, counter + 1) end)
+        spawn_link(fn-> broadcast_served_orders(orders, counter + 1, ack_pid) end)
     end
   end
 
@@ -398,10 +401,7 @@ defmodule Elevator do
     all_orders = Map.get(elevator_data, :orders)
     direction = Map.get(elevator_data, :dir)
 
-    Logger.info("Should elevator stop at floor?")
     {order_at_floor, floor_orders} = Order.check_orders_at_floor(all_orders, floor, direction)
-    IO.inspect(order_at_floor)
-    IO.inspect(floor_orders)
     # Updating moving-timer and last_floor
     temp_elevator_data = check_at_new_floor(elevator_data, floor)
 

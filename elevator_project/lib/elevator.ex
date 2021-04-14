@@ -188,13 +188,18 @@ defmodule Elevator do
   when orders |> is_list()
   do
     message_id = Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders})
-    process_id = message_id |> Kernel.inspect() |> String.to_atom()
+    process_id =
+      message_id |>
+      Kernel.inspect() |>
+      String.to_atom()
+
     Process.register(self, process_id)
+
     case Network.receive_ack(message_id) do
       {:ok, _receiver_id}->
         :ok
       {:no_ack, :no_id}->
-        spawn_link( fn -> broadcast_served_orders(orders, counter + 1) end)
+        spawn_link(fn-> broadcast_served_orders(orders, counter + 1) end)
     end
   end
 
@@ -621,9 +626,9 @@ defmodule Elevator do
     open_door()
     timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
 
-    Enum.filter(floor_orders, fn order -> order.order_type in [:hall_down, :hall_up] end) |>
-    
-      spawn_link( fn -> broadcast_served_orders(floor_orders) end)
+    external_orders = Enum.filter(floor_orders, fn order -> order.order_type in [:hall_down, :hall_up] end)
+    spawn_link(fn-> broadcast_served_orders(external_orders) end)
+
     modify_elevator_lights(:clear_lights, floor_orders)
 
     # Remove old orders and calculate new target_order

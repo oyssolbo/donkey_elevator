@@ -127,6 +127,7 @@ defmodule Master do
         GenStateMachine.cast(@node_name, {:elevator_init, from_node})
 
       {:elevator, from_node, message_id, {:elevator_served_order, served_order_list, ack_pid}} ->
+        Logger.info("Master received message that elevator has served order(s)")
         Network.send_data_spesific_node(:master, ack_pid, from_node, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:elevator_served_order, from_node, served_order_list})
 
@@ -170,7 +171,7 @@ defmodule Master do
 
     Logger.info("Master sending orders to elevator #{elevator_id}")
     message_id  = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list, ack_pid})
-    
+
     case Network.receive_ack(message_id) do
       {:ok, _receiver_id} ->
         :ok
@@ -437,11 +438,13 @@ defmodule Master do
   be reset
   """
   def handle_event(
-        :info,
+        :cast,
         {:elevator_served_order, _elevator_id, served_order_list},
         :active_state,
         master_data)
   do
+    Logger.info("Inside handler-event in master that elevator has served an order")
+
     order_list = Map.get(master_data, :order_list)
     updated_order_list = Order.remove_orders(served_order_list, order_list)
 
@@ -497,9 +500,6 @@ defmodule Master do
         master_data)
   when order_list |> is_list() and order_list != []
   do
-    Logger.info("Active master received orders")
-    IO.inspect(order_list)
-
     new_master_data =
       case Order.check_valid_order(order_list) do
         :true->

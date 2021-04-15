@@ -179,9 +179,6 @@ defmodule Master do
     end
   end
 
-
-
-
   defp send_order_to_elevator(
         _order_list,
         elevator_id,
@@ -194,7 +191,6 @@ defmodule Master do
     # We can assume that the elevator has received a timeout
     GenStateMachine.cast(@node_name, {:elevator_timeout, elevator_id})
   end
-
 
   @doc """
   Sends (read: spams) data to other master

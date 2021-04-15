@@ -30,6 +30,7 @@ defmodule Master do
   require Client
 
   @update_active_time         Application.fetch_env!(:elevator_project, :master_update_active_time_ms)
+  @update_lights_time         Application.fetch_env!(:elevator_project, :master_update_lights_time_ms)
   @timeout_active_master_time Application.fetch_env!(:elevator_project, :master_timeout_active_ms)
   @timeout_elevator_time      Application.fetch_env!(:elevator_project, :master_timeout_elevator_ms)
 
@@ -38,14 +39,14 @@ defmodule Master do
   @node_name                  :master
 
   @enforce_keys [
-    :active_order_list,
+    :order_list,
     :master_timer,            # Time of last connection with active master
     :master_message_id,       # ID of last message received from active_master
     :activation_time,         # Time the master became active
-    :connected_elevator_list  # List of connection-id the master has with each elevator
+    :connected_elevators      # List of connection-id the master has with each elevator
   ]
 
-  defstruct [:active_order_list, :master_timer, :master_message_id, :activation_time, :connected_elevator_list]
+  defstruct [:order_list, :master_timer, :master_message_id, :activation_time, :connected_elevators]
 
 
 ###################################### External functions ######################################
@@ -63,11 +64,11 @@ defmodule Master do
     Logger.info("Master initialing")
 
     data = %Master{
-      active_order_list:        [],
+      order_list:        [],
       master_timer:             make_ref(),
       master_message_id:        0,
       activation_time:          :nil,
-      connected_elevator_list:  []
+      connected_elevators:     []
     }
 
     master_data = Timer.start_timer(self(), data, :master_timer, :master_active_timeout, @timeout_active_master_time)
@@ -136,7 +137,6 @@ defmodule Master do
       {:panel, from_node, message_id, order_list} ->
         GenStateMachine.cast(@node_name, {:panel_received_order, order_list})
         Network.send_data_spesific_node(:master, :panel, from_node, {message_id, :ack})
-
     end
 
     receive_thread()
@@ -170,7 +170,7 @@ defmodule Master do
 
     Logger.info("Master sending orders to elevator #{elevator_id}")
     message_id  = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list, ack_pid})
-
+    
     case Network.receive_ack(message_id) do
       {:ok, _receiver_id} ->
         :ok
@@ -178,9 +178,6 @@ defmodule Master do
         send_order_to_elevator(order_list, elevator_id, counter + 1, ack_pid)
     end
   end
-
-
-
 
   defp send_order_to_elevator(
         _order_list,
@@ -208,12 +205,10 @@ defmodule Master do
   @doc """
   Broadcasts the lights that should be set or cleared
   """
-  defp broadcast_lights(
-        event_atom,
-        event_data)
-  when event_atom |> is_atom()
+  defp broadcast_hall_lights(external_order_list)
+  when external_order_list |> is_list()
   do
-    Network.send_data_all_nodes(:master, :lights_receive, {event_atom, event_data})
+    Network.send_data_all_nodes(:master, :lights_receive, {:set_hall_lights, external_order_list})
   end
 
 
@@ -234,7 +229,8 @@ defmodule Master do
   do
     Logger.info("Backup has lost connection to active. Activating")
 
-    Timer.interrupt_after(self(), :master_update_timer, @update_active_time)
+    Timer.interrupt_after(self(), :master_update_master_timer, @update_active_time)
+    Timer.interrupt_after(self(), :master_update_lights_timer, @update_lights_time)
 
     activated_master_data =
       Timer.set_utc_time(master_data, :activation_time) |>
@@ -260,12 +256,12 @@ defmodule Master do
     new_master_data =
       cond do
         intern_message_id < extern_message_id ->
-          active_order_list = Map.get(extern_master_data, :active_order_list)
-          connected_elevator_list = Map.get(extern_master_data, :connected_elevator_list)
+          order_list = Map.get(extern_master_data, :order_list)
+          connected_elevators =    Map.get(extern_master_data, :connected_elevators)
 
           Timer.start_timer(self(), intern_master_data, :master_timer, :master_active_timeout, @timeout_active_master_time) |>
-            Map.put(:active_order_list, active_order_list) |>
-            Map.put(:connected_elevator_list, connected_elevator_list) |>
+            Map.put(:order_list, order_list) |>
+            Map.put(:connected_elevators,     connected_elevators)    |>
             Map.put(:master_message_id, extern_message_id)
 
         intern_message_id >= extern_message_id ->
@@ -281,7 +277,8 @@ defmodule Master do
 
   These messages are considered not important, and results in no change of operation / state for the
   backup-master. The messages / message-types are:
-    - :master_update_timer
+    - :master_update_master_timer
+    - :master_update_lights_timer
     - :elevator_status_update
     - :elevator_served_order
     - :elevator_timeout or :elevator_init
@@ -291,7 +288,7 @@ defmodule Master do
   """
   def handle_event(
         _,
-        something,
+        _,
         :backup_state,
         master_data)
   do
@@ -307,11 +304,11 @@ defmodule Master do
   """
   def handle_event(
         :info,
-        :master_update_timer,
+        :master_update_master_timer,
         :active_state,
         master_data)
   do
-    Timer.interrupt_after(self(), :master_update_timer, @update_active_time)
+    Timer.interrupt_after(self(), :master_update_master_timer, @update_active_time)
 
     updated_message_id = Map.get(master_data, :master_message_id) + 1
     new_master_data = Map.put(master_data, :master_message_id, updated_message_id)
@@ -319,6 +316,27 @@ defmodule Master do
     send_data_to_master(new_master_data)
     {:next_state, :active_state, new_master_data}
   end
+
+
+  @doc """
+  Handler event that triggers for broadcasting the external lights to all nodes in
+  the network. By continously broadcasting the external orders, one guarantees that
+  a network-error will not cause critical-future damage
+  """
+  def handle_event(
+        :info,
+        :master_update_lights_timer,
+        :active_state,
+        master_data)
+  do
+    Map.get(master_data, :order_list) |>
+      Enum.filter(fn order -> order.order_type in [:hall_up, :hall_down] end) |>
+      broadcast_hall_lights()
+
+    Timer.interrupt_after(self(), :master_update_lights_timer, @update_lights_time)
+    {:next_state, :active_state, master_data}
+  end
+
 
 
   @doc """
@@ -374,8 +392,8 @@ defmodule Master do
         master_data)
   do
     # Add to list of connected elevators and reset timer
-    old_elevator_client_list = Map.get(master_data, :connected_elevator_list)
-    elevator_client =
+    old_elevator_client_list = Map.get(master_data, :connected_elevators)
+        elevator_client =
       case Client.extract_client(elevator_id, old_elevator_client_list) do
         [] ->
           struct(Client,
@@ -393,7 +411,7 @@ defmodule Master do
       Client.add_clients(old_elevator_client_list)
 
     # Delegate any undelegated orders
-    order_list = Map.get(master_data, :active_order_list)
+    order_list = Map.get(master_data, :order_list)
 
     undelegated_orders = get_undelegated_orders(master_data)
 
@@ -406,7 +424,7 @@ defmodule Master do
     # Since we have connection to at least one elevator, we can assume that all orders are delegated
     new_order_list = Order.add_orders(delegated_orders, other_orders)
     new_master_data =
-      Map.put(master_data, :connected_elevator_list, updated_elevator_list) |>
+      Map.put(master_data, :connected_elevators,    updated_elevator_list) |>
       Map.put(:active_orders, new_order_list)
 
     {:next_state, :active_state, new_master_data}
@@ -424,12 +442,10 @@ defmodule Master do
         :active_state,
         master_data)
   do
-    broadcast_lights(:clear_lights, served_order_list)
-
-    order_list = Map.get(master_data, :active_order_list)
+    order_list = Map.get(master_data, :order_list)
     updated_order_list = Order.remove_orders(served_order_list, order_list)
 
-    new_master_data = Map.put(master_data, :active_order_list, updated_order_list)
+    new_master_data = Map.put(master_data, :order_list, updated_order_list)
     {:next_state, :active_state, new_master_data}
   end
 
@@ -444,19 +460,19 @@ defmodule Master do
   """
   def handle_event(
         _,
-        {timeout_atom, elevator_id},
+        {emergency_atom, elevator_id},
         :active_state,
         master_data)
-  when timeout_atom in [:elevator_timeout, :elevator_init]
+  when emergency_atom in [:elevator_timeout, :elevator_init]
   do
     # Find and remove the connection
-    elevator_list = Map.get(master_data, :connected_elevator_list)
-    updated_elevator_list =
+    elevator_list = Map.get(master_data, :connected_elevators)
+        updated_elevator_list =
       Client.extract_client(elevator_id, elevator_list) |>
       Client.remove_clients(elevator_list)
 
     # Find a list of affected orders and unaffected orders
-    order_list = Map.get(master_data, :active_order_list)
+    order_list = Map.get(master_data, :order_list)
     affected_orders = Order.extract_orders(elevator_id, order_list)
     unaffected_orders = Order.remove_orders(affected_orders, order_list)
 
@@ -465,7 +481,7 @@ defmodule Master do
 
     # Combining the two sets of orders, and adding to master_data
     new_order_list = Order.add_orders(delegated_orders, unaffected_orders)
-    new_master_data = Map.put(master_data, :active_order_list, new_order_list)
+    new_master_data = Map.put(master_data, :order_list, new_order_list)
 
     {:next_state, :active_state, new_master_data}
   end
@@ -481,8 +497,6 @@ defmodule Master do
         master_data)
   when order_list |> is_list() and order_list != []
   do
-    broadcast_lights(:set_lights, order_list)
-
     Logger.info("Active master received orders")
     IO.inspect(order_list)
 
@@ -492,14 +506,14 @@ defmodule Master do
           temp_order_list = Order.modify_order_field(order_list, :delegated_elevator, :nil)
           undelegated_orders = get_undelegated_orders(master_data, temp_order_list)
 
-          connected_elevator_list = Map.get(master_data, :connected_elevator_list)
-          delegated_orders = delegate_orders(undelegated_orders, connected_elevator_list)
+          connected_elevators =    Map.get(master_data, :connected_elevators)
+              delegated_orders = delegate_orders(undelegated_orders, connected_elevators)
 
           updated_order_list =
-            Map.get(master_data, :active_order_list) |>
+            Map.get(master_data, :order_list) |>
             Order.add_orders(delegated_orders)
 
-          Map.put(master_data, :active_order_list, updated_order_list)
+          Map.put(master_data, :order_list, updated_order_list)
 
         :false->
           master_data
@@ -513,13 +527,13 @@ defmodule Master do
   Function to handle if the GenStateMachine-server receives an unexpected event
   """
   def handle_event(
-    _,
-    _,
-    state,
-    master_data)
-do
-  {:next_state, state, master_data}
-end
+        _,
+        _,
+        state,
+        master_data)
+  do
+    {:next_state, state, master_data}
+  end
 
 
 ###################################### Actions ######################################
@@ -536,11 +550,11 @@ end
         intern_master_data,
         extern_master_data)
   do
-    intern_orders = Map.get(intern_master_data, :active_order_list)
-    extern_orders = Map.get(extern_master_data, :active_order_list)
+    intern_orders = Map.get(intern_master_data, :order_list)
+    extern_orders = Map.get(extern_master_data, :order_list)
 
-    intern_connected_elevators = Map.get(intern_master_data, :connected_elevator_list)
-    extern_connected_elevators = Map.get(extern_master_data, :connected_elevator_list)
+    intern_connected_elevators = Map.get(intern_master_data, :connected_elevators)
+        extern_connected_elevators = Map.get(extern_master_data, :connected_elevators)
 
     intern_message_id = Map.get(intern_master_data, :master_message_id, 0)
     extern_message_id = Map.get(extern_master_data, :master_message_id, 0)
@@ -560,9 +574,9 @@ end
     # Set message id and update intern_master_data
     new_message_id = max(intern_message_id, extern_message_id)
 
-    Map.put(intern_master_data, :active_order_list, new_order_list) |>
+    Map.put(intern_master_data, :order_list, new_order_list) |>
       Map.put(:master_message_id, new_message_id) |>
-      Map.put(:connected_elevator_list, new_elevator_connection_list)
+      Map.put(:connected_elevators,     new_elevator_connection_list)
   end
 
 
@@ -632,7 +646,7 @@ end
         master_data,
         new_order_list \\ [])
   do
-    old_order_list = Map.get(master_data, :active_order_list, [])
+    old_order_list = Map.get(master_data, :order_list, [])
 
     old_nil_delegated_orders = Order.extract_orders(:nil, old_order_list)
     new_nil_delegated_orders = Order.extract_orders(:nil, new_order_list)

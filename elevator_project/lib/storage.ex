@@ -27,7 +27,7 @@ defmodule Storage do
     Order-structs, and will attempt to reconstruct said data.
     """
     def read(fileName \\ "save_data.txt") do
-        {report, result} = File.read(fileName)   #Beware! read! embeds errors into results, without error messages
+        {report, result} = File.read(fileName)
         {dreport, map_list} = Poison.decode(result)
         if report != :ok or dreport != :ok do
             Logger.error("Read failed - check data integrity")

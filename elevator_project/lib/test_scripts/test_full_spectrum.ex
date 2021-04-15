@@ -21,6 +21,8 @@ defmodule FST do
         catch
             :exit, _reason ->
                 Logger.error("Could not initialize system")
+            :error, _reason ->
+                Logger.error("Could not initialize system")
         end
     end
 

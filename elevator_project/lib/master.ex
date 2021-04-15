@@ -127,6 +127,7 @@ defmodule Master do
         GenStateMachine.cast(@node_name, {:elevator_init, from_node})
 
       {:elevator, from_node, message_id, {:elevator_served_order, served_order_list, ack_pid}} ->
+        Logger.info("Elevator servered a order")
         Network.send_data_spesific_node(:master, ack_pid, from_node, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:elevator_served_order, from_node, served_order_list})
 
@@ -162,7 +163,13 @@ defmodule Master do
         ack_pid \\ make_ref())
   when counter < @max_resends
   do
-    ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+    #ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+    ack_pid = cond do
+      is_atom(ack_pid) ->
+        ack_pid
+      :true ->
+        ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+    end
 
     if(counter == 0) do
       Process.register(self, ack_pid)
@@ -170,7 +177,7 @@ defmodule Master do
 
     Logger.info("Master sending orders to elevator #{elevator_id}")
     message_id  = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list, ack_pid})
-    
+
     case Network.receive_ack(message_id) do
       {:ok, _receiver_id} ->
         :ok

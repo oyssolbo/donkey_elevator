@@ -127,7 +127,9 @@ defmodule Master do
         GenStateMachine.cast(@node_name, {:elevator_init, from_node})
 
       {:elevator, from_node, message_id, {:elevator_served_order, served_order_list, ack_pid}} ->
+
         Logger.info("Master received message that elevator has served order(s)")
+
         Network.send_data_spesific_node(:master, ack_pid, from_node, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:elevator_served_order, from_node, served_order_list})
 
@@ -163,7 +165,12 @@ defmodule Master do
         ack_pid \\ make_ref())
   when counter < @max_resends
   do
-    ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+    ack_pid = cond do
+      is_atom(ack_pid) ->
+        ack_pid
+      :true ->
+        ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+    end
 
     if(counter == 0) do
       Process.register(self, ack_pid)
@@ -192,7 +199,6 @@ defmodule Master do
     # We can assume that the elevator has received a timeout
     GenStateMachine.cast(@node_name, {:elevator_timeout, elevator_id})
   end
-
 
   @doc """
   Sends (read: spams) data to other master

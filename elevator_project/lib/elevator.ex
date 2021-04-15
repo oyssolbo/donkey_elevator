@@ -40,6 +40,7 @@ defmodule Elevator do
   @door_time            Application.fetch_env!(:elevator_project, :elevator_timeout_door_ms)
   @moving_time          Application.fetch_env!(:elevator_project, :elevator_timeout_moving_ms)
   @status_update_time   Application.fetch_env!(:elevator_project, :elevator_update_status_time_ms)
+  @max_resends          Application.fetch_env!(:elevator_project, :network_resend_max_counter)
 
   @node_name            :elevator
 
@@ -165,13 +166,20 @@ defmodule Elevator do
   """
   defp broadcast_served_orders(orders, counter \\ 0, ack_pid \\ make_ref())
   when orders |> is_list()
+  and counter < @max_resends
   do
-    ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+    ack_pid = cond do
+      is_atom(ack_pid) ->
+        ack_pid
+      :true ->
+        ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+    end
 
     if (counter == 0) do
       Process.register(self(), ack_pid)
     end
 
+    Logger.info("Sending served orders to master")
     message_id = Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders, ack_pid})
 
     case Network.receive_ack(message_id) do
@@ -180,6 +188,12 @@ defmodule Elevator do
       {:no_ack, :no_id}->
         broadcast_served_orders(orders, counter + 1, ack_pid)
     end
+  end
+
+  defp broadcast_served_orders(orders, counter, ack_pid)
+  when counter == @max_resends
+  do
+    Logger.info("Elevator was unable to confirm served orders with master")
   end
 
 
@@ -225,8 +239,6 @@ defmodule Elevator do
   when state in [:init_state, :idle_state, :door_state, :moving_state]
   and new_order_list != []
   do
-    Logger.info("Elevator received order in state '#{state}'")
-
     new_elevator_data =
       case Order.check_valid_order(new_order_list) do
         :true->

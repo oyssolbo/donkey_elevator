@@ -9,7 +9,7 @@ defmodule UDP_discover do
   @broadcast_port 9876
   @init_port 6789
   @num_tries 5
-  @default_timeout 15000
+  @default_timeout 10000
 
 
   @doc """

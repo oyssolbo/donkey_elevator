@@ -127,13 +127,8 @@ defmodule Elevator do
   defp receive_thread()
   do
     receive do
-      {:master, from_node, message_id, {:delegated_order, order_list}} ->
-        master_ack_adress =
-          message_id |>
-          Kernel.inspect()
-          |> String.to_atom()
-
-        Network.send_data_spesific_node(:elevator, master_ack_adress, from_node, {message_id, :ack})
+      {:master, from_node, message_id, {:delegated_order, order_list, ack_pid}} ->
+        Network.send_data_spesific_node(:elevator, ack_pid, from_node, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:delegated_order, order_list})
 
       {:panel, _node, _message_id, {:delegated_order, order_list}} ->
@@ -168,24 +163,24 @@ defmodule Elevator do
   end
 
   @doc """
-  Must be started as a new process with spawn() or spawn_link() !!
+  Must be started as a new process with spawn() or spawn_link() !!, ack_pid and counter should be left blank
   """
-  defp broadcast_served_orders(orders, counter \\ 0)
+  defp broadcast_served_orders(orders, counter \\ 0, ack_pid \\ make_ref)
   when orders |> is_list()
   do
-    message_id = Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders})
-    process_id =
-      message_id |>
-      Kernel.inspect() |>
-      String.to_atom()
+    ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
 
-    Process.register(self(), process_id)
+    if (counter == 0) do
+      Process.register(self, ack_pid)
+    end
+
+    message_id = Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders, ack_pid})
 
     case Network.receive_ack(message_id) do
       {:ok, _receiver_id}->
         :ok
       {:no_ack, :no_id}->
-        spawn_link(fn-> broadcast_served_orders(orders, counter + 1) end)
+        broadcast_served_orders(orders, counter + 1, ack_pid)
     end
   end
 
@@ -386,6 +381,7 @@ defmodule Elevator do
   do
     all_orders = Map.get(elevator_data, :orders)
     direction = Map.get(elevator_data, :dir)
+
 
     {order_at_floor, floor_orders} = check_reached_order_floor?(all_orders, floor, direction)
 

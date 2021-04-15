@@ -252,8 +252,8 @@ defmodule Order do
       _ -> :false
     end)
   end
-  
 
+  
 ## Modify order ##
   @doc """
   Function that modifies a field in a single order, or a list of orders. The

@@ -122,8 +122,6 @@ defmodule Elevator do
   Process for receiving data from master and panel, and calls the respective
   handlers in the GenStateMachine-server
   """
-
-
   defp receive_thread()
   do
     receive do
@@ -165,13 +163,13 @@ defmodule Elevator do
   @doc """
   Must be started as a new process with spawn() or spawn_link() !!, ack_pid and counter should be left blank
   """
-  defp broadcast_served_orders(orders, counter \\ 0, ack_pid \\ make_ref)
+  defp broadcast_served_orders(orders, counter \\ 0, ack_pid \\ make_ref())
   when orders |> is_list()
   do
     ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
 
     if (counter == 0) do
-      Process.register(self, ack_pid)
+      Process.register(self(), ack_pid)
     end
 
     message_id = Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders, ack_pid})
@@ -225,6 +223,7 @@ defmodule Elevator do
         state,
         %Elevator{orders: prev_orders} = elevator_data)
   when state in [:init_state, :idle_state, :door_state, :moving_state]
+  and new_order_list != []
   do
     Logger.info("Elevator received order in state '#{state}'")
 
@@ -481,9 +480,9 @@ defmodule Elevator do
     {:next_state, :restart_state, elevator_data}
   end
 
-  ##### Evrything else #####
+  ##### Everything else #####
   @doc """
-  Function to handle if the GenStateMachine receives an unexpected event
+  Function to handle non-important events that otherwise will trigger an error
   """
   def handle_event(
       _,

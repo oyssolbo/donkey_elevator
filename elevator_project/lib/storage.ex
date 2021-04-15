@@ -1,6 +1,7 @@
 #import Matriks
 
 defmodule Storage do
+    require Logger
 
     require Order
 
@@ -13,8 +14,12 @@ defmodule Storage do
     and overwrites whatever was on the file from before.
     """
     def write(data, fileName \\ "save_data.txt") do
-        textData = Poison.encode!(data)
-        result = File.write(fileName, textData)
+        {ereport, textData} = Poison.encode(data)
+        if ereport != :ok do
+            Logger.error("Encode operation failed - write aborted")
+        else
+            result = File.write(fileName, textData)
+        end
     end
 
     @doc """
@@ -22,9 +27,20 @@ defmodule Storage do
     Order-structs, and will attempt to reconstruct said data.
     """
     def read(fileName \\ "save_data.txt") do
-        result = File.read!(fileName)   #Beware! read! embeds errors into results, without error messages
-        map_list = Poison.decode!(result)
-        orders = structify_maplist(map_list)
+        {report, result} = File.read(fileName)   #Beware! read! embeds errors into results, without error messages
+        {dreport, map_list} = Poison.decode(result)
+        if report != :ok or dreport != :ok do
+            Logger.error("Read failed - check data integrity")
+            []
+        else
+            try do
+                structify_maplist(map_list)
+            catch
+                :error, _reason ->
+                    Logger.error("Data structification failed - check save data integrity")
+                    []
+            end
+        end
     end
 
     @doc """

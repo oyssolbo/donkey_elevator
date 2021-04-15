@@ -127,11 +127,6 @@ defmodule Elevator do
   defp receive_thread()
   do
     receive do
-      # {:master, from_node, message_id, {:delegated_order, order_list}} ->
-      #   Logger.info("Elevator received order from master")
-      #   master_ack_adress = message_id |> Kernel.inspect() |> String.to_atom()
-      #   Network.send_data_spesific_node(:elevator, master_ack_adress, from_node, {message_id, :ack})
-      #   GenStateMachine.cast(@node_name, {:delegated_order, order_list})
 
       {:master, from_node, message_id, {:delegated_order, order_list, ack_pid}} ->
         Logger.info("Elevator received order from master")
@@ -179,7 +174,6 @@ defmodule Elevator do
     ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
 
     if (counter == 0) do
-      #ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
       Process.register(self, ack_pid)
     end
 

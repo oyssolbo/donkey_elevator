@@ -128,14 +128,15 @@ defmodule Elevator do
   do
     receive do
       {:master, from_node, message_id, {:delegated_order, order_list}} ->
-        Logger.info("Elevator received order from master")
-        #Network.send_data_spesific_node(:elevator, :master_receive, from_node, {message_id, :ack})
-        master_ack_adress = message_id |> Kernel.inspect() |> String.to_atom()
+        master_ack_adress =
+          message_id |>
+          Kernel.inspect()
+          |> String.to_atom()
+
         Network.send_data_spesific_node(:elevator, master_ack_adress, from_node, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:delegated_order, order_list})
 
       {:panel, _node, _message_id, {:delegated_order, order_list}} ->
-        Logger.info("Elevator received order from panel")
         GenStateMachine.cast(@node_name, {:delegated_order, order_list})
 
       {from, _, _, {event, data}} ->
@@ -203,7 +204,7 @@ defmodule Elevator do
     the elevator will set lights corresponding to 'event_data' (could be floor, door or orders)
     high
   """
-  defp modify_elevator_lights(
+  defp set_elevator_lights(
         event_atom,
         event_data)
   when event_atom |> is_atom()
@@ -238,7 +239,7 @@ defmodule Elevator do
           updated_order_list = Order.add_orders(new_order_list, prev_orders)
 
           Storage.write(updated_order_list)
-          modify_elevator_lights(:set_lights, updated_order_list)
+          set_elevator_lights(:set_cab_lights, updated_order_list)
 
           Map.put(elevator_data, :orders, updated_order_list)
 
@@ -528,7 +529,7 @@ defmodule Elevator do
   when floor |> is_integer
   do
     #Lights.set_floorlight(floor)
-    modify_elevator_lights(:set_floor_light, floor)
+    set_elevator_lights(:set_floor_light, floor)
     GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
 
@@ -574,7 +575,7 @@ defmodule Elevator do
   defp reached_floor_limit()
   do
     Driver.set_motor_direction(:stop)
-    IO.puts("Elevator reached limit. Stopping the elevator, and going to idle")
+    Logger.info("Elevator reached limit. Stopping the elevator, and going to idle")
   end
 
 
@@ -592,19 +593,15 @@ defmodule Elevator do
     Driver.set_motor_direction(:stop)
     Logger.info("Reached target floor at floor #{floor}")
 
-    # Open door, start timer and message master
     open_door()
     timer_elevator_data = Timer.start_timer(self(), elevator_data, :timer, :door_timer, @door_time)
 
-    external_orders = Enum.filter(floor_orders, fn order -> order.order_type in [:hall_down, :hall_up] end)
-    spawn_link(fn-> broadcast_served_orders(external_orders) end)
-
-    modify_elevator_lights(:clear_lights, floor_orders)
-
-    # Remove old orders and calculate new target_order
+    # Send order-status to master, storage and lights
+    spawn_link(fn-> broadcast_served_orders(floor_orders) end)
     updated_orders = Order.remove_orders(floor_orders, order_list)
 
     Storage.write(updated_orders)
+    set_elevator_lights(:set_cab_lights, updated_orders)
 
     Map.put(timer_elevator_data, :orders, updated_orders)
   end
@@ -724,11 +721,11 @@ defmodule Elevator do
   """
   defp open_door()
   do
-    modify_elevator_lights(:set_door_light, :on)
+    set_elevator_lights(:set_door_light, :on)
   end
   defp close_door()
   do
-    modify_elevator_lights(:set_door_light, :off)
+    set_elevator_lights(:set_door_light, :off)
   end
 
 

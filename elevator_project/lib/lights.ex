@@ -4,8 +4,12 @@ defmodule Lights do
   and sets the corresponding lights high.
 
   The module must send messages to elevator and master. Lights are set based on updates
-  from these modules, and are cleared when either the elevator or the master messages a
-  list of orders that are served
+  from these modules. All other lights are cleared, and by updating which orders are
+  active, the lights are indirectly cleared.
+
+  Based on the functionality of the lights-module, it would not be required
+  to save the states of internal and external orders as well as the last known
+  elevator-floor. This is done to prevent unecessary use of bandwith for the driver
 
   Dependencies
     - Driver
@@ -25,17 +29,28 @@ defmodule Lights do
 
   @node_name    :lights
 
+  @enforce_keys [:internal_orders, :external_orders, :floor_light]
+  defstruct     [:internal_orders, :external_orders, :floor_light]
+
 
 ##### Initialization #####
 
   @doc """
-  Initializes receiver-function, and stores an empty list as
-  active lights
+  Initializes receiver-function, and stores an empty list as active lights.
   """
   def init(_init_arg \\ [])
   do
+    lights_data = %Lights{
+      internal_orders:  [],
+      external_orders:  [],
+      floor_light:      :nil
+    }
+
+    clear_external_lights()
+    clear_internal_lights()
+
     init_receive()
-    {:ok, []}
+    {:ok, lights_data}
   end
 
 
@@ -87,18 +102,34 @@ defmodule Lights do
   """
   def handle_cast(
         {:set_hall_lights, external_order_list},
-        data)
+        %Lights{external_orders: external_orders} = lights_data)
+  when external_order_list |> is_list()
   do
-    set_external_lights(external_order_list)
-    {:noreply, data}
+    new_lights_data =
+    case Enum.sort(external_order_list) == Enum.sort(external_orders) do
+      :true->
+        lights_data
+      :false->
+        set_external_lights(external_order_list)
+        Map.put(lights_data, :external_orders, external_order_list)
+    end
+    {:noreply, new_lights_data}
   end
 
   def handle_cast(
         {:set_cab_lights, internal_order_list},
-        data)
+        %Lights{internal_orders: internal_orders} = lights_data)
+  when internal_order_list |> is_list()
   do
-    set_internal_lights(internal_order_list)
-    {:noreply, data}
+    new_lights_data =
+    case Enum.sort(internal_order_list) == Enum.sort(internal_orders) do
+      :true->
+        lights_data
+      :false->
+        set_internal_lights(internal_order_list)
+        Map.put(lights_data, :internal_orders, internal_order_list)
+    end
+    {:noreply, new_lights_data}
   end
 
 
@@ -107,11 +138,18 @@ defmodule Lights do
   """
   def handle_cast(
         {:set_floor_light, floor},
-        order_list)
+        %Lights{floor_light: last_floor} = lights_data)
   when floor >= @min_floor and floor <= @max_floor
   do
-    Driver.set_floor_indicator(floor)
-    {:noreply, order_list}
+    new_lights_data =
+    case last_floor == floor do
+      :true->
+        lights_data
+      :false->
+        Driver.set_floor_indicator(floor)
+        Map.put(lights_data, :floor_light, floor)
+    end
+    {:noreply, new_lights_data}
   end
 
 
@@ -120,11 +158,11 @@ defmodule Lights do
   """
   def handle_cast(
         {:set_door_light, state},
-        order_list)
+        lights_data)
   when state in [:on, :off]
   do
     Driver.set_door_open_light(state)
-    {:noreply, order_list}
+    {:noreply, lights_data}
   end
 
 

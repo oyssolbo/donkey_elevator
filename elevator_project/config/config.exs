@@ -9,11 +9,12 @@ config :elevator_project,
 
   # Network
   network_node_tick_time_ms:      50,
-  network_ack_timeout_time_ms:    500, #increased from 200 to 500 for less spam under testing
+  network_ack_timeout_time_ms:    200,
   network_resend_max_counter:     10,
 
   # Master
   master_update_active_time_ms:   100,
+  master_update_lights_time_ms:   200,
   master_timeout_active_ms:       1000,
   master_timeout_elevator_ms:     2000,
 

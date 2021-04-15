@@ -59,12 +59,10 @@ defmodule Lights do
   defp receive_thread()
   do
     receive do
-      {:master, _from_node, _message_id, {event_name, data}} ->
-        Logger.info("Received light update from master")
-        GenServer.cast(@node_name, {event_name, data})
+      {:master, _from_node, _message_id, {:set_hall_lights, order_list}} ->
+        GenServer.cast(@node_name, {:set_hall_lights, order_list})
 
       {:elevator, _from_node, _message_id, {event_name, data}} ->
-        #Logger.info("Received light update from elevator")
         GenServer.cast(@node_name, {event_name, data})
     end
 
@@ -81,38 +79,28 @@ defmodule Lights do
   end
 
 
-##### Implementing lights #####
+##### Light-handler #####
 
   @doc """
-  Handler that recieves a list of orders from either the master or elevator, and
+  Handler that recieves a list of orders from master or elevator, and
   sets the corresponding lights high
   """
   def handle_cast(
-        {:set_lights, set_order_list},
-        order_list)
+        {:set_hall_lights, external_order_list},
+        data)
   do
-    updated_order_list = Order.add_orders(set_order_list, order_list)
-    set_order_lights(updated_order_list)
-
-    {:noreply, updated_order_list}
+    set_external_lights(external_order_list)
+    {:noreply, data}
   end
 
-
-  @doc """
-  Handler that recieves a list of orders from master or elevator that is served.
-  It removes the orders, and sets the remaining corresponding lights high
-  """
   def handle_cast(
-        {:clear_lights, clear_order_list},
-        order_list)
+        {:set_cab_lights, internal_order_list},
+        data)
   do
-    clear_all_lights()
-
-    updated_order_list = Order.remove_orders(clear_order_list, order_list)
-    set_order_lights(updated_order_list)
-
-    {:noreply, updated_order_list}
+    set_internal_lights(internal_order_list)
+    {:noreply, data}
   end
+
 
   @doc """
   Handler that sets the floor-light on a given floor 'floor' high
@@ -123,7 +111,6 @@ defmodule Lights do
   when floor >= @min_floor and floor <= @max_floor
   do
     Driver.set_floor_indicator(floor)
-
     {:noreply, order_list}
   end
 
@@ -137,7 +124,6 @@ defmodule Lights do
   when state in [:on, :off]
   do
     Driver.set_door_open_light(state)
-
     {:noreply, order_list}
   end
 
@@ -145,55 +131,65 @@ defmodule Lights do
 ##### Workhorse-functions #####
 
   @doc """
-  Set order-lights. The function first turns off all other lights, before setting
-  the lights corresponding to a list of orders 'order_list'
+  Function to iterate through a list of orders, and set the corresponding
+  light on
+
+  set_internal_lights() - invokes clear_internal_lights() and sets all corresponding internal lights :on
+  set_external_ligths() - invokes clear_external_lights() and sets all corresponding external lights :on
   """
-  defp set_order_lights(order_list)
+  defp set_internal_lights(order_list)
+  when order_list |> is_list()
   do
-    clear_all_lights()
-    set_all_order_lights(order_list)
+    clear_internal_lights()
+    Enum.filter(order_list, fn order -> order.order_type == :cab end) |>
+      Enum.each(fn order ->
+        Driver.set_order_button_light(:cab, order.order_floor, :on)
+      end)
+  end
+
+  defp set_external_lights(order_list)
+  when order_list |> is_list()
+  do
+    clear_external_lights()
+    Enum.filter(order_list, fn order -> order.order_type in [:hall_up, :hall_down] end) |>
+      Enum.each(fn order ->
+        Driver.set_order_button_light(order.order_type, order.order_floor, :on)
+      end)
   end
 
 
   @doc """
-  Function to clear all lights recursively
+  Functions to clear all lights recursively
 
-  Clears all hall_down, hall_up, cab at each floor
+  clear_internal_lights() - clears all :cab-lights
+  clear_external_lights() - clears all :hall_up and :hall_down
   """
-  defp clear_all_lights(floor \\ @min_floor)
+  defp clear_internal_lights(floor \\ @min_floor)
   when floor <= @max_floor
   do
-    Driver.set_order_button_light(:hall_down, floor, :off)
-    Driver.set_order_button_light(:hall_up, floor, :off)
     Driver.set_order_button_light(:cab, floor, :off)
 
-    clear_all_lights(floor + 1)
+    clear_internal_lights(floor + 1)
   end
 
-  defp clear_all_lights(floor)
+  defp clear_internal_lights(floor)
   when floor > @max_floor
   do
     :ok
   end
 
-
-  @doc """
-  Function to iterate through a list of orders, and set the corresponding
-  light on
-  """
-  defp set_all_order_lights(order_list)
+  defp clear_external_lights(floor \\ @min_floor)
+  when floor <= @max_floor
   do
-    if Order.is_order_list(order_list) do
-      Enum.each(order_list, fn order ->
-        case Map.get(order, :order_type) do
-          :hall_up ->
-            Driver.set_order_button_light(:hall_up, Map.get(order, :order_floor), :on)
-          :hall_down ->
-            Driver.set_order_button_light(:hall_down, Map.get(order, :order_floor), :on)
-          :cab ->
-            Driver.set_order_button_light(:cab, Map.get(order, :order_floor), :on)
-        end
-      end)
-    end
+    Driver.set_order_button_light(:hall_down, floor, :off)
+    Driver.set_order_button_light(:hall_up, floor, :off)
+
+    clear_external_lights(floor + 1)
+  end
+
+  defp clear_external_lights(floor)
+  when floor > @max_floor
+  do
+    :ok
   end
 end

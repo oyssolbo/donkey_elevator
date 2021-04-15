@@ -233,13 +233,13 @@ defmodule ElevatorTest do
       order_floor: 0,
       order_id: make_ref(),
       order_type: :hall_down
-      } # ,
-      # %Order{
-      # delegated_elevator: nil,
-      # order_floor: 1,
-      # order_id: make_ref(),
-      # order_type: :hall_down
-      # }
+      },
+      %Order{
+      delegated_elevator: nil,
+      order_floor: 1,
+      order_id: make_ref(),
+      order_type: :hall_down
+      }
     ]
 
     elevator_dir = :down
@@ -247,4 +247,42 @@ defmodule ElevatorTest do
 
     Elevator.calculate_optimal_floor(elevator_orders, elevator_dir, elevator_floor)
   end
+
+
+  def bounds()
+  do
+    Driver.start_link([])
+    Process.sleep(250)
+    Elevator.start_link([])
+    Process.sleep(250)
+    Process.sleep(5000)
+
+    Logger.info("Sending first order")
+    order1 = Order.create_rnd_order(2, :hall_up)
+
+    Elevator.send_order(order1)
+    #Elevator.get_struct()
+
+    Logger.info("Sending second order")
+    order2 = Order.create_rnd_order(6, :hall_up)
+    Elevator.send_order(order2)
+    #Elevator.get_struct()
+
+  end
+
+  def opt_dir()
+  do
+    order1 = Order.create_rnd_order(2, :hall_up)
+    order2 = Order.create_rnd_order(6, :hall_up)
+
+    floor1 = 1
+    floor2 = 2
+    floor3 = 3
+    dir = :down
+
+    Elevator.calculate_optimal_direction([order1, order2], dir, floor1) |> IO.inspect()
+    Elevator.calculate_optimal_direction([order1, order2], dir, floor2) |> IO.inspect()
+    Elevator.calculate_optimal_direction([order1, order2], dir, floor3) |> IO.inspect()
+  end
+
 end

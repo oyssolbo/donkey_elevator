@@ -163,7 +163,6 @@ defmodule Master do
         ack_pid \\ make_ref())
   when counter < @max_resends
   do
-    #ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
     ack_pid = cond do
       is_atom(ack_pid) ->
         ack_pid

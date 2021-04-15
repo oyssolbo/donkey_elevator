@@ -5,9 +5,10 @@ defmodule NetworkTest do
   do
     #Driver.start_link([])
     Network.init_node_network()
-    #Elevator.start_link([])
-    #Master.start_link([])
-    #Panel.init()
+    Elevator.start_link([])
+    Master.start_link([])
+    Panel.start_link([])
+    Lights.start_link([])
   end
 
   def receive_thread()
@@ -34,4 +35,10 @@ defmodule NetworkTest do
     message_id = Network.send_data_all_nodes(:tester, :master_receive, :test_data)
     Network.send_data_all_nodes(:test_function, :master_receive, {message_id, :ack})
   end
+
+
+  def pack_loss_test() do
+
+  end
+
 end

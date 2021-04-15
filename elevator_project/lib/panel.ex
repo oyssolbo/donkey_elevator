@@ -76,7 +76,9 @@ defmodule Panel do
             Order.extract_orders(:hall_down, current_orders)
 
         master_msg_id = Network.send_data_all_nodes(:panel, :master_receive, orders_to_masters)
-        Network.send_data_inside_node(:panel, :elevator_receive, {:delegated_orders, orders_to_elevator})
+        if orders_to_elevator != [] do
+            Network.send_data_inside_node(:panel, :elevator_receive, {:delegated_order, orders_to_elevator})
+        end
 
         updated_orders =
         receive do

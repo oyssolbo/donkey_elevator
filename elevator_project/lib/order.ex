@@ -252,7 +252,7 @@ defmodule Order do
       _ -> :false
     end)
   end
-  
+
 
 ## Modify order ##
   @doc """
@@ -332,5 +332,3 @@ defmodule Order do
 
 
 end
-
-

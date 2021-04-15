@@ -240,8 +240,6 @@ defmodule Elevator do
         %Elevator{orders: prev_orders} = elevator_data)
   when state in [:init_state, :idle_state, :door_state, :moving_state]
   do
-    #Logger.info("Elevator received order in state '#{state}'")
-
     new_elevator_data =
       case Order.check_valid_order(new_order_list) do
         :true->

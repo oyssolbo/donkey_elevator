@@ -253,7 +253,7 @@ defmodule Master do
 
           Timer.start_timer(self(), intern_master_data, :master_timer, :master_active_timeout, @timeout_active_master_time) |>
             Map.put(:order_list, order_list) |>
-            Map.put(:connected_elevators,     connected_elevators)    |>
+            Map.put(:connected_elevators, connected_elevators)    |>
             Map.put(:master_message_id, extern_message_id)
 
         intern_message_id >= extern_message_id ->
@@ -416,8 +416,8 @@ defmodule Master do
     # Since we have connection to at least one elevator, we can assume that all orders are delegated
     new_order_list = Order.add_orders(delegated_orders, other_orders)
     new_master_data =
-      Map.put(master_data, :connected_elevators,    updated_elevator_list) |>
-      Map.put(:active_orders, new_order_list)
+      Map.put(master_data, :connected_elevators, updated_elevator_list) |>
+      Map.put(:order_list, new_order_list)
 
     {:next_state, :active_state, new_master_data}
   end
@@ -568,7 +568,7 @@ defmodule Master do
 
     Map.put(intern_master_data, :order_list, new_order_list) |>
       Map.put(:master_message_id, new_message_id) |>
-      Map.put(:connected_elevators,     new_elevator_connection_list)
+      Map.put(:connected_elevators, new_elevator_connection_list)
   end
 
 

@@ -101,33 +101,33 @@ defmodule Lights do
   sets the corresponding lights high
   """
   def handle_cast(
-        {:set_hall_lights, external_order_list},
-        %Lights{external_orders: external_orders} = lights_data)
-  when external_order_list |> is_list()
+        {:set_hall_lights, new_external_orders},
+        %Lights{external_orders: old_external_orders} = lights_data)
+  when new_external_orders |> is_list()
   do
     new_lights_data =
-    case Enum.sort(external_order_list) == Enum.sort(external_orders) do
+    case Enum.sort(new_external_orders) == Enum.sort(old_external_orders) do
       :true->
         lights_data
       :false->
-        set_external_lights(external_order_list)
-        Map.put(lights_data, :external_orders, external_order_list)
+        set_external_lights(new_external_orders)
+        Map.put(lights_data, :external_orders, new_external_orders)
     end
     {:noreply, new_lights_data}
   end
 
   def handle_cast(
-        {:set_cab_lights, internal_order_list},
-        %Lights{internal_orders: internal_orders} = lights_data)
-  when internal_order_list |> is_list()
+        {:set_cab_lights, new_internal_orders},
+        %Lights{internal_orders: old_internal_orders} = lights_data)
+  when new_internal_orders |> is_list()
   do
     new_lights_data =
-    case Enum.sort(internal_order_list) == Enum.sort(internal_orders) do
+    case Enum.sort(new_internal_orders) == Enum.sort(old_internal_orders) do
       :true->
         lights_data
       :false->
-        set_internal_lights(internal_order_list)
-        Map.put(lights_data, :internal_orders, internal_order_list)
+        set_internal_lights(new_internal_orders)
+        Map.put(lights_data, :internal_orders, new_internal_orders)
     end
     {:noreply, new_lights_data}
   end

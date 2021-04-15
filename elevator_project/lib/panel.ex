@@ -68,27 +68,30 @@ defmodule Panel do
             previous_orders \\ [])
     when previous_orders |> is_list()
     do
-        current_orders = check_for_new_orders(floor_table, previous_orders)
-
-        orders_to_elevator = Order.extract_orders(:cab, current_orders)
-        orders_to_masters =
-            Order.extract_orders(:hall_up, current_orders) ++
-            Order.extract_orders(:hall_down, current_orders)
-
-        master_msg_id = Network.send_data_all_nodes(:panel, :master_receive, orders_to_masters)
-        if orders_to_elevator != [] do
-            Network.send_data_inside_node(:panel, :elevator_receive, {:delegated_order, orders_to_elevator})
-        end
-
-        updated_orders =
-        receive do
-            {:master, _from_node, _message_id, {master_msg_id, :ack}}->
-                []
-        after @ack_timeout_time->
-            orders_to_masters
-        end
         Process.sleep(@panel_sleep_time)
-        check_and_send_orders(floor_table, updated_orders)
+        current_orders = check_for_new_orders(floor_table, previous_orders)
+        if not hot_buttons?(floor_table) do
+            orders_to_elevator = Order.extract_orders(:cab, current_orders)
+            orders_to_masters =
+                Order.extract_orders(:hall_up, current_orders) ++
+                Order.extract_orders(:hall_down, current_orders)
+
+            master_msg_id = Network.send_data_all_nodes(:panel, :master_receive, orders_to_masters)
+            if orders_to_elevator != [] do
+                Network.send_data_inside_node(:panel, :elevator_receive, {:delegated_order, orders_to_elevator})
+            end
+
+            updated_orders =
+            receive do
+                {:master, _from_node, _message_id, {master_msg_id, :ack}}->
+                    []
+            after @ack_timeout_time->
+                orders_to_masters
+            end
+            check_and_send_orders(floor_table, updated_orders)
+        else
+            check_and_send_orders(floor_table, current_orders)
+        end
     end
 
 
@@ -160,5 +163,10 @@ defmodule Panel do
     when previous_orders != []
     do
         Enum.any?(previous_orders, fn order -> order.order_floor == floor and order.order_type == type end)
+    end
+
+    def hot_buttons?(floor_table) do
+        butts = Enum.map(floor_table, fn floor -> Driver.get_order_button_state(floor, :hall_up) end)++Enum.map(floor_table, fn floor -> Driver.get_order_button_state(floor, :hall_down) end)++Enum.map(floor_table, fn floor -> Driver.get_order_button_state(floor, :cab) end)
+        Enum.any?(butts, fn num -> num != 0 end)
     end
 end

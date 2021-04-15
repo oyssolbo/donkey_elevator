@@ -15,6 +15,7 @@ defmodule FST do
             Panel.start_link([])
             Master.start_link([])
             Elevator.start_link([])
+            Lights.start_link([])
 
             Logger.info("Full spectrum test suite initiated")
         catch

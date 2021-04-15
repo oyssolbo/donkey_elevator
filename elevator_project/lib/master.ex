@@ -144,11 +144,8 @@ defmodule Master do
   end
 
   defp init_receive()
-  do      # {:elevator, from_node, message_id, {:elevator_served_order, served_order_list}} ->
-    #   process_id = message_id |> Kernel.inspect() |> String.to_atom()
-    #   Network.send_data_spesific_node(:master, process_id, from_node, {message_id, :ack})
-    #   #Network.send_data_spesific_node(:master, :elevator_receive, from_node, {message_id, :ack})
-    #   GenStateMachine.cast(@node_name, {:elevator_served_order, from_node, served_order_list})
+  do
+
     spawn_link(fn -> receive_thread() end) |>
       Process.register(:master_receive)
   end

@@ -253,7 +253,7 @@ defmodule Order do
     end)
   end
 
-
+  
 ## Modify order ##
   @doc """
   Function that modifies a field in a single order, or a list of orders. The

@@ -191,7 +191,6 @@ defmodule Master do
   when counter == @max_resends
   do
     Logger.info("Master is unable to send order to elevator")
-    IO.inspect(elevator_id)
 
     # We can assume that the elevator has received a timeout
     GenStateMachine.cast(@node_name, {:elevator_timeout, elevator_id})
@@ -611,7 +610,7 @@ end
 
     # Delegate the order to the optimal elevator
     delegated_order = Order.modify_order_field(order, :delegated_elevator, optimal_elevator_id)
-    spawn(fn-> send_order_to_elevator([delegated_order], optimal_elevator_id) end)
+    spawn_link(fn-> send_order_to_elevator([delegated_order], optimal_elevator_id) end)
 
 
     [delegated_order | delegate_orders(rest_orders, connected_elevators)]

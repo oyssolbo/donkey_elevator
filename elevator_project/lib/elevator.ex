@@ -112,7 +112,7 @@ defmodule Elevator do
   """
   def terminate(_reason, _state)
   do
-    Logger.info("Elevator given order to terminate. Terminating")
+    Logger.error("Elevator given order to terminate. Terminating")
     Driver.set_motor_direction(:stop)
     Process.exit(self(), :normal)
   end
@@ -164,15 +164,19 @@ defmodule Elevator do
   @doc """
   Must be started as a new process with spawn() or spawn_link() !!, ack_pid and counter should be left blank
   """
-  defp broadcast_served_orders(orders, counter \\ 0, ack_pid \\ make_ref())
+  defp broadcast_served_orders(
+        orders,
+        counter \\ 0,
+        ack_pid \\ make_ref())
   when orders |> is_list()
   and counter < @max_resends
   do
-    ack_pid = cond do
+    ack_pid =
+    cond do
       is_atom(ack_pid) ->
         ack_pid
       :true ->
-        ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+        ack_pid |> Kernel.inspect() |> String.to_atom()
     end
 
     if (counter == 0) do
@@ -190,7 +194,10 @@ defmodule Elevator do
     end
   end
 
-  defp broadcast_served_orders(orders, counter, ack_pid)
+  defp broadcast_served_orders(
+        _orders,
+        counter,
+        _ack_pid)
   when counter == @max_resends
   do
     Logger.info("Elevator was unable to confirm served orders with master")

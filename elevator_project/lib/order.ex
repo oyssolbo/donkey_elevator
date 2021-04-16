@@ -44,7 +44,8 @@ defmodule Order do
   def add_orders(
         new_orders,
         order_list)
-  when is_list(order_list) and is_list(new_orders)
+  when is_list(order_list)
+  and is_list(new_orders)
   do
     new_orders++order_list |>
       Enum.uniq()
@@ -91,67 +92,13 @@ defmodule Order do
         order_list)
   when is_list(order_list)
   do
-    if is_order_list(order_list) do
-      # Enum.map(orders, fn order -> remove_orders(order, order_list) end)
-      new_order_list = remove_orders(first_order, order_list)
-      remove_orders(rest_orders, new_order_list)
-    else
-      Logger.info("Not an order-list")
-      []
-    end
+    # Enum.map(orders, fn order -> remove_orders(order, order_list) end)
+    new_order_list = remove_orders(first_order, order_list)
+    remove_orders(rest_orders, new_order_list)
   end
 
 
 ## Extract orders(s) ##
-
-  @doc """
-  Function that extract a list order corresponding to a list of ids 'order_id_list'. Returns
-  an empty list if not found, or if the list did not contain only orders
-  """
-  def extract_order(
-        [first_order_id | rest_order_id] = order_id_list,
-        order_list)
-  when order_list |> is_list() and order_id_list |> is_list()
-  do
-    [extract_order(first_order_id, order_list) | extract_order(rest_order_id, order_list)]
-  end
-
-
-  @doc """
-  Function that extract a single order with id 'order_id' from a list of orders. Returns
-  an empty list if not found, or if the list did not contain only orders
-  """
-  def extract_order(
-        order_id,
-        order_list)
-  when order_list |> is_list()
-  do
-    if is_order_list(order_list) do
-      Enum.filter(order_list, fn x -> x.order_id == order_id end)
-    else
-      Logger.info("Not an order-list")
-      []
-    end
-  end
-
-
-  @doc """
-  Function to get all orders at floor 'floor' in a list of orders
-  that satisfies the required [:dir, :cab]. If there are no orders
-  fulfilling the requirements, the function returns an empty list
-  """
-  def extract_orders(
-        floor,
-        dir,
-        order_list)
-  when is_list(order_list) and is_integer(floor) and dir in [:up, :down]
-  do
-    hall_dir = convertion_dir_hall_dir(dir)
-    Enum.filter(order_list, fn x ->
-      x.order_floor == floor and
-      x.order_type in [hall_dir, :cab]
-    end)
-  end
 
 
   @doc """
@@ -161,14 +108,10 @@ defmodule Order do
   def extract_orders(
         type,
         order_list)
-  when order_list |> is_list() and type in [:hall_up, :up, :hall_down, :down, :cab]
+  when order_list |> is_list()
+  and type in [:hall_up, :hall_down, :cab]
   do
-    if is_order_list(order_list) do
-      Enum.filter(order_list, fn x -> x.order_type == type end)
-    else
-      Logger.info("Not an order-list")
-      []
-    end
+    Enum.filter(order_list, fn x -> x.order_type == type end)
   end
 
 
@@ -181,13 +124,49 @@ defmodule Order do
         order_list)
   when order_list |> is_list()
   do
-    if is_order_list(order_list) do
-      Enum.filter(order_list, fn x -> x.delegated_elevator == elevator_id end)
-    else
-      Logger.info("Not an order-list")
-      []
-    end
+    Enum.filter(order_list, fn x -> x.delegated_elevator == elevator_id end)
   end
+
+
+  @doc """
+  Function to get all orders at floor 'floor' in a list of orders
+  that satisfies the required [:dir, :cab]. If there are no orders
+  fulfilling the requirements, the function returns an empty list
+  """
+  def extract_orders(
+        floor,
+        dir,
+        order_list)
+  when is_list(order_list)
+  and is_integer(floor)
+  and dir in [:up, :down]
+  do
+    hall_dir = convertion_dir_hall_dir(dir)
+    Enum.filter(order_list, fn x ->
+      x.order_floor == floor and
+      x.order_type in [hall_dir, :cab]
+    end)
+  end
+
+
+  @doc """
+  Function that extracts a list of orders with a given type at a given
+  floor.
+  """
+  def extract_orders(
+        floor,
+        type,
+        order_list)
+  when is_list(order_list)
+  and is_integer(floor)
+  and type in [:hall_up, :hall_down, :cab]
+  do
+    Enum.filter(order_list, fn x ->
+      x.order_floor == floor and
+      x.order_type == type
+    end)
+  end
+
 
 ## Check order(s) ##
   @doc """
@@ -242,6 +221,25 @@ defmodule Order do
 
 
   @doc """
+  Function that checks is there are similar orders already in a list of orders.
+  The function checks both the type and the floor, and returns a list with any
+  duplicates removed
+  """
+  def check_and_remove_duplicates(
+        check_orders,
+        order_list)
+  when order_list |> is_list()
+  and check_orders |> is_list
+  do
+    Enum.filter(check_orders, fn order ->
+      extract_orders(order.order_floor, order.order_type, order_list) == []
+    end) ++
+      order_list
+  end
+
+
+
+  @doc """
   Function to check whether a list contains only orders or not
   """
   def is_order_list(list)
@@ -253,7 +251,7 @@ defmodule Order do
     end)
   end
 
-  
+
 ## Modify order ##
   @doc """
   Function that modifies a field in a single order, or a list of orders. The
@@ -273,12 +271,7 @@ defmodule Order do
         value)
   when orders |> is_list()
   do
-    if is_order_list(orders) do
-      Enum.map(orders, fn order -> Map.put(order, field, value) end)
-    else
-      Logger.info("Not an order-list")
-      orders
-    end
+    Enum.map(orders, fn order -> Map.put(order, field, value) end)
   end
 
 ## Create random order ##
@@ -306,7 +299,7 @@ defmodule Order do
   """
   def create_rnd_order_list(len) do
     if len > 0 do
-      ordr_lst = [create_rnd_order()]++create_rnd_order_list(len-1)
+      [create_rnd_order()]++create_rnd_order_list(len-1)
     else
       []
     end
@@ -329,6 +322,4 @@ defmodule Order do
       _ -> :error
     end
   end
-
-
 end

@@ -64,11 +64,11 @@ defmodule Master do
     Logger.info("Master initialing")
 
     data = %Master{
-      order_list:        [],
-      master_timer:             make_ref(),
-      master_message_id:        0,
-      activation_time:          :nil,
-      connected_elevators:     []
+      order_list:           [],
+      master_timer:         make_ref(),
+      master_message_id:    0,
+      activation_time:      :nil,
+      connected_elevators:  []
     }
 
     master_data = Timer.start_timer(self(), data, :master_timer, :master_active_timeout, @timeout_active_master_time)
@@ -127,12 +127,8 @@ defmodule Master do
         GenStateMachine.cast(@node_name, {:elevator_init, from_node})
 
       {:elevator, from_node, message_id, {:elevator_served_order, served_order_list, ack_pid}} ->
-
-        Logger.info("Master received message that elevator has served order(s)")
-
         Network.send_data_spesific_node(:master, ack_pid, from_node, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:elevator_served_order, from_node, served_order_list})
-
 
       {:elevator, from_node, _message_id, {:elevator_status_update, {last_dir, last_floor}}} ->
         GenStateMachine.cast(@node_name, {:elevator_status_update, from_node, {last_dir, last_floor}})
@@ -147,7 +143,6 @@ defmodule Master do
 
   defp init_receive()
   do
-
     spawn_link(fn -> receive_thread() end) |>
       Process.register(:master_receive)
   end
@@ -165,19 +160,19 @@ defmodule Master do
         ack_pid \\ make_ref())
   when counter < @max_resends
   do
-    ack_pid = cond do
+    ack_pid =
+    cond do
       is_atom(ack_pid) ->
         ack_pid
       :true ->
-        ack_pid = ack_pid |> Kernel.inspect() |> String.to_atom()
+        ack_pid |> Kernel.inspect() |> String.to_atom()
     end
 
     if(counter == 0) do
-      Process.register(self, ack_pid)
+      Process.register(self(), ack_pid)
     end
 
-    Logger.info("Master sending orders to elevator #{elevator_id}")
-    message_id  = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list, ack_pid})
+    message_id = Network.send_data_spesific_node(:master, :elevator_receive, elevator_id, {:delegated_order, order_list, ack_pid})
 
     case Network.receive_ack(message_id) do
       {:ok, _receiver_id} ->
@@ -203,7 +198,7 @@ defmodule Master do
   @doc """
   Sends (read: spams) data to other master
   """
-  defp send_data_to_master(%Master{} = master_data)
+  defp broadcast_master_status(%Master{} = master_data)
   do
     Network.send_data_all_other_nodes(:master, :master_receive, {:master_update_active, master_data})
   end
@@ -320,7 +315,7 @@ defmodule Master do
     updated_message_id = Map.get(master_data, :master_message_id) + 1
     new_master_data = Map.put(master_data, :master_message_id, updated_message_id)
 
-    send_data_to_master(new_master_data)
+    broadcast_master_status(new_master_data)
     {:next_state, :active_state, new_master_data}
   end
 
@@ -400,7 +395,7 @@ defmodule Master do
   do
     # Add to list of connected elevators and reset timer
     old_elevator_client_list = Map.get(master_data, :connected_elevators)
-        elevator_client =
+    elevator_client =
       case Client.extract_client(elevator_id, old_elevator_client_list) do
         [] ->
           struct(Client,
@@ -449,8 +444,6 @@ defmodule Master do
         :active_state,
         master_data)
   do
-    Logger.info("Inside handler-event in master that elevator has served an order")
-
     order_list = Map.get(master_data, :order_list)
     updated_order_list = Order.remove_orders(served_order_list, order_list)
 
@@ -474,9 +467,11 @@ defmodule Master do
         master_data)
   when emergency_atom in [:elevator_timeout, :elevator_init]
   do
+    Logger.warning("Elevator timed out")
+
     # Find and remove the connection
     elevator_list = Map.get(master_data, :connected_elevators)
-        updated_elevator_list =
+    updated_elevator_list =
       Client.extract_client(elevator_id, elevator_list) |>
       Client.remove_clients(elevator_list)
 
@@ -490,30 +485,36 @@ defmodule Master do
 
     # Combining the two sets of orders, and adding to master_data
     new_order_list = Order.add_orders(delegated_orders, unaffected_orders)
-    new_master_data = Map.put(master_data, :order_list, new_order_list)
+    new_master_data =
+      Map.put(master_data, :connected_elevators, updated_elevator_list) |>
+      Map.put(:order_list, new_order_list)
 
     {:next_state, :active_state, new_master_data}
   end
 
 
   @doc """
-  Handle if the GenStateMachine-server receives a list of orders from panel
+  Handle if the GenStateMachine-server receives a list of orders from panel. The
+  function checks if the orders are valid - and if true, adds them to a list of
+  orders to be served
   """
   def handle_event(
         :cast,
-        {:panel_received_order, order_list},
+        {:panel_received_order, new_order_list},
         :active_state,
         master_data)
-  when order_list |> is_list() and order_list != []
+  when new_order_list |> is_list()
+  and new_order_list != []
   do
+    Logger.info("Master received order from panel")
     new_master_data =
-      case Order.check_valid_order(order_list) do
+      case Order.check_valid_order(new_order_list) do
         :true->
-          temp_order_list = Order.modify_order_field(order_list, :delegated_elevator, :nil)
+          temp_order_list = Order.modify_order_field(new_order_list, :delegated_elevator, :nil)
           undelegated_orders = get_undelegated_orders(master_data, temp_order_list)
 
-          connected_elevators =    Map.get(master_data, :connected_elevators)
-              delegated_orders = delegate_orders(undelegated_orders, connected_elevators)
+          connected_elevators = Map.get(master_data, :connected_elevators)
+          delegated_orders = delegate_orders(undelegated_orders, connected_elevators)
 
           updated_order_list =
             Map.get(master_data, :order_list) |>
@@ -529,8 +530,8 @@ defmodule Master do
   end
 
 
-   @doc """
-  Function to handle if the GenStateMachine-server receives an unexpected event
+  @doc """
+  Function to handle if the GenStateMachine-server receives a not-important event
   """
   def handle_event(
         _,
@@ -612,27 +613,10 @@ defmodule Master do
   Returns a list of orders with the correct assigned elevator
   """
   defp delegate_orders(
-        orders,
+        undelegated_orders,
         [] = _connected_elevators)
   do
-    Order.modify_order_field(orders, :delegated_elevator, :nil)
-  end
-
-  defp delegate_orders(
-        [order | rest_orders],
-        connected_elevators)
-  do
-    # Determine which elevator is must suitable for a given order
-    optimal_elevator_id =
-      find_optimal_elevator(order, connected_elevators, struct(Client)) |>
-      Map.get(:client_id)
-
-    # Delegate the order to the optimal elevator
-    delegated_order = Order.modify_order_field(order, :delegated_elevator, optimal_elevator_id)
-    spawn_link(fn-> send_order_to_elevator([delegated_order], optimal_elevator_id) end)
-
-
-    [delegated_order | delegate_orders(rest_orders, connected_elevators)]
+    Order.modify_order_field(undelegated_orders, :delegated_elevator, :nil)
   end
 
   defp delegate_orders(
@@ -642,11 +626,32 @@ defmodule Master do
     []
   end
 
+  defp delegate_orders(
+        undelegated_orders,
+        connected_elevators)
+  do
+    # Find optimal elevators for each order
+    delegated_orders =
+      Enum.map(undelegated_orders, fn order ->
+        optimal_elevator_id = find_optimal_elevator_id(order, connected_elevators, struct(Client))
+        Map.put(order, :delegated_elevator, optimal_elevator_id)
+      end)
+
+    # Send a list corresponding to each elevator
+    Enum.each(connected_elevators, fn elevator_client ->
+      elevator_orders = Order.extract_orders(elevator_client.client_id, delegated_orders)
+      spawn_link(fn-> send_order_to_elevator(elevator_orders, elevator_client.client_id) end)
+    end)
+
+    delegated_orders
+  end
+
 
   @doc """
   Function that gets a set of undelegated orders (orders with the field
   :delegated_elevator set to :nil). It can take in a new list of orders, and
-  adds these orders to the list of undelegated orders
+  adds these orders to the list of undelegated orders. Note that it will only
+  add new orders that does not have a similar order in the original list
   """
   defp get_undelegated_orders(
         master_data,
@@ -657,7 +662,8 @@ defmodule Master do
     old_nil_delegated_orders = Order.extract_orders(:nil, old_order_list)
     new_nil_delegated_orders = Order.extract_orders(:nil, new_order_list)
 
-    Order.add_orders(old_nil_delegated_orders, new_nil_delegated_orders)
+    Order.check_and_remove_duplicates(new_nil_delegated_orders, old_nil_delegated_orders) |>
+      Order.add_orders(old_nil_delegated_orders)
   end
 
 
@@ -669,7 +675,7 @@ defmodule Master do
   elevators and not enough floors to be relevant. For a larger building, a better
   function must be developed
   """
-  defp find_optimal_elevator(
+  defp find_optimal_elevator_id(
         order,
         [check_elevator | rest_elevator],
         optimal_elevator)
@@ -677,27 +683,27 @@ defmodule Master do
     optimal_data = Map.get(optimal_elevator, :client_data)
 
     if optimal_data == :nil do
-      find_optimal_elevator(order, rest_elevator, check_elevator)
+      find_optimal_elevator_id(order, rest_elevator, check_elevator)
 
     else
       cost_optimal_elevator = calculate_elevator_cost(order, optimal_elevator)
       cost_check_elevator = calculate_elevator_cost(order, check_elevator)
 
       if cost_optimal_elevator <= cost_check_elevator do
-        find_optimal_elevator(order, rest_elevator, optimal_elevator)
+        find_optimal_elevator_id(order, rest_elevator, optimal_elevator)
 
       else
-        find_optimal_elevator(order, rest_elevator, check_elevator)
+        find_optimal_elevator_id(order, rest_elevator, check_elevator)
       end
     end
   end
 
-  defp find_optimal_elevator(
+  defp find_optimal_elevator_id(
         _order,
         [],
         optimal_elevator)
   do
-    optimal_elevator
+    Map.get(optimal_elevator, :client_id, :nil)
   end
 
 

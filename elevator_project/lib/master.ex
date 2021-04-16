@@ -518,7 +518,7 @@ defmodule Master do
 
           updated_order_list =
             Map.get(master_data, :order_list) |>
-            Order.add_orders(delegated_orders) |> IO.inspect()
+            Order.add_orders(delegated_orders)
 
           Map.put(master_data, :order_list, updated_order_list)
 
@@ -631,19 +631,14 @@ defmodule Master do
         connected_elevators)
   do
     # Find optimal elevators for each order
-    Logger.info("Checking delegated_orders")
-    IO.inspect(undelegated_orders)
     delegated_orders =
       Enum.map(undelegated_orders, fn order ->
         optimal_elevator_id = find_optimal_elevator_id(order, connected_elevators, struct(Client))
         Map.put(order, :delegated_elevator, optimal_elevator_id)
       end)
 
-    IO.inspect(delegated_orders)
-
     # Send a list corresponding to each elevator
     Enum.each(connected_elevators, fn elevator_client ->
-      IO.inspect(elevator_client)
       elevator_orders = Order.extract_orders(elevator_client.client_id, delegated_orders)
       spawn_link(fn-> send_order_to_elevator(elevator_orders, elevator_client.client_id) end)
     end)

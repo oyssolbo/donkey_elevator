@@ -8,7 +8,7 @@ defmodule Network do
   require Logger
 
   @ack_timeout Application.fetch_env!(:elevator_project, :network_ack_timeout_time_ms)
-  @node_name Application.fetch_env!(:elevator_project, :node_name)
+  @static_node_name Application.fetch_env!(:elevator_project, :node_name)
 
   @doc """
   Init the node nettork on the machine
@@ -18,8 +18,8 @@ defmodule Network do
   def init_node_network()
   do
     ip = UDP_discover.get_ip()
-    #node_name_s = Kernel.inspect(:rand.uniform(10000)) <> "@" <> ip #use for testing where elevator/ node does not need to be restarted
-    node_name_s = @node_name <> "@" <> ip # use for testing where the elevator/node needs to be restarted, assures constant node_name
+    node_name_s = Kernel.inspect(:rand.uniform(10000)) <> "@" <> ip #use for testing where elevator/ node does not need to be restarted
+    #node_name_s = @static_node_name <> "@" <> ip # use for testing where the elevator/node needs to be restarted, assures constant node_name
     node_name_a = String.to_atom(node_name_s)
     SystemNode.start_node(node_name_a)
 
@@ -86,8 +86,13 @@ defmodule Network do
   and receiver_id |> is_atom()
   do
     message_id = make_ref()
+    case Process.whereis(receiver_id) do
+      :nil->
+        Logger.warning("Unable to send data because the process is not alive :)")
+        _->
+          send(receiver_id, {sender_id, Node.self(), message_id, data})
+        end
 
-    send({receiver_id, Node.self()}, {sender_id, Node.self(), message_id, data})
     message_id
   end
 

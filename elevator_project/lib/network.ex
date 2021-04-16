@@ -7,7 +7,7 @@ defmodule Network do
 
   require Logger
 
-  @ack_timeout Application.fetch_env!(:elevator_project, :network_ack_timeout_time_ms)
+  @ack_timeout      Application.fetch_env!(:elevator_project, :network_ack_timeout_time_ms)
   @static_node_name Application.fetch_env!(:elevator_project, :node_name)
 
   @doc """
@@ -87,7 +87,7 @@ defmodule Network do
   do
     case Process.whereis(receiver_id) do
       :nil->
-        Logger.warning("Unable to send data because the process is not alive :)")
+        Logger.error("Unable to send data because the process is not alive :)")
       _->
         message_id = make_ref()
         send(receiver_id, {sender_id, Node.self(), message_id, data})

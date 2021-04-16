@@ -8,7 +8,7 @@ config :elevator_project,
   project_cookie_name:            :ttk4145_30,
   
   #Node
-  node_name: "machine2",
+  node_name: "static_name_1",
 
   # Network
   network_node_tick_time_ms:      50,

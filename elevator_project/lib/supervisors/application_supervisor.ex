@@ -14,7 +14,6 @@ defmodule ElevatorProject.Supervisor do
   @impl :true
   def init(_args) do
     children = [
-      #{Driver.Supervisor, []},
       {Elevator.Supervisor, []},
       {Master.Supervisor, []},
       {Panel.Supervisor, []},

@@ -77,4 +77,15 @@ defmodule ProjectTest do
     Elevator.send_order_to_elevator()
   end
 
+
+  def init_all()
+  do
+    Network.init_node_network()
+    Driver.start_link([])
+    Elevator.start_link([])
+    Master.start_link([])
+    Panel.start_link([])
+    Lights.start_link([])
+  end
+
 end

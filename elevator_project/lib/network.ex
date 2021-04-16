@@ -85,15 +85,14 @@ defmodule Network do
   when sender_id |> is_atom()
   and receiver_id |> is_atom()
   do
-    message_id = make_ref()
     case Process.whereis(receiver_id) do
       :nil->
         Logger.warning("Unable to send data because the process is not alive :)")
-        _->
-          send(receiver_id, {sender_id, Node.self(), message_id, data})
-        end
+      _->
+        message_id = make_ref()
+        send(receiver_id, {sender_id, Node.self(), message_id, data})
+    end
 
-    message_id
   end
 
  @doc """

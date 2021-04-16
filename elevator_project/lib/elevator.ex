@@ -311,7 +311,7 @@ defmodule Elevator do
     Process.cancel_timer(timer)
 
     # Reading previously saved orders, and starting timer
-    stored_orders = [] #Storage.read()
+    stored_orders = Storage.read()
     prev_orders =
       case Order.check_valid_order(stored_orders) do
         :true->

@@ -36,7 +36,16 @@ defmodule NetworkTest do
     Network.send_data_all_nodes(:test_function, :master_receive, {message_id, :ack})
   end
 
+  #Could test the normal program and se how it works with the following commands
+  """
+  sudo iptables -A INPUT -p tcp --dport 15657 -j ACCEPT
+  sudo iptables -A INPUT -p tcp --sport 15657 -j ACCEPT
+  sudo iptables -A INPUT -m statistic --mode random --probability 0.2 -j DROP
 
+  remove packet loss:
+  sudo iptables -F
+
+  """
   def pack_loss_test() do
 
   end

@@ -6,6 +6,9 @@ config :elevator_project,
   project_min_floor:              0,
   project_num_floors:             4,
   project_cookie_name:            :ttk4145_30,
+  
+  #Node
+  node_name: "machine_2",
 
   # Network
   network_node_tick_time_ms:      50,

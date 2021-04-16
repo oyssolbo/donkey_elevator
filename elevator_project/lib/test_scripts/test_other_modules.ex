@@ -278,4 +278,24 @@ defmodule OrderTest do
   end
 
 
+  def check_remove_duplicates()
+  do
+    # Test passed
+
+    order1 = Order.create_rnd_order(0, :hall_up)#
+    order2 = Order.create_rnd_order(1, :hall_down)#
+    order3 = Order.create_rnd_order(1, :cab)#
+
+    order4 = Order.create_rnd_order(0, :hall_up)
+    order5 = Order.create_rnd_order(3, :hall_down)#
+    order6 = Order.create_rnd_order(2, :cab)#
+    order7 = Order.create_rnd_order(0, :hall_up)
+    order8 = Order.create_rnd_order(0, :hall_up)
+    order9 = Order.create_rnd_order(0, :hall_up)
+
+    order_list1 = [order1, order2, order3]
+    Order.check_and_remove_duplicates([order4, order5, order6, order7, order8, order9], order_list1) |> IO.inspect()
+  end
+
+
 end

@@ -512,7 +512,7 @@ defmodule Master do
           temp_order_list = Order.modify_order_field(order_list, :delegated_elevator, :nil)
           undelegated_orders = get_undelegated_orders(master_data, temp_order_list)
 
-          connected_elevators = Map.get(master_data, :connected_elevators) |> IO.inspect()
+          connected_elevators = Map.get(master_data, :connected_elevators)
           delegated_orders = delegate_orders(undelegated_orders, connected_elevators)
 
           updated_order_list =

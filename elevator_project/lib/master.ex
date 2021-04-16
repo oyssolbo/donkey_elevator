@@ -506,6 +506,7 @@ defmodule Master do
   when new_order_list |> is_list()
   and new_order_list != []
   do
+    Logger.info("Master received order from panel")
     new_master_data =
       case Order.check_valid_order(new_order_list) do
         :true->
@@ -517,7 +518,7 @@ defmodule Master do
 
           updated_order_list =
             Map.get(master_data, :order_list) |>
-            Order.add_orders(delegated_orders)
+            Order.add_orders(delegated_orders) |> IO.inspect()
 
           Map.put(master_data, :order_list, updated_order_list)
 
@@ -622,7 +623,7 @@ defmodule Master do
         [],
         _connected_elevators)
   do
-  []
+    []
   end
 
   defp delegate_orders(
@@ -631,10 +632,11 @@ defmodule Master do
   do
     # Find optimal elevators for each order
     Logger.info("Checking delegated_orders")
+    IO.inspect(undelegated_orders)
     delegated_orders =
       Enum.map(undelegated_orders, fn order ->
-        optimal_elevator = find_optimal_elevator(order, connected_elevators, struct(Client))
-        Map.get(order, :delegated_elevator, optimal_elevator)
+        optimal_elevator_id = find_optimal_elevator_id(order, connected_elevators, struct(Client))
+        Map.put(order, :delegated_elevator, optimal_elevator_id)
       end)
 
     IO.inspect(delegated_orders)
@@ -678,7 +680,7 @@ defmodule Master do
   elevators and not enough floors to be relevant. For a larger building, a better
   function must be developed
   """
-  defp find_optimal_elevator(
+  defp find_optimal_elevator_id(
         order,
         [check_elevator | rest_elevator],
         optimal_elevator)
@@ -686,27 +688,27 @@ defmodule Master do
     optimal_data = Map.get(optimal_elevator, :client_data)
 
     if optimal_data == :nil do
-      find_optimal_elevator(order, rest_elevator, check_elevator)
+      find_optimal_elevator_id(order, rest_elevator, check_elevator)
 
     else
       cost_optimal_elevator = calculate_elevator_cost(order, optimal_elevator)
       cost_check_elevator = calculate_elevator_cost(order, check_elevator)
 
       if cost_optimal_elevator <= cost_check_elevator do
-        find_optimal_elevator(order, rest_elevator, optimal_elevator)
+        find_optimal_elevator_id(order, rest_elevator, optimal_elevator)
 
       else
-        find_optimal_elevator(order, rest_elevator, check_elevator)
+        find_optimal_elevator_id(order, rest_elevator, check_elevator)
       end
     end
   end
 
-  defp find_optimal_elevator(
+  defp find_optimal_elevator_id(
         _order,
         [],
         optimal_elevator)
   do
-    optimal_elevator
+    Map.get(optimal_elevator, :client_id, :nil)
   end
 
 

@@ -9,6 +9,8 @@ defmodule Network do
 
   @ack_timeout      Application.fetch_env!(:elevator_project, :network_ack_timeout_time_ms)
   @static_node_name Application.fetch_env!(:elevator_project, :node_name)
+  @node_tick_time   Application.fetch_env!(:elevator_project, :network_node_tick_time_ms)
+  @node_cookie      Application.fetch_env!(:elevator_project, :project_cookie_name)
 
   @doc """
   Init the node nettork on the machine
@@ -17,18 +19,58 @@ defmodule Network do
   """
   def init_node_network()
   do
-    ip = UDP_discover.get_ip()
+    ip = UDP.get_ip()
     node_name_s = Kernel.inspect(:rand.uniform(10000)) <> "@" <> ip #use for testing where elevator/ node does not need to be restarted
     #node_name_s = @static_node_name <> "@" <> ip # use for testing where the elevator/node needs to be restarted, assures constant node_name
     node_name_a = String.to_atom(node_name_s)
-    SystemNode.start_node(node_name_a)
+    start_node(node_name_a)
 
-    UDP_discover.broadcast_listen() #listen for other nodes forever
-    UDP_discover.broadcast_cast(node_name_s) #cast node names forever
+    UDP.broadcast_listen() #listen for other nodes forever
+    UDP.broadcast_cast(node_name_s) #cast node names forever
 
-    #Not needed at the moment
-    #id_table = :ets.new(:buckets_registry, [:set, :protected, :named_table])
-    #:ets.insert(:buckets_registry, {Node.self(), make_ref()}) #Note, make_ref() can be swapped with ip if we know ip's will be unique
+  end
+
+
+  @doc """
+  Initializing a node with name 'name' and cookie 'cookie'
+
+  The function returns the :pid if it is started in distributed mode, or
+  self() if unable to start in distirbuted mode
+  """
+  def start_node(
+        name,
+        cookie \\ @node_cookie)
+  when cookie |> is_atom
+  do
+    case Node.start(name, :longnames, @node_tick_time) do
+      {:ok, _pid} ->
+        Node.set_cookie(Node.self(), cookie)
+        Node.self()
+      {:error, _} ->
+        Logger.error("An error occured when starting the node #{name} as a distributed node")
+        {:error, self()}
+    end
+  end
+
+  @doc """
+  Connects the node to node-network
+  """
+  def connect_node_network(node)
+  do
+    case Node.ping(node) do
+      :pong ->
+        Logger.info("Succesfully connected to #{node}")
+      :pang ->
+        Logger.info("Unable to connect to #{node}")
+    end
+  end
+
+  @doc """
+  List all the current nodes, including the node the process is running on
+  """
+  def nodes_in_network()
+  do
+    Node.list([:visible, :this])
   end
 
 
@@ -56,7 +98,7 @@ defmodule Network do
   and receiver_id |> is_atom()
   do
     message_id = make_ref()
-    network_list = SystemNode.nodes_in_network()
+    network_list = nodes_in_network()
 
     send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id)
 
@@ -64,7 +106,7 @@ defmodule Network do
   end
 
 
-@doc """
+  @doc """
   heper function to send_data_all_nodes
   """
   defp send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id, iteration \\ 0)
@@ -92,35 +134,19 @@ defmodule Network do
         message_id = make_ref()
         send(receiver_id, {sender_id, Node.self(), message_id, data})
     end
-
   end
 
- @doc """
+  @doc """
   Send data to the spesific process "receiver_id" on the spesific node "receiver_node"
   """
   def send_data_spesific_node(sender_id, receiver_id, receiver_node, data)
   when sender_id |> is_atom()
   and receiver_id |> is_atom()
   and receiver_node |> is_atom()
-    do
-      message_id = make_ref()
-      send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})
-      message_id
-    end
-
-   @doc """
-  Prof of concept function to demonstrate receive_functionallity
-  """
-  def receive_thread(sender_id, handler)
   do
-    receive do
-      {:master, sender_node, message_id, data} -> IO.puts("Got the following data from master #{data}")
-      {:panel, message_id, data} -> IO.puts("Got the following data from panel #{data}")
-
-    after
-      10_000 -> IO.puts("Connection timeout")
-
-    end
+    message_id = make_ref()
+    send({receiver_id, receiver_node}, {sender_id, Node.self(), message_id, data})
+    message_id
   end
 
 
@@ -139,18 +165,4 @@ defmodule Network do
     end
   end
 
-
-
-
- @doc """
-  Returns the node id that is created in init_node_network
-  kepts in case need arises
-  """
-  def get_node_id()
-  do
-    node_id_list = :ets.lookup(:buckets_registry, Node.self())
-    [node_id_list_head | node_id_list_tail] = node_id_list
-    {_node, node_id} = node_id_list_head
-    node_id
-  end
 end

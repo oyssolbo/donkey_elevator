@@ -27,19 +27,21 @@ defmodule Storage do
     Order-structs, and will attempt to reconstruct said data.
     """
     def read(fileName \\ "save_data.txt") do
-        {report, result} = File.read(fileName)   #Beware! read! embeds errors into results, without error messages
-        {dreport, map_list} = Poison.decode(result)
-        if report != :ok or dreport != :ok do
-            Logger.error("Read failed - check data integrity")
-            []
-        else
-            try do
+        try do
+            {report, result} = File.read(fileName)   #Beware! read! embeds errors into results, without error messages
+            {dreport, map_list} = Poison.decode(result)
+            if report != :ok or dreport != :ok do
+                Logger.error("Read failed - check data integrity")
+                []
+            else
                 structify_maplist(map_list)
-            catch
-                :error, _reason ->
-                    Logger.error("Data structification failed - check save data integrity")
-                    []
             end
+
+        catch
+            :error, reason ->
+                Logger.error("Reading from file failed due to #{Kernel.inspect(reason)}")
+                []
+
         end
     end
 

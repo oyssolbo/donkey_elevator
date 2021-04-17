@@ -755,7 +755,7 @@ defmodule Elevator do
   do
     Logger.info("Killing elevator")
     Driver.set_motor_direction(:stop)
-    Process.exit(self(), :shutdown)
+    Process.exit(self(), :kill)
   end
 
 

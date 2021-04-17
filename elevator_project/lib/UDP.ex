@@ -1,4 +1,4 @@
-defmodule UDP_discover do
+defmodule UDP do
   @moduledoc """
   Module giving basic functions for using networking
   """
@@ -106,8 +106,8 @@ defmodule UDP_discover do
       {:ok, recv_packet} ->
         node_atom = Kernel.elem(recv_packet, 2) |> to_string() |> String.to_atom()
 
-      if (node_atom not in SystemNode.nodes_in_network()) do
-        SystemNode.connect_node_network(node_atom)
+      if (node_atom not in Network.nodes_in_network()) do
+        Network.connect_node_network(node_atom)
       end
 
       {:error, reason} ->

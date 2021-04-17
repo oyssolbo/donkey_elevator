@@ -38,8 +38,8 @@ defmodule Storage do
             end
 
         catch
-            :error, _reason ->
-                Logger.error("Data structification failed - check save data integrity")
+            :error, reason ->
+                Logger.error("Reading from file failed due to #{Kernel.inspect(reason)}")
                 []
 
         end

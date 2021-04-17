@@ -130,7 +130,6 @@ defmodule Network do
     case Process.whereis(receiver_id) do
       :nil->
         Logger.error("Unable to send data because the process is not alive :)")
-        Process.sleep(100)
       _->
         message_id = make_ref()
         send(receiver_id, {sender_id, Node.self(), message_id, data})

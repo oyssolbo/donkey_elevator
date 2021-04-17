@@ -53,7 +53,7 @@ defmodule Network do
   end
 
   @doc """
-  @brief Connects the node to node-network
+  Connects the node to node-network
   """
   def connect_node_network(node)
   do
@@ -66,7 +66,7 @@ defmodule Network do
   end
 
   @doc """
-  @brief List all the current nodes, including the node the process is running on
+  List all the current nodes, including the node the process is running on
   """
   def nodes_in_network()
   do
@@ -106,7 +106,7 @@ defmodule Network do
   end
 
 
-@doc """
+  @doc """
   heper function to send_data_all_nodes
   """
   defp send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id, iteration \\ 0)
@@ -136,7 +136,7 @@ defmodule Network do
     end
   end
 
- @doc """
+  @doc """
   Send data to the spesific process "receiver_id" on the spesific node "receiver_node"
   """
   def send_data_spesific_node(sender_id, receiver_id, receiver_node, data)

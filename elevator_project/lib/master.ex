@@ -415,7 +415,7 @@ defmodule Master do
     # Delegate any undelegated orders
     order_list = Map.get(master_data, :order_list)
 
-    undelegated_orders = get_undelegated_orders(master_data)
+    undelegated_orders = Order.extract_orders(:nil, order_list)
 
     other_orders =
       undelegated_orders |>
@@ -510,8 +510,12 @@ defmodule Master do
     new_master_data =
       case Order.check_valid_order(new_order_list) do
         :true->
-          temp_order_list = Order.modify_order_field(new_order_list, :delegated_elevator, :nil)
-          undelegated_orders = get_undelegated_orders(master_data, temp_order_list)
+          old_order_list = Map.get(master_data, :order_list)
+
+          unique_orders =
+            Order.modify_order_field(new_order_list, :delegated_elevator, :nil) |>
+            Order.check_and_remove_duplicates(old_order_list)
+          undelegated_orders = Order.extract_orders(:nil, unique_orders)
 
           connected_elevators = Map.get(master_data, :connected_elevators)
           delegated_orders = delegate_orders(undelegated_orders, connected_elevators)
@@ -644,26 +648,6 @@ defmodule Master do
     end)
 
     delegated_orders
-  end
-
-
-  @doc """
-  Function that gets a set of undelegated orders (orders with the field
-  :delegated_elevator set to :nil). It can take in a new list of orders, and
-  adds these orders to the list of undelegated orders. Note that it will only
-  add new orders that does not have a similar order in the original list
-  """
-  defp get_undelegated_orders(
-        master_data,
-        new_order_list \\ [])
-  do
-    old_order_list = Map.get(master_data, :order_list, [])
-
-    old_nil_delegated_orders = Order.extract_orders(:nil, old_order_list)
-    new_nil_delegated_orders = Order.extract_orders(:nil, new_order_list)
-
-    Order.check_and_remove_duplicates(new_nil_delegated_orders, old_nil_delegated_orders) |>
-      Order.add_orders(old_nil_delegated_orders)
   end
 
 

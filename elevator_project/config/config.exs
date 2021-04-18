@@ -6,14 +6,15 @@ config :elevator_project,
   project_min_floor:              0,
   project_num_floors:             4,
   project_cookie_name:            :ttk4145_30,
-  
+
   #Node
-  node_name: "static_name_1",
+  node_name:                      "static_name_1",
 
   # Network
   network_node_tick_time_ms:      50,
   network_ack_timeout_time_ms:    200,
   network_resend_max_counter:     10,
+  network_broadcast_timeout_ms:   10000,
 
   # Master
   master_update_active_time_ms:   100,
@@ -28,6 +29,5 @@ config :elevator_project,
   elevator_timeout_door_ms:       3000,
   elevator_timeout_moving_ms:     5000,
 
-  # Panel  
+  # Panel
   panel_sleep_time_ms:            25
-

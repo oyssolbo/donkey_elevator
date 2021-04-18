@@ -463,9 +463,19 @@ defmodule Elevator do
         :door_state,
         elevator_data)
   do
-    Logger.info("Elevator closing door and going into idle")
-    close_door()
-    {:next_state, :idle_state, elevator_data}
+    next_state =
+    case Driver.get_obstruction_switch_state() do
+      :active->
+        Logger.warning("Obstruction active. Keeping the door open")
+        Timer.interrupt_after(self(), :door_timer, @door_time)
+        :door_state
+
+      :inactive->
+        Logger.info("Elevator closing door and going into idle")
+        close_door()
+        :idle_state
+    end
+    {:next_state, next_state, elevator_data}
   end
 
 # at_floor #

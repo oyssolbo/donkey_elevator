@@ -1,15 +1,20 @@
 defmodule Elevator do
   @moduledoc """
-  Module implementing the elevator for the project
+  Module implementing the elevator for the project.
+  The elevator is implemented using GenStateMachine, and has the following states and transitions:
 
     States:               Transitions to:
       - :init_state         :idle_state, :restart_state
       - :idle_state         :moving_state
-      - :moving_state       :door_state, :restart_state, :idle_state
+      - :moving_state       :door_state, :restart_state
       - :door_state         :idle_state
       - :restart_state      :restart_state
 
-  Requirements:
+  The module interacts with the modules Master, Panel and Lights through message-passing. Each message
+  is received by 'receive_thread', and depending on the parameters in the message, a corresponding
+  event in GenStateMachine is triggered.
+
+  Dependencies:
     - Driver
     - Network
     - Order

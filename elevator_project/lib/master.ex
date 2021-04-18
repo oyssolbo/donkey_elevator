@@ -588,7 +588,7 @@ defmodule Master do
     extern_orders = Map.get(extern_master_data, :order_list)
 
     intern_connected_elevators = Map.get(intern_master_data, :connected_elevators)
-        extern_connected_elevators = Map.get(extern_master_data, :connected_elevators)
+    extern_connected_elevators = Map.get(extern_master_data, :connected_elevators)
 
     intern_message_id = Map.get(intern_master_data, :master_message_id, 0)
     extern_message_id = Map.get(extern_master_data, :master_message_id, 0)

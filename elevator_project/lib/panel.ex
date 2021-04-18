@@ -56,7 +56,6 @@ defmodule Panel do
     end
 
 
-
     @doc """
     Checks the hardware for any new orders, and tries to send the message to elevator
     and master. If an ack is not received within @ack_timeout_time, the orders are

@@ -23,11 +23,12 @@ defmodule Storage do
 
     @doc """
     Reads from a txt-file, default name "save_data.txt". Assumes the data is a list of Poison-encoded
-    Order-structs, and will attempt to reconstruct said data. If an error is
+    Order-structs, and will attempt to reconstruct said data. If an error occurs, the function returns
+    an empty list. Otherwise, it returns a list containing old orders
     """
     def read(fileName \\ "save_data.txt") do
         try do
-            {report, result} = File.read(fileName)   #Beware! read! embeds errors into results, without error messages
+            {report, result} = File.read(fileName)
             {dreport, map_list} = Poison.decode(result)
             if report != :ok or dreport != :ok do
                 Logger.error("Read failed - check data integrity")
@@ -44,7 +45,7 @@ defmodule Storage do
                 Logger.error("Reading from file triggered exit due to #{Kernel.inspect(reason)}")
                 []
             _->
-                Logger.info("Reading from file failed due to unknown error")
+                Logger.error("Reading from file failed due to unknown error")
                 []
         end
     end

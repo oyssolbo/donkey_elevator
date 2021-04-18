@@ -282,10 +282,7 @@ defmodule Master do
     - :master_update_master_timer
     - :master_update_lights_timer
     - :elevator_status_update
-    - :elevator_served_order
-    - :elevator_timeout or :elevator_init
-    - :panel_received_order
-
+    - :elevato_
   It is assumed that active master will handle these events, and indirectly update backup-master
   """
   def handle_event(
@@ -600,6 +597,7 @@ defmodule Master do
     new_order_list = Order.add_orders(intern_undelegated_orders, extern_undelegated_orders)
 
     # Cancel all timers, and remove info about the elevators from the list
+    IO.inspect(intern_connected_elevators)
     Client.cancel_all_client_timers(intern_connected_elevators)
     Client.cancel_all_client_timers(extern_connected_elevators)
 

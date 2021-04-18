@@ -3,8 +3,6 @@ defmodule Client do
   Module wrapping the ID for each client that exist between between
   two modules. This module is implemented to standardize the identification
   of client between the modules
-
-  But yeah, this does not need to be it's own module.
   """
 
   require Timer

@@ -6,7 +6,8 @@ defmodule UDP do
 
   require Logger
 
-  @broadcast_address {255, 255, 255, 255}
+  @default_ip_address {127, 0, 0, 1}
+  @broadcast_address  {255, 255, 255, 255}
   @broadcast_port     9876
   @init_port          6789
 
@@ -15,7 +16,8 @@ defmodule UDP do
 
   @doc """
   Function that hopefully returns the IP-address of the system. Returns
-  a string containing the ip-address if found.
+  a string containing the ip-address if found. Otherwise, it returns the
+  ip-address of the local system
   """
   def get_ip(port \\ @init_port)
   do
@@ -25,7 +27,7 @@ defmodule UDP do
 
         ip = case :gen_udp.recv(socket, 100, 1000) do
           {:ok, {ip, _port, _data}} -> ip
-          {:error, _} -> :error
+          {:error, _} -> @default_ip_address
         end
 
         :gen_udp.close(socket)
@@ -37,7 +39,8 @@ defmodule UDP do
           get_ip(port + 1)
         else
           Logger.error("Could not find ip-address")
-          {:error, :could_not_get_ip}
+          :inet.ntoa(@default_ip_address) |>
+            to_string()
         end
     end
   end

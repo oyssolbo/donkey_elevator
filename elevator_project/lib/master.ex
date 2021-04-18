@@ -357,6 +357,9 @@ defmodule Master do
         intern_master_data)
   do
     Logger.info("Two active masters simultaneously")
+    if check_valid_master_data_struct(extern_master_data) == :false do
+      Logger.error("Invalid master data-struct")
+    end
 
     intern_activation_time = Map.get(intern_master_data, :activation_time)
     extern_activation_time = Map.get(extern_master_data, :activation_time)
@@ -544,6 +547,30 @@ defmodule Master do
 
 
 ###################################### Actions ######################################
+
+  @doc """
+  Function to check if a master-data struct is valid. This function will return false
+  if any of the fields are set to :nil or invalid numbers
+  """
+  defp check_valid_master_data_struct(master_data)
+  do
+    order_list = Map.get(master_data, :order_list)
+    master_timer = Map.get(master_data, :master_timer)
+    activation_time = Map.get(master_data, :activation_time)
+    master_message_id = Map.get(master_data, :master_message_id)
+    connected_elevators = Map.get(master_data, :connected_elevators)
+
+    if order_list == :nil
+    or master_timer == :nil
+    or activation_time == :nil
+    or master_message_id == :nil
+    or master_message_id < 0
+    or connected_elevators == :nil do
+      :false
+    else
+      :true
+    end
+  end
 
 
   @doc """

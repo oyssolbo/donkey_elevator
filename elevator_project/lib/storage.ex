@@ -43,6 +43,9 @@ defmodule Storage do
             :exit, reason ->
                 Logger.error("Reading from file triggered exit due to #{Kernel.inspect(reason)}")
                 []
+            _->
+                Logger.info("Reading from file failed due to unknown error")
+                []
         end
     end
 

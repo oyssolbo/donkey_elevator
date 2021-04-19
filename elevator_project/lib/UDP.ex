@@ -1,7 +1,7 @@
 defmodule UDP do
   @moduledoc """
   Module granting basic functionality for networking, such as getting ip-address,
-  broadcasting and listening
+  broadcasting and listening to messages
   """
 
   require Logger
@@ -15,9 +15,9 @@ defmodule UDP do
   @broadcast_timeout  Application.fetch_env!(:elevator_project, :network_broadcast_timeout_ms)
 
   @doc """
-  Function that hopefully returns the IP-address of the system. Returns
-  a string containing the ip-address if found. Otherwise, it returns the
-  ip-address of the local system
+  Function that returns an IP-address. If the system's correct IP-address is found, the
+  function returns a string containing the ip-address. Otherwise, it returns a string
+  containing the default local-host ip-address
   """
   def get_ip(port \\ @init_port)
   do
@@ -26,8 +26,11 @@ defmodule UDP do
         :gen_udp.send(socket, @broadcast_address, port, "test packet")
 
         ip = case :gen_udp.recv(socket, 100, 1000) do
-          {:ok, {ip, _port, _data}} -> ip
-          {:error, _} -> @default_ip_address
+          {:ok, {ip, _port, _data}} ->
+            ip
+          {:error, _} ->
+            Logger.error("Could not identify ip-address. Returning local-host")
+            @default_ip_address
         end
 
         :gen_udp.close(socket)
@@ -38,7 +41,7 @@ defmodule UDP do
         if port - @init_port < @num_tries do
           get_ip(port + 1)
         else
-          Logger.error("Could not find ip-address")
+          Logger.error("Could not identify ip-address. Returning local-host")
           :inet.ntoa(@default_ip_address) |>
             to_string()
         end
@@ -66,12 +69,13 @@ defmodule UDP do
   Function that will broadcast the node_name on the broadcast port
   It will spawn it's own process for looping in infinity
   """
-  def broadcast_cast(node_name, port \\ @broadcast_port)
+  def broadcast_cast(
+        node_name,
+        port \\ @broadcast_port)
   do
     case broadcast_open_socket() do
       {:ok, socket} ->
-        #:gen_udp.send(socket, @broadcast_address, @broadcast_port, node_name)
-        spawn (fn -> broadcast_cast_loop(node_name, socket, port) end)
+        spawn_link(fn -> broadcast_cast_loop(node_name, socket, port) end)
       {:error, reason} ->
         Logger.error("The error #{reason} occured while trying to broadcast #{node_name}")
     end
@@ -81,7 +85,10 @@ defmodule UDP do
   Function that will broadcast the node_name on the broadcast port
   will loop in infinity
   """
-  defp broadcast_cast_loop(node_name, socket, port)
+  defp broadcast_cast_loop(
+        node_name,
+        socket,
+        port)
   do
     :gen_udp.send(socket, @broadcast_address, port, node_name)
     Process.sleep(@broadcast_timeout)
@@ -97,7 +104,7 @@ defmodule UDP do
   do
     case broadcast_open_socket(port) do
       {:ok, socket} ->
-        spawn( fn -> broadcast_receive_and_connect(socket) end)
+        spawn_link(fn -> broadcast_receive_and_connect(socket) end)
     end
   end
 
@@ -114,10 +121,9 @@ defmodule UDP do
           Kernel.elem(recv_packet, 2) |>
             to_string() |>
             String.to_atom()
-
-      if (node_atom not in Network.nodes_in_network()) do
-        Network.connect_node_network(node_atom)
-      end
+        if (node_atom not in Network.nodes_in_network()) do
+          Network.connect_node_network(node_atom)
+        end
 
       {:error, reason} ->
         Logger.error("Failed to receive due to #{reason}")

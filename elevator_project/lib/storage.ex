@@ -17,7 +17,7 @@ defmodule Storage do
         if ereport != :ok do
             Logger.error("Encode operation failed - write aborted")
         else
-            result = File.write(fileName, textData)
+            File.write(fileName, textData)
         end
     end
 

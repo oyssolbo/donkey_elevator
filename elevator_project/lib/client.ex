@@ -157,7 +157,7 @@ defmodule Client do
   def cancel_all_client_timers(clients)
   when clients |> is_list()
   do
-    Enum.map(clients, fn client -> Timer.stop_timer(client, :last_message_time) end)
+    Enum.map(clients, fn client -> Timer.stop_timer(client, :client_timer) end)
   end
 
 end

@@ -11,16 +11,16 @@ config :elevator_project,
   node_name:                      "static_name_1",
 
   # Network
-  network_node_tick_time_ms:      50,
+  network_node_tick_time_ms:      15000,
   network_ack_timeout_time_ms:    200,
-  network_resend_max_counter:     10,
+  network_resend_max_counter:     20,
   network_broadcast_timeout_ms:   10000,
 
   # Master
   master_update_active_time_ms:   100,
   master_update_lights_time_ms:   200,
-  master_timeout_active_ms:       1000,
-  master_timeout_elevator_ms:     2000,
+  master_timeout_active_ms:       1800,
+  master_timeout_elevator_ms:     2500,
 
   # Elevator
   elevator_update_status_time_ms: 250,

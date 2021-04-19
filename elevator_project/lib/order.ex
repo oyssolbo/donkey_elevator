@@ -1,5 +1,3 @@
-
-
 defmodule Order do
   @moduledoc """
   Module that implements the struct 'Order' with different functions for operating

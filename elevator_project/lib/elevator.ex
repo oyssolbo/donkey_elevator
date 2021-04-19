@@ -172,9 +172,6 @@ defmodule Elevator do
     spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master_receive, :elevator_obstruction) end)
   end
 
-  @doc """
-  Must be started as a new process with spawn() or spawn_link() !!, ack_pid and counter should be left blank
-  """
   defp broadcast_served_orders(
         orders,
         counter \\ 0,
@@ -194,7 +191,6 @@ defmodule Elevator do
       Process.register(self(), ack_pid)
     end
 
-    Logger.info("Sending served orders to master")
     message_id = Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders, ack_pid})
 
     case Network.receive_ack(message_id) do
@@ -211,9 +207,8 @@ defmodule Elevator do
         _ack_pid)
   when counter == @max_resends
   do
-    Logger.info("Elevator was unable to confirm served orders with master")
+    Logger.warning("Elevator was unable to confirm served orders with master")
   end
-
 
   defp broadcast_elevator_status(
         last_dir,
@@ -280,7 +275,7 @@ defmodule Elevator do
         :restart_state,
         elevator_data)
   do
-    Logger.info("Elevator received order(s) while in restart_state. Order(s) not accepted!")
+    Logger.warning("Elevator received order(s) while in restart_state. Order(s) not accepted!")
     {:next_state, :restart_state, elevator_data}
   end
 
@@ -350,7 +345,7 @@ defmodule Elevator do
         :init_state,
         elevator_data)
   do
-    Logger.info("Elevator did not get to a defined floor before timeout. Restarting")
+    Logger.error("Elevator did not get to a defined floor before timeout. Restarting")
     kill_process()
     {:next_state, :restart_state, elevator_data}
   end
@@ -456,7 +451,7 @@ defmodule Elevator do
         :moving_state,
         elevator_data)
   do
-    Logger.info("Elevator spent too long time moving. Engine failure - restarting.")
+    Logger.error("Elevator spent too long time moving. Engine failure - restarting.")
     kill_process()
     {:next_state, :restart_state, elevator_data}
   end
@@ -517,6 +512,7 @@ defmodule Elevator do
         :restart_state,
         elevator_data)
   do
+    Logger.error("General handler in :restart_state invoked. Restarting")
     kill_process()
     {:next_state, :restart_state, elevator_data}
   end

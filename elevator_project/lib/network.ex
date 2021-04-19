@@ -160,7 +160,6 @@ defmodule Network do
         #Logger.info("Ack received")
         {:ok, receiver_id}
       after @ack_timeout ->
-        Logger.info("Ack not received")
         {:no_ack, :no_id}
     end
   end

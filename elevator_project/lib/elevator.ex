@@ -191,6 +191,7 @@ defmodule Elevator do
       Process.register(self(), ack_pid)
     end
 
+    Logger.info("Elevator sending served orders to master")
     message_id = Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders, ack_pid})
 
     case Network.receive_ack(message_id) do

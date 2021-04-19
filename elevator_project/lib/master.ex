@@ -231,10 +231,9 @@ defmodule Master do
   do
     Logger.info("Backup has lost connection to active. Activating")
 
-    connected_elevators =
-      Map.get(master_data, :connected_elevators, []) |>
-      Client.cancel_all_client_timers() |>
-      Client.start_all_client_timers(self(), :elevator_timeout, @timeout_elevator_time)
+    prev_connected_elevators = Map.get(master_data, :connected_elevators, [])
+    Client.cancel_all_client_timers(prev_connected_elevators)
+    connected_elevators = Client.start_all_client_timers(prev_connected_elevators, self(), :elevator_timeout, @timeout_elevator_time)
 
     Timer.interrupt_after(self(), :master_update_master_timer, @update_active_time)
     Timer.interrupt_after(self(), :master_update_lights_timer, @update_lights_time)
@@ -243,7 +242,7 @@ defmodule Master do
       Timer.set_utc_time(master_data, :activation_time) |>
       Map.put(:master_message_id, 0) |>
       Map.put(:connected_elevators, connected_elevators)
-      
+
     {:next_state, :active_state, activated_master_data}
   end
 
@@ -266,7 +265,7 @@ defmodule Master do
       cond do
         intern_message_id < extern_message_id ->
           order_list = Map.get(extern_master_data, :order_list)
-          connected_elevators =    Map.get(extern_master_data, :connected_elevators)
+          connected_elevators = Map.get(extern_master_data, :connected_elevators)
 
           Timer.start_timer(self(), intern_master_data, :master_timer, :master_active_timeout, @timeout_active_master_time) |>
             Map.put(:order_list, order_list) |>

@@ -100,7 +100,6 @@ defmodule Order do
 
 ## Extract orders(s) ##
 
-
   @doc """
   Function that extracts all orders that have the type 'type'
   Example; extracts all orders with type ':cab' from a list of orders
@@ -272,37 +271,6 @@ defmodule Order do
   when orders |> is_list()
   do
     Enum.map(orders, fn order -> Map.put(order, field, value) end)
-  end
-
-## Create random order ##
-  @doc """
-  Creates random order
-  """
-  def create_rnd_order()
-  do
-    rnd_id = Time.utc_now()
-    rnd_type = Enum.random([:hall_up, :hall_down, :cab])
-    rnd_floor = Enum.random(0..@max_floor)
-    struct(Order, [order_id: rnd_id, order_type: rnd_type, order_floor: rnd_floor])
-  end
-
-  def create_rnd_order(
-        floor,
-        type)
-  do
-    rnd_id = Time.utc_now()
-    struct(Order, [order_id: rnd_id, order_type: type, order_floor: floor])
-  end
-
-  @doc """
-  Creates a list of random orders, of given length.
-  """
-  def create_rnd_order_list(len) do
-    if len > 0 do
-      [create_rnd_order()]++create_rnd_order_list(len-1)
-    else
-      []
-    end
   end
 
 ## Conversion between dir and hall_dir ##

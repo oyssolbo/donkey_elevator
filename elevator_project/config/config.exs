@@ -14,6 +14,7 @@ config :elevator_project,
   network_node_tick_time_ms:      15000,
   network_ack_timeout_time_ms:    200,
   network_resend_max_counter:     20,
+  network_broadcast_timeout_ms:   10000,
 
   # Master
   master_update_active_time_ms:   100,

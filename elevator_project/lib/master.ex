@@ -231,12 +231,18 @@ defmodule Master do
   do
     Logger.info("Backup has lost connection to active. Activating")
 
+    prev_connected_elevators = Map.get(master_data, :connected_elevators, [])
+    Client.cancel_all_client_timers(prev_connected_elevators)
+    connected_elevators = Client.start_all_client_timers(prev_connected_elevators, self(), :elevator_timeout, @timeout_elevator_time)
+
     Timer.interrupt_after(self(), :master_update_master_timer, @update_active_time)
     Timer.interrupt_after(self(), :master_update_lights_timer, @update_lights_time)
 
     activated_master_data =
       Timer.set_utc_time(master_data, :activation_time) |>
-      Map.put(:master_message_id, 0)
+      Map.put(:master_message_id, 0) |>
+      Map.put(:connected_elevators, connected_elevators)
+
     {:next_state, :active_state, activated_master_data}
   end
 
@@ -259,11 +265,11 @@ defmodule Master do
       cond do
         intern_message_id < extern_message_id ->
           order_list = Map.get(extern_master_data, :order_list)
-          connected_elevators =    Map.get(extern_master_data, :connected_elevators)
+          connected_elevators = Map.get(extern_master_data, :connected_elevators)
 
           Timer.start_timer(self(), intern_master_data, :master_timer, :master_active_timeout, @timeout_active_master_time) |>
             Map.put(:order_list, order_list) |>
-            Map.put(:connected_elevators, connected_elevators)    |>
+            Map.put(:connected_elevators, connected_elevators) |>
             Map.put(:master_message_id, extern_message_id)
 
         intern_message_id >= extern_message_id ->
@@ -415,7 +421,7 @@ defmodule Master do
     # Delegate any undelegated orders
     order_list = Map.get(master_data, :order_list)
 
-    undelegated_orders = get_undelegated_orders(master_data)
+    undelegated_orders = Order.extract_orders(:nil, order_list)
 
     other_orders =
       undelegated_orders |>
@@ -510,8 +516,12 @@ defmodule Master do
     new_master_data =
       case Order.check_valid_order(new_order_list) do
         :true->
-          temp_order_list = Order.modify_order_field(new_order_list, :delegated_elevator, :nil)
-          undelegated_orders = get_undelegated_orders(master_data, temp_order_list)
+          old_order_list = Map.get(master_data, :order_list)
+
+          unique_orders =
+            Order.modify_order_field(new_order_list, :delegated_elevator, :nil) |>
+            Order.check_and_remove_duplicates(old_order_list)
+          undelegated_orders = Order.extract_orders(:nil, unique_orders)
 
           connected_elevators = Map.get(master_data, :connected_elevators)
           delegated_orders = delegate_orders(undelegated_orders, connected_elevators)
@@ -644,26 +654,6 @@ defmodule Master do
     end)
 
     delegated_orders
-  end
-
-
-  @doc """
-  Function that gets a set of undelegated orders (orders with the field
-  :delegated_elevator set to :nil). It can take in a new list of orders, and
-  adds these orders to the list of undelegated orders. Note that it will only
-  add new orders that does not have a similar order in the original list
-  """
-  defp get_undelegated_orders(
-        master_data,
-        new_order_list \\ [])
-  do
-    old_order_list = Map.get(master_data, :order_list, [])
-
-    old_nil_delegated_orders = Order.extract_orders(:nil, old_order_list)
-    new_nil_delegated_orders = Order.extract_orders(:nil, new_order_list)
-
-    Order.check_and_remove_duplicates(new_nil_delegated_orders, old_nil_delegated_orders) |>
-      Order.add_orders(old_nil_delegated_orders)
   end
 
 

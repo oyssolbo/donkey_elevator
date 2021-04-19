@@ -3,8 +3,6 @@ defmodule Client do
   Module wrapping the ID for each client that exist between between
   two modules. This module is implemented to standardize the identification
   of client between the modules
-
-  But yeah, this does not need to be it's own module.
   """
 
   require Timer
@@ -152,6 +150,24 @@ defmodule Client do
 
 
   @doc """
+  Function to start all timers in a list of clients
+
+  The function assumes that the parameter 'clients' is a list
+  """
+  def start_all_client_timers(
+        clients,
+        process_name,
+        interrupt_atom_name,
+        timeout_time)
+  when clients |> is_list()
+  do
+    Enum.map(clients, fn client ->
+      client_id = Map.get(client, :client_id)
+      Timer.start_timer(process_name, client, :client_timer, {interrupt_atom_name, client_id}, timeout_time)
+    end)
+  end
+
+  @doc """
   Function to cancel the timers in a list of clients
 
   The function assumes that the parameter 'clients' is a list
@@ -159,7 +175,7 @@ defmodule Client do
   def cancel_all_client_timers(clients)
   when clients |> is_list()
   do
-    Enum.map(clients, fn client -> Timer.stop_timer(client, :client_timer) end)
+    Enum.each(clients, fn client -> Timer.stop_timer(client, :client_timer) end)
   end
 
 end

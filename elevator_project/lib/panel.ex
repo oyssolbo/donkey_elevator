@@ -26,8 +26,9 @@ defmodule Panel do
     @node_name          :panel
 
     @doc """
-    Initializes the panel module by spawning the function 'check_and_send_orders'. If this
-    process dies, the Supervisor restarts
+    Initializes the panel module by spawning the function 'check_and_send_orders'. The
+    init-function requires the parameter 'floor_table' to be a list ranging from @min_floor
+    to @max_floor
     """
     def init(floor_table)
     do
@@ -51,7 +52,7 @@ defmodule Panel do
     """
     def terminate(_reason, _state)
     do
-      Logger.info("Panel given order to terminate. Terminating")
+      Logger.error("Panel given order to terminate. Terminating")
       Process.exit(self(), :normal)
     end
 

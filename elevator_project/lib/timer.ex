@@ -33,7 +33,8 @@ defmodule Timer do
 
 
   @doc """
-  Function to stop a timer - if necessary
+  Function to stop a timer - if necessary. The function assumes that the input
+  is a struct / map containing a reference to a timer-object that can be stopped
   """
   def stop_timer(
         data_struct,
@@ -65,7 +66,7 @@ defmodule Timer do
   """
   def set_utc_time(data_struct, variable_name)
   do
-    utc_time = Time.utc_now()
+    utc_time = get_utc_time()
     Map.put(data_struct, variable_name, utc_time)
   end
 

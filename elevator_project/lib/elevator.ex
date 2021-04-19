@@ -157,6 +157,7 @@ defmodule Elevator do
   @doc """
   Functions for broadcasting different information to other nodes:
     broadcast_elevator_init: broadcasts to all nodes that the elevator is just initialized
+    broadcast_elevator_obstruction: broadcasts to all nodes that the elevator has an obstruction
     broadcast_served_orders: broadcasts a list of orders that the elevator has served
     broadcast_elevator_status: broadcast the status (dir, last_floor) to all other nodes, such
       that active master will receive the update
@@ -164,6 +165,11 @@ defmodule Elevator do
   defp broadcast_elevator_init()
   do
     spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master_receive, :elevator_init) end)
+  end
+
+  defp broadcast_elevator_obstruction()
+  do
+    spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master_receive, :elevator_obstruction) end)
   end
 
   @doc """
@@ -472,6 +478,7 @@ defmodule Elevator do
     case Driver.get_obstruction_switch_state() do
       :active->
         Logger.warning("Obstruction active. Keeping the door open")
+        broadcast_elevator_obstruction()
         Timer.interrupt_after(self(), :door_timer, @door_time)
         :door_state
 

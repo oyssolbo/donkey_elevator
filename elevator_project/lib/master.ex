@@ -476,8 +476,6 @@ defmodule Master do
         master_data)
   when emergency_atom in [:elevator_timeout, :elevator_init, :elevator_obstruction]
   do
-    Logger.warning("Elevator experienced an error (timeout, init, obstruction)")
-
     # Find and remove the connection
     elevator_list = Map.get(master_data, :connected_elevators)
     updated_elevator_list =

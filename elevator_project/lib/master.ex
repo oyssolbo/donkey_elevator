@@ -126,6 +126,9 @@ defmodule Master do
       {:elevator, from_node, _message_id, :elevator_init} ->
         GenStateMachine.cast(@node_name, {:elevator_init, from_node})
 
+      {:elevator, from_node, _message_id, :elevator_obstruction} ->
+        GenStateMachine.cast(@node_name, {:elevator_obstruction, from_node})
+
       {:elevator, from_node, message_id, {:elevator_served_order, served_order_list, ack_pid}} ->
         Network.send_data_spesific_node(:master, ack_pid, from_node, {message_id, :ack})
         GenStateMachine.cast(@node_name, {:elevator_served_order, from_node, served_order_list})
@@ -471,9 +474,9 @@ defmodule Master do
         {emergency_atom, elevator_id},
         :active_state,
         master_data)
-  when emergency_atom in [:elevator_timeout, :elevator_init]
+  when emergency_atom in [:elevator_timeout, :elevator_init, :elevator_obstruction]
   do
-    Logger.warning("Elevator timed out")
+    Logger.warning("Elevator experienced an error (timeout, init, obstruction)")
 
     # Find and remove the connection
     elevator_list = Map.get(master_data, :connected_elevators)

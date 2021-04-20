@@ -1,6 +1,6 @@
 defmodule Network do
   @moduledoc """
-  Module for casting and receiving nodenames via UDP broadcast
+  Module to set up the node network and provide easy to use send functions
   Dependencies:
   -UDP
   """
@@ -13,29 +13,27 @@ defmodule Network do
   @node_cookie      Application.fetch_env!(:elevator_project, :project_cookie_name)
 
   @doc """
-  Init the node nettork on the machine
-  Remember to run "epmd -daemon" in terminal (not in iex) befrore running program for the first time after a reboot
-  Otherwise the error "econrefused" might apear and the network will not work
+  Function to start a distributed elixir Node and reapeatedly broadcast the node name on the local network.
+  The function will also connect to received node names.
+
+  Remember to run "epmd -daemon" in  the terminal (not in iex) befrore starting the program for the first time.
+  Otherwise the error "econrefused" might occur
   """
   def init_node_network()
   do
     ip = UDP.get_ip()
-    node_name_s = Kernel.inspect(:rand.uniform(10000)) <> "@" <> ip #use for testing where elevator/ node does not need to be restarted
-    #node_name_s = @static_node_name <> "@" <> ip # use for testing where the elevator/node needs to be restarted, assures constant node_name
+    node_name_s = get_random_node_name() <> "@" <> ip
     node_name_a = String.to_atom(node_name_s)
     start_node(node_name_a)
 
     UDP.broadcast_listen() #listen for other nodes forever
-    UDP.broadcast_cast(node_name_s) #cast node names forever
+    UDP.broadcast_cast(node_name_s) #cast node name forever
 
   end
 
 
   @doc """
-  Initializing a node with name 'name' and cookie 'cookie'
-
-  The function returns the :pid if it is started in distributed mode, or
-  self() if unable to start in distirbuted mode
+  Function to Initializie a Elixir distributed node
   """
   def start_node(
         name,
@@ -52,9 +50,7 @@ defmodule Network do
     end
   end
 
-  @doc """
-  Connects the node to node-network
-  """
+
   def connect_node_network(node)
   do
     case Node.ping(node) do
@@ -75,9 +71,12 @@ defmodule Network do
 
 
   @doc """
-  Send data to all other known nodes  on the network to the process receiver_id, iteration should be left blank
+  Send data to all OTHER known nodes on the network to the process receiver_id
   """
-  def send_data_all_other_nodes(sender_id, receiver_id, data)
+  def send_data_all_other_nodes(
+        sender_id,
+        receiver_id,
+        data)
   when sender_id |> is_atom()
   and receiver_id |> is_atom()
   do
@@ -91,9 +90,12 @@ defmodule Network do
 
 
   @doc """
-  Send data to all known nodes on the network (including itself) to the process receiver_id, iteration should be left blank
+  Send data to ALL known nodes on the network (including itself) to the process receiver_id
   """
-  def send_data_all_nodes(sender_id, receiver_id, data)
+  def send_data_all_nodes(
+        sender_id,
+        receiver_id,
+        data)
   when sender_id |> is_atom()
   and receiver_id |> is_atom()
   do
@@ -106,10 +108,13 @@ defmodule Network do
   end
 
 
-  @doc """
-  heper function to send_data_all_nodes
-  """
-  defp send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id, iteration \\ 0)
+  defp send_data_all_nodes_loop(
+        sender_id,
+        receiver_id,
+        data,
+        network_list,
+        message_id,
+        iteration \\ 0)
   do
     receiver_node = Enum.at(network_list, iteration)
 
@@ -123,7 +128,10 @@ defmodule Network do
   @doc """
   Send data locally (on the same node) to the process receiver_id
   """
-  def send_data_inside_node(sender_id, receiver_id, data)
+  def send_data_inside_node(
+        sender_id,
+        receiver_id,
+        data)
   when sender_id |> is_atom()
   and receiver_id |> is_atom()
   do
@@ -139,7 +147,11 @@ defmodule Network do
   @doc """
   Send data to the spesific process "receiver_id" on the spesific node "receiver_node"
   """
-  def send_data_spesific_node(sender_id, receiver_id, receiver_node, data)
+  def send_data_spesific_node(
+        sender_id,
+        receiver_id,
+        receiver_node,
+        data)
   when sender_id |> is_atom()
   and receiver_id |> is_atom()
   and receiver_node |> is_atom()
@@ -151,7 +163,7 @@ defmodule Network do
 
 
   @doc """
-  Function that looks for acks with the message_id, message_id
+  Function that looks for acks with the correct message_id
   """
   def receive_ack(message_id)
   do
@@ -162,6 +174,18 @@ defmodule Network do
       after @ack_timeout ->
         {:no_ack, :no_id}
     end
+  end
+
+  @doc """
+  Function to generate 5 random letters for a unique node name
+  """
+  def get_random_node_name()
+  do
+    Stream.repeatedly(fn -> Enum.random(65..90) end)
+    |> Stream.uniq
+      |> Enum.take(5)
+      |> List.to_string()
+
   end
 
 end

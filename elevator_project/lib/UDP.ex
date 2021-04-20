@@ -1,7 +1,6 @@
 defmodule UDP do
   @moduledoc """
-  Module granting basic functionality for networking, such as getting ip-address,
-  broadcasting and listening to messages
+  Module granting basic functionality for networking, such as getting ip-addresses and peer discovery
   """
 
   require Logger
@@ -50,7 +49,7 @@ defmodule UDP do
 
 
   @doc """
-  Helper function to open UDP socket on the broadcast port with the broadcast options
+  Helper function to open UDP socket with the broadcast options
   """
   def broadcast_open_socket(port \\ @broadcast_port)
   do
@@ -128,6 +127,8 @@ defmodule UDP do
       {:error, reason} ->
         Logger.error("Failed to receive due to #{reason}")
     end
+
     broadcast_receive_and_connect(socket)
   end
+
 end

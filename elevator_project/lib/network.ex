@@ -73,7 +73,10 @@ defmodule Network do
   @doc """
   Send data to all OTHER known nodes on the network to the process receiver_id
   """
-  def send_data_all_other_nodes(sender_id, receiver_id, data)
+  def send_data_all_other_nodes(
+        sender_id,
+        receiver_id,
+         data)
   when sender_id |> is_atom()
   and receiver_id |> is_atom()
   do
@@ -89,7 +92,10 @@ defmodule Network do
   @doc """
   Send data to ALL known nodes on the network (including itself) to the process receiver_id
   """
-  def send_data_all_nodes(sender_id, receiver_id, data)
+  def send_data_all_nodes(
+        sender_id,
+        receiver_id,
+        data)
   when sender_id |> is_atom()
   and receiver_id |> is_atom()
   do
@@ -102,7 +108,13 @@ defmodule Network do
   end
 
 
-  defp send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id, iteration \\ 0)
+  defp send_data_all_nodes_loop(
+        sender_id,
+        receiver_id,
+        data,
+        network_list,
+        message_id,
+        iteration \\ 0)
   do
     receiver_node = Enum.at(network_list, iteration)
 
@@ -116,7 +128,10 @@ defmodule Network do
   @doc """
   Send data locally (on the same node) to the process receiver_id
   """
-  def send_data_inside_node(sender_id, receiver_id, data)
+  def send_data_inside_node(
+        sender_id,
+        receiver_id,
+        data)
   when sender_id |> is_atom()
   and receiver_id |> is_atom()
   do
@@ -132,7 +147,11 @@ defmodule Network do
   @doc """
   Send data to the spesific process "receiver_id" on the spesific node "receiver_node"
   """
-  def send_data_spesific_node(sender_id, receiver_id, receiver_node, data)
+  def send_data_spesific_node(
+        sender_id,
+        receiver_id,
+        receiver_node,
+        data)
   when sender_id |> is_atom()
   and receiver_id |> is_atom()
   and receiver_node |> is_atom()

@@ -19,7 +19,7 @@ The system is configured in a semi-peer-to-peer solution, set up in a way such t
 Each machine is capable of operating its local elevator independently, via the four mentioned module instances. In the case where several 
 machines are connected together, only the ```Master``` module will know, or care. They will then agree amongst themselves who will take on 
 the role of 'active' (controlling the distribution of orders) and who will remain in a standby state - acting as backup, similar to the
-configuration found in process-pairs. The other modules will simply behave as if there are 3 masters and send data to every active node. Only the active master will act on the received data from the other modules.
+configuration found in process-pairs. The other modules will simply behave as if there are _n_ masters and send data to every active node. Only the active master will act on the received data from the other modules.
 
 
 ## Running the project

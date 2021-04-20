@@ -1,6 +1,6 @@
 defmodule Network do
   @moduledoc """
-  Module for casting and receiving nodenames via UDP broadcast
+  Module to set up and the network and provide easy tp use send functions
   Dependencies:
   -UDP
   """
@@ -17,13 +17,12 @@ defmodule Network do
   The function will also connect to received node names
   -
   Remember to run "epmd -daemon" in terminal (not in iex) befrore running the program for the first time after a reboot.
-  Otherwise the error "econrefused" might apear and the network will not work
+  Otherwise the error "econrefused" might occur
   """
   def init_node_network()
   do
     ip = UDP.get_ip()
-    node_name_s = Kernel.inspect(:rand.uniform(10000)) <> "@" <> ip #use for testing where the node name must be unique on
-    #node_name_s = @static_node_name <> "@" <> ip
+    node_name_s = get_random_node_name() <> "@" <> ip
     node_name_a = String.to_atom(node_name_s)
     start_node(node_name_a)
 
@@ -156,6 +155,18 @@ defmodule Network do
       after @ack_timeout ->
         {:no_ack, :no_id}
     end
+  end
+
+  @doc """
+  Function to generate 5 random letter
+  """
+  def get_random_node_name()
+  do
+    Stream.repeatedly(fn -> Enum.random(65..90) end)
+    |> Stream.uniq
+    |> Enum.take(5)
+    |> List.to_string()
+
   end
 
 end

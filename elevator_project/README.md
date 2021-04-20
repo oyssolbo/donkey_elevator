@@ -4,7 +4,22 @@ Repository maintaining terrible elixir-code for the elevator-project in TTK4145 
 
 
 ## File-structure
-The project's source code is found inside _/lib_, with the supervisors being inside _/lib/supervisors_
+The project's source code is found inside _/lib_, with the supervisors being inside _/lib/supervisors_. 
+
+## Comunication
+The modules comunicate between each other via message passing based on the function in the Network module.  
+Master    <-> Panel  
+Master    <-> Elevator  
+Master     -> Lights  
+Elevator   -> Panel  
+Elevator   -> Lights  
+
+The system is configured in a semi-peer-to-peer solution, set up in a way such that each machine has an instance of the following modules: 
+```Master```, ```Elevator```, ```Panel``` and ```Lights```. These are consistent, concurrent processes, monitored by supervisors. 
+Each machine is capable of operating its local elevator independently, via the four mentioned module instances. In the case where several 
+machines are connected together, only the ```Master``` module will know, or care. They will then agree amongst themselves who will take on 
+the role of 'active' (controlling the distribution of orders) and who will remain in a standby state - acting as backup, similar to the
+configuration found in process-pairs. The other modules will simply behave as if there are 3 masters and send data to every active node. Only the active master will act on the received data from the other modules.
 
 
 ## Running the project

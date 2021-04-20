@@ -128,6 +128,8 @@ defmodule UDP do
       {:error, reason} ->
         Logger.error("Failed to receive due to #{reason}")
     end
+
     broadcast_receive_and_connect(socket)
   end
+
 end

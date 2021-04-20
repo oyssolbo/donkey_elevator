@@ -1,6 +1,6 @@
 defmodule Network do
   @moduledoc """
-  Module to set up and the network and provide easy tp use send functions
+  Module to set up the node network and provide easy to use send functions
   Dependencies:
   -UDP
   """
@@ -164,8 +164,8 @@ defmodule Network do
   do
     Stream.repeatedly(fn -> Enum.random(65..90) end)
     |> Stream.uniq
-    |> Enum.take(5)
-    |> List.to_string()
+      |> Enum.take(5)
+      |> List.to_string()
 
   end
 

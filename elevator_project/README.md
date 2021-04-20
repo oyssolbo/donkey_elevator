@@ -31,5 +31,5 @@ This starts the supervision-tree, and enables all modules on the node. By corres
 The project's source code is found inside _/lib_, with the supervisors being inside _/lib/supervisors_
 
 ## External libraries used
-- Poison 4.0.1
+- Poison 4.0.1 - Lightweight JSON library for Elixir. See documentation, https://hexdocs.pm/poison/Poison.html
 

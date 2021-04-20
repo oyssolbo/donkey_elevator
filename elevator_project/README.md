@@ -11,7 +11,7 @@ The modules comunicate between each other via message passing based on the funct
 Master    <-> Panel
 Master    <-> Elevator
 Master     -> Lights
-Elevator  <-> Panel
+Elevator   -> Panel
 Elevator   -> Lights
 
 

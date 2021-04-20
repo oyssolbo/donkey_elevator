@@ -111,11 +111,7 @@ defmodule Master do
 
   @doc """
   Receives messages from elevator, panel or other master. The function casts a message
-  to the GenStateMachine-server, such that all events can be handled properly. The module
-  is operating with multiple receive-threads, and the events are written out to separate
-  the events between the receive-functions. Otherwise - if a general {event_name, data}
-  is used, it would allow {message_id, :ack} to interfere. Secondly, it gives greater
-  freedom to design the interactions better
+  to the GenStateMachine-server, such that all events can be handled properly.
   """
   defp receive_thread()
   do

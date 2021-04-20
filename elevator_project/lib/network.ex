@@ -13,29 +13,28 @@ defmodule Network do
   @node_cookie      Application.fetch_env!(:elevator_project, :project_cookie_name)
 
   @doc """
-  Init the node nettork on the machine
-  Remember to run "epmd -daemon" in terminal (not in iex) befrore running program for the first time after a reboot
+  Function to start a distributed elixir Node and reapeatedly broadcast the node name on the local network.
+  The function will also connect to received node names
+  -
+  Remember to run "epmd -daemon" in terminal (not in iex) befrore running the program for the first time after a reboot.
   Otherwise the error "econrefused" might apear and the network will not work
   """
   def init_node_network()
   do
     ip = UDP.get_ip()
-    node_name_s = Kernel.inspect(:rand.uniform(10000)) <> "@" <> ip #use for testing where elevator/ node does not need to be restarted
-    #node_name_s = @static_node_name <> "@" <> ip # use for testing where the elevator/node needs to be restarted, assures constant node_name
+    node_name_s = Kernel.inspect(:rand.uniform(10000)) <> "@" <> ip #use for testing where the node name must be unique on
+    #node_name_s = @static_node_name <> "@" <> ip
     node_name_a = String.to_atom(node_name_s)
     start_node(node_name_a)
 
     UDP.broadcast_listen() #listen for other nodes forever
-    UDP.broadcast_cast(node_name_s) #cast node names forever
+    UDP.broadcast_cast(node_name_s) #cast node name forever
 
   end
 
 
   @doc """
-  Initializing a node with name 'name' and cookie 'cookie'
-
-  The function returns the :pid if it is started in distributed mode, or
-  self() if unable to start in distirbuted mode
+  Function to Initializie a Elixir distributed node
   """
   def start_node(
         name,
@@ -52,9 +51,7 @@ defmodule Network do
     end
   end
 
-  @doc """
-  Connects the node to node-network
-  """
+
   def connect_node_network(node)
   do
     case Node.ping(node) do
@@ -75,7 +72,7 @@ defmodule Network do
 
 
   @doc """
-  Send data to all other known nodes  on the network to the process receiver_id, iteration should be left blank
+  Send data to all OTHER known nodes  on the network to the process receiver_id
   """
   def send_data_all_other_nodes(sender_id, receiver_id, data)
   when sender_id |> is_atom()
@@ -91,7 +88,7 @@ defmodule Network do
 
 
   @doc """
-  Send data to all known nodes on the network (including itself) to the process receiver_id, iteration should be left blank
+  Send data to ALL known nodes on the network (including itself) to the process receiver_id
   """
   def send_data_all_nodes(sender_id, receiver_id, data)
   when sender_id |> is_atom()
@@ -106,9 +103,6 @@ defmodule Network do
   end
 
 
-  @doc """
-  heper function to send_data_all_nodes
-  """
   defp send_data_all_nodes_loop(sender_id, receiver_id, data, network_list, message_id, iteration \\ 0)
   do
     receiver_node = Enum.at(network_list, iteration)

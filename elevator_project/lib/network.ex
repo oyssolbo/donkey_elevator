@@ -14,9 +14,9 @@ defmodule Network do
 
   @doc """
   Function to start a distributed elixir Node and reapeatedly broadcast the node name on the local network.
-  The function will also connect to received node names
-  -
-  Remember to run "epmd -daemon" in terminal (not in iex) befrore running the program for the first time after a reboot.
+  The function will also connect to received node names.
+
+  Remember to run "epmd -daemon" in  the terminal (not in iex) befrore starting the program for the first time.
   Otherwise the error "econrefused" might occur
   """
   def init_node_network()
@@ -71,7 +71,7 @@ defmodule Network do
 
 
   @doc """
-  Send data to all OTHER known nodes  on the network to the process receiver_id
+  Send data to all OTHER known nodes on the network to the process receiver_id
   """
   def send_data_all_other_nodes(sender_id, receiver_id, data)
   when sender_id |> is_atom()
@@ -144,7 +144,7 @@ defmodule Network do
 
 
   @doc """
-  Function that looks for acks with the message_id, message_id
+  Function that looks for acks with the correct message_id
   """
   def receive_ack(message_id)
   do
@@ -158,7 +158,7 @@ defmodule Network do
   end
 
   @doc """
-  Function to generate 5 random letter
+  Function to generate 5 random letters for a unique node name
   """
   def get_random_node_name()
   do

@@ -150,8 +150,9 @@ defmodule Master do
 
 
   @doc """
-  Sends a list of orders to an elevator. Continues to try until it receives an ack or a certain amount of
-  time has passed. If no response from elevator, it is removed from the list. Conter and ack_pid should be left blank.
+  Sends a list of orders to an elevator. Continues to try until it receives an ack or @max_resends times.
+  If no response from elevator, it is removed from the list. Conter and ack_pid should be left blank.
+  Must be spawned as a new process to avoid conflicts with Process.register
   """
   defp send_order_to_elevator(
         order_list,
@@ -189,7 +190,7 @@ defmodule Master do
         _ack_pid)
   when counter == @max_resends
   do
-    Logger.info("Master is unable to send order to elevator")
+    Logger.warning("Master is unable to send order to elevator")
 
     # We can assume that the elevator has received a timeout
     GenStateMachine.cast(@node_name, {:elevator_timeout, elevator_id})

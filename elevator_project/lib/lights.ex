@@ -3,7 +3,7 @@ defmodule Lights do
   Module for setting lights. The module receives a list of active orders
   and sets the corresponding lights high.
 
-  The module must send messages to elevator and master. Lights are set based on updates
+  The module must receive messages from elevator and master. Lights are set based on updates
   from these modules. All other lights are cleared, and by updating which orders are
   active, the lights are indirectly cleared.
 
@@ -154,7 +154,7 @@ defmodule Lights do
 
 
   @doc """
-  Handler that sets the door as 'state'
+  Handler that sets the door-light as 'state'
   """
   def handle_cast(
         {:set_door_light, state},

@@ -1,20 +1,15 @@
 defmodule Elevator do
   @moduledoc """
-  Module implementing the elevator for the project.
-  The elevator is implemented using GenStateMachine, and has the following states and transitions:
+  Module implementing the elevator for the project
 
     States:               Transitions to:
       - :init_state         :idle_state, :restart_state
       - :idle_state         :moving_state
-      - :moving_state       :door_state, :restart_state
+      - :moving_state       :door_state, :restart_state, :idle_state
       - :door_state         :idle_state
       - :restart_state      :restart_state
 
-  The module interacts with the modules Master, Panel and Lights through message-passing. Each message
-  is received by 'receive_thread', and depending on the parameters in the message, a corresponding
-  event in GenStateMachine is triggered.
-
-  Dependencies:
+  Requirements:
     - Driver
     - Network
     - Order
@@ -166,6 +161,9 @@ defmodule Elevator do
     spawn_link(fn -> Network.send_data_all_nodes(:elevator, :master_receive, :elevator_init) end)
   end
 
+  @doc """
+  Must be started as a new process with spawn() or spawn_link() !!, ack_pid and counter should be left blank
+  """
   defp broadcast_served_orders(
         orders,
         counter \\ 0,
@@ -185,7 +183,7 @@ defmodule Elevator do
       Process.register(self(), ack_pid)
     end
 
-    Logger.info("Elevator sending served orders to master")
+    Logger.info("Sending served orders to master")
     message_id = Network.send_data_all_nodes(:elevator, :master_receive, {:elevator_served_order, orders, ack_pid})
 
     case Network.receive_ack(message_id) do
@@ -202,8 +200,9 @@ defmodule Elevator do
         _ack_pid)
   when counter == @max_resends
   do
-    Logger.warning("Elevator was unable to confirm served orders with master")
+    Logger.info("Elevator was unable to confirm served orders with master")
   end
+
 
   defp broadcast_elevator_status(
         last_dir,
@@ -270,7 +269,7 @@ defmodule Elevator do
         :restart_state,
         elevator_data)
   do
-    Logger.warning("Elevator received order(s) while in restart_state. Order(s) not accepted!")
+    Logger.info("Elevator received order(s) while in restart_state. Order(s) not accepted!")
     {:next_state, :restart_state, elevator_data}
   end
 
@@ -340,7 +339,7 @@ defmodule Elevator do
         :init_state,
         elevator_data)
   do
-    Logger.error("Elevator did not get to a defined floor before timeout. Restarting")
+    Logger.info("Elevator did not get to a defined floor before timeout. Restarting")
     kill_process()
     {:next_state, :restart_state, elevator_data}
   end
@@ -446,7 +445,7 @@ defmodule Elevator do
         :moving_state,
         elevator_data)
   do
-    Logger.error("Elevator spent too long time moving. Engine failure - restarting.")
+    Logger.info("Elevator spent too long time moving. Engine failure - restarting.")
     kill_process()
     {:next_state, :restart_state, elevator_data}
   end
@@ -464,19 +463,9 @@ defmodule Elevator do
         :door_state,
         elevator_data)
   do
-    next_state =
-    case Driver.get_obstruction_switch_state() do
-      :active->
-        Logger.warning("Obstruction active. Keeping the door open")
-        Timer.interrupt_after(self(), :door_timer, @door_time)
-        :door_state
-
-      :inactive->
-        Logger.info("Elevator closing door and going into idle")
-        close_door()
-        :idle_state
-    end
-    {:next_state, next_state, elevator_data}
+    Logger.info("Elevator closing door and going into idle")
+    close_door()
+    {:next_state, :idle_state, elevator_data}
   end
 
 # at_floor #
@@ -506,7 +495,6 @@ defmodule Elevator do
         :restart_state,
         elevator_data)
   do
-    Logger.error("General handler in :restart_state invoked. Restarting")
     kill_process()
     {:next_state, :restart_state, elevator_data}
   end
@@ -559,10 +547,6 @@ defmodule Elevator do
     GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
 
-  @doc """
-  Function that check if we are not a floor
-  If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server
-  """
   def check_at_floor(floor)
   when floor |> is_atom
   do

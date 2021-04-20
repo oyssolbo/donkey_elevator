@@ -1,4 +1,3 @@
-
 defmodule Panel do
     @moduledoc """
     Module for detecting button inputs on the elevator panel, and passing the information on

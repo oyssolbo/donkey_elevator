@@ -110,6 +110,7 @@ defmodule Client do
 
 
 ## Extract client(s) ##
+
   @doc """
   Function that finds a client with client_id: 'id' in a list of clients
 

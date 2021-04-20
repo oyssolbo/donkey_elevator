@@ -8,11 +8,11 @@ The project's source code is found inside _/lib_, with the supervisors being ins
 
 ## Comunication
 The modules comunicate between each other via message passing based on the function in the Network module.
-Master    <-> Panel
-Master    <-> Elevator
-Master     -> Lights
-Elevator   -> Panel
-Elevator   -> Lights
+Master    <-> Panel  
+Master    <-> Elevator  
+Master     -> Lights  
+Elevator   -> Panel  
+Elevator   -> Lights  
 
 
 ## Running the project

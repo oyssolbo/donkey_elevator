@@ -556,10 +556,6 @@ defmodule Elevator do
     GenStateMachine.cast(@node_name, {:at_floor, floor})
   end
 
-  @doc """
-  Function that check if we are not a floor
-  If true (on floor {0, 1, 2, ...}) it sends a message to the GenStateMachine-server
-  """
   def check_at_floor(floor)
   when floor |> is_atom
   do

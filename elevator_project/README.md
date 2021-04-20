@@ -27,3 +27,6 @@ ElevatorProject.Application.start([], [])
 ```
 This starts the supervision-tree, and enables all modules on the node. By corresponding the argument 'port' between the Simulator and the Driver, multiple elevators can be runned simultaneously
 
+## File-structure
+The project's source code is found inside _/lib_, with the supervisors being inside _/lib/supervisors_
+

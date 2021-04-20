@@ -14,6 +14,13 @@ Master     -> Lights
 Elevator   -> Panel  
 Elevator   -> Lights  
 
+The system is configured in a semi-peer-to-peer solution, set up in a way such that each machine has an instance of the following modules: 
+```Master```, ```Elevator```, ```Panel``` and ```Lights```. These are consistent, concurrent processes, monitored by supervisors. 
+Each machine is capable of operating its local elevator independently, via the four mentioned module instances. In the case where several 
+machines are connected together, only the ```Master``` module will know, or care. They will then agree amongst themselves who will take on 
+the role of 'active', and control the distribution of orders, and who will remain in a standby state - acting as backup, similar to the
+configuration found in process-pairs.
+
 
 ## Running the project
 

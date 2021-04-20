@@ -76,7 +76,7 @@ defmodule Network do
   def send_data_all_other_nodes(
         sender_id,
         receiver_id,
-         data)
+        data)
   when sender_id |> is_atom()
   and receiver_id |> is_atom()
   do
